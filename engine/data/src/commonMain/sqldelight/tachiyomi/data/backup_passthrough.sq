@@ -1,0 +1,19 @@
+CREATE TABLE backup_passthrough(
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    payload BLOB NOT NULL
+);
+
+findByKind:
+SELECT payload
+FROM backup_passthrough
+WHERE kind = :kind
+ORDER BY _id;
+
+deleteByKind:
+DELETE FROM backup_passthrough
+WHERE kind = :kind;
+
+insert:
+INSERT INTO backup_passthrough (kind, payload)
+VALUES (:kind, :payload);

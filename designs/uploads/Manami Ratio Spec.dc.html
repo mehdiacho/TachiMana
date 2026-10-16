@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><style>body{margin:0;background:#101014;font-family:system-ui,sans-serif}a{color:#8fb8e8}a:hover{color:#b3d1f0}</style></helmet>
+<div style="max-width:1060px;margin:0 auto;padding:44px 36px 80px;color:#cfd2d8">
+<div style="font:700 26px system-ui;color:#fff">Manami — Ratio Spec</div>
+<div style="font:12px ui-monospace,monospace;color:rgba(255,255,255,.45);margin:6px 0 28px">v1 · desktop app · companion to “Manami Explorations” turn 3 (<a href="Manami Explorations.dc.html">canvas</a>) · derived from yokai@master res/values</div>
+
+<div style="font:600 17px system-ui;color:#fff;margin:26px 0 8px">§0 · How to read this spec</div>
+<div style="font:12.5px/1.7 system-ui;color:rgba(255,255,255,.75)">Every dimension is one of three kinds. <b style="color:#fff">(a) Density</b> — type, radii, strokes, icons, padding, gaps, fixed heights: fixed density units (<span style="font-family:ui-monospace,monospace">px</span> at 1× / <span style="font-family:ui-monospace,monospace">dp</span>), never scaled by window width. <b style="color:#fff">(b) Width-class</b> — the short §1.6 whitelist that tracks available width via size-class breakpoints. <b style="color:#fff">(c) Vertical position</b> — never coordinates: every screen is an ordered flex stack of fixed/intrinsic blocks with <b style="color:#fff">exactly one</b> flexible spacer (<span style="font-family:ui-monospace,monospace">flex:1</span>) per region. Baseline reference window: <span style="font-family:ui-monospace,monospace">1440×900</span> (design mockups shown at 1240 wide); minimum window <span style="font-family:ui-monospace,monospace">1024×640</span>.</div>
+<div style="margin:12px 0 0;padding:10px 14px;border-left:3px solid #78bcff;background:rgba(120,188,255,.07);font:12px/1.6 system-ui;color:rgba(255,255,255,.75)"><b style="color:#78bcff">Key point:</b> anything not listed in §1.6 is fixed. When unsure, it is density, not width-class.</div>
+
+<div style="font:600 17px system-ui;color:#fff;margin:30px 0 8px">§1 · Foundation tokens</div>
+<div style="font:600 13px system-ui;color:#e8e6e3;margin:14px 0 6px">§1.1–1.2 · Color — all themes (user-selectable; ship all)</div>
+<div style="font:11.5px/1.5 system-ui;color:rgba(255,255,255,.6);margin-bottom:8px">Default at first run: <b style="color:#78bcff">Yokai (dark)</b>. Values verbatim from <span style="font-family:ui-monospace,monospace">app/src/main/res/values{,-night}/colors.xml</span>. “surface” = elevated surface / primaryVariant; “accent” = colorSecondary (active controls, selection); onPrimary = text on primary.</div>
+<table style="width:100%;border-collapse:collapse">
+<thead><tr>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">THEME</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">SCHEME</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">BACKGROUND</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">SURFACE</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">PRIMARY</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">ON-PRIMARY</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">ACCENT</th>
+<th style="padding:5px 8px;text-align:left;font:600 10px ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.2)">NOTE</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{ themeRows }}" as="r" hint-placeholder-count="16">
+<tr>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;white-space:nowrap">{{ r.n }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;color:rgba(255,255,255,.55)">{{ r.sc }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ r.bg }};outline:1px solid rgba(255,255,255,.2);margin-right:6px;vertical-align:-1px"></span>{{ r.bg }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ r.su }};outline:1px solid rgba(255,255,255,.2);margin-right:6px;vertical-align:-1px"></span>{{ r.su }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ r.p }};outline:1px solid rgba(255,255,255,.2);margin-right:6px;vertical-align:-1px"></span>{{ r.p }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ r.op }};outline:1px solid rgba(255,255,255,.2);margin-right:6px;vertical-align:-1px"></span>{{ r.op }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ r.ac }};outline:1px solid rgba(255,255,255,.2);margin-right:6px;vertical-align:-1px"></span>{{ r.ac }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px system-ui;color:rgba(255,255,255,.55)">{{ r.note }}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<div style="font:11.5px/1.6 system-ui;color:rgba(255,255,255,.6);margin:8px 0 0">Semantic (theme-independent): sync-ok <span style="font-family:ui-monospace,monospace">#7ADC77</span> · sync-active = theme primary, pulsing · download badge <span style="font-family:ui-monospace,monospace">#2E7D32</span> dark / <span style="font-family:ui-monospace,monospace">#99CC99</span> light · unread badge = primary · error <span style="font-family:ui-monospace,monospace">#F44336</span> · splash <span style="font-family:ui-monospace,monospace">#0E1418</span> (yokai_background) · divider <span style="font-family:ui-monospace,monospace">rgba(fg,.08)</span>, strong <span style="font-family:ui-monospace,monospace">rgba(fg,.14)</span>. AMOLED option: background → <span style="font-family:ui-monospace,monospace">#000000</span>, surfaces unchanged.</div>
+
+<div style="font:600 13px system-ui;color:#e8e6e3;margin:20px 0 6px">§1.3 · Type scale (fixed; family: system-ui / SF / Segoe / Roboto)</div>
+<table style="width:100%;border-collapse:collapse">
+<sc-for list="{{ typeRows }}" as="r" hint-placeholder-count="9">
+<tr>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;width:160px">{{ r.n }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;color:#9fd0ff;width:230px">{{ r.v }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px system-ui;color:rgba(255,255,255,.55)">{{ r.u }}</td>
+</tr>
+</sc-for>
+</table>
+
+<div style="font:600 13px system-ui;color:#e8e6e3;margin:20px 0 6px">§1.4 · Spacing scale (fixed)</div>
+<table style="width:100%;border-collapse:collapse">
+<sc-for list="{{ spaceRows }}" as="r" hint-placeholder-count="6">
+<tr>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;width:160px">{{ r.n }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;color:#9fd0ff;width:230px">{{ r.v }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px system-ui;color:rgba(255,255,255,.55)">{{ r.u }}</td>
+</tr>
+</sc-for>
+</table>
+
+<div style="font:600 13px system-ui;color:#e8e6e3;margin:20px 0 6px">§1.5 · Corner radius (fixed)</div>
+<table style="width:100%;border-collapse:collapse">
+<sc-for list="{{ radiusRows }}" as="r" hint-placeholder-count="6">
+<tr>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;width:160px">{{ r.n }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;color:#9fd0ff;width:230px">{{ r.v }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px system-ui;color:rgba(255,255,255,.55)">{{ r.u }}</td>
+</tr>
+</sc-for>
+</table>
+
+<div style="font:600 13px system-ui;color:#e8e6e3;margin:20px 0 6px">§1.6 · Width-class elements — the ONLY things that scale with window width</div>
+<table style="width:100%;border-collapse:collapse">
+<sc-for list="{{ widthRows }}" as="r" hint-placeholder-count="7">
+<tr>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;width:220px">{{ r.n }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;color:#9fd0ff">{{ r.v }}</td>
+</tr>
+</sc-for>
+</table>
+<div style="margin:10px 0 0;padding:10px 14px;border-left:3px solid #F3B375;background:rgba(243,179,117,.07);font:12px/1.6 system-ui;color:rgba(255,255,255,.75)"><b style="color:#F3B375">Desktop rule:</b> panes don't use %-widths — they are fixed columns; the ONE flexible region per screen (library grid / browse grid / reader canvas) absorbs all leftover width. Window size-classes: <span style="font-family:ui-monospace,monospace">compact &lt;1200</span> (details pane becomes overlay), <span style="font-family:ui-monospace,monospace">medium 1200–1599</span>, <span style="font-family:ui-monospace,monospace">expanded ≥1600</span> (activity pane may stay open in Recents).</div>
+
+<div style="font:600 17px system-ui;color:#fff;margin:30px 0 8px">§2 · Shared components (specified once; screens reference by §)</div>
+<table style="width:100%;border-collapse:collapse">
+<sc-for list="{{ compRows }}" as="r" hint-placeholder-count="16">
+<tr>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;width:190px;white-space:nowrap;vertical-align:top">{{ r.id }} {{ r.n }}</td>
+<td style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11.5px/1.6 ui-monospace,monospace;color:rgba(255,255,255,.7)">{{ r.spec }}</td>
+</tr>
+</sc-for>
+</table>
+
+<div style="font:600 17px system-ui;color:#fff;margin:30px 0 8px">§3 · Screen recipes (ordered flex stacks; ★ = the single flexible spacer)</div>
+<sc-for list="{{ screens }}" as="s" hint-placeholder-count="6">
+<div style="margin:0 0 16px">
+<div style="font:600 13px system-ui;color:#e8e6e3;margin-bottom:4px">{{ s.n }}</div>
+<div style="font:11.5px/1.75 ui-monospace,monospace;color:rgba(255,255,255,.68);white-space:pre-line">{{ s.rec }}</div>
+</div>
+</sc-for>
+<div style="margin:4px 0 0;padding:10px 14px;border-left:3px solid #F3B375;background:rgba(243,179,117,.07);font:12px/1.6 system-ui;color:rgba(255,255,255,.75)"><b style="color:#F3B375">Rotated portrait mode (90°):</b> inherits §1 unchanged. Structural diffs only: whole window canvas rotates (transform on root; pointer + wheel input remapped); nav rail §2.2 is replaced by a bottom nav bar <span style="font-family:ui-monospace,monospace">h56</span> with the same three items; details/activity panes become overlays regardless of width-class; hotkey <span style="font-family:ui-monospace,monospace">Ctrl+R</span> cycles 0°→90°CW→90°CCW→180°; optional “follow monitor rotation” uses the OS display-orientation event.</div>
+
+<div style="font:600 17px system-ui;color:#fff;margin:30px 0 8px">§4 · Motion quick-reference</div>
+<table style="width:100%;border-collapse:collapse">
+<sc-for list="{{ motionRows }}" as="r" hint-placeholder-count="7">
+<tr>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:600 11.5px system-ui;color:#e8e6e3;width:190px">{{ r.n }}</td>
+<td style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.07);font:11px ui-monospace,monospace;color:rgba(255,255,255,.7)">{{ r.v }}</td>
+</tr>
+</sc-for>
+</table>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const themeRows = [
+      { n: "Yokai ★default", sc: "dark", bg: "#1C1C1D", su: "#202125", p: "#78bcff", op: "#071D39", ac: "#3399FF", note: "used in all turn-3 designs" },
+      { n: "Yokai / Tachiyomi", sc: "light", bg: "#FAFAFA", su: "#E5ECF4", p: "#54759E", op: "#FFFFFF", ac: "#2979FF", note: "" },
+      { n: "Midnight Dusk", sc: "dark", bg: "#16151D", su: "#272026", p: "#E570A0", op: "#370318", ac: "#F02475", note: "" },
+      { n: "Spring Blossom", sc: "light", bg: "#f7f4f8", su: "#efe3f3", p: "#a149bf", op: "#FFFFFF", ac: "#c43c97", note: "light pair of Midnight Dusk" },
+      { n: "Tako", sc: "dark", bg: "#21212E", su: "#2A2A3C", p: "#fccd9f", op: "#3C2004", ac: "#F3B375", note: "surface = surfaceTako" },
+      { n: "Tako", sc: "light", bg: "#F2EDF7", su: "#F7F5FF", p: "#463561", op: "#FFFFFF", ac: "#66577E", note: "" },
+      { n: "Teal & Sapphire", sc: "dark", bg: "#14191b", su: "#1d2528", p: "#80b8d1", op: "#02212C", ac: "#589ab8", note: "" },
+      { n: "Teal & Sapphire", sc: "light", bg: "#f0f7f7", su: "#d4f1e6", p: "#5f9c96", op: "#FFFFFF", ac: "#05B1A4", note: "" },
+      { n: "Choc. Strawberries", sc: "dark", bg: "#1a1716", su: "#2B2320", p: "#e14e4e", op: "#330303", ac: "#AA2200", note: "" },
+      { n: "Strawberry Daiquiri", sc: "light", bg: "#FAFAFA", su: "#F3E7E7", p: "#d31d3b", op: "#FFFFFF", ac: "#ED4A65", note: "" },
+      { n: "Flat Lime", sc: "dark", bg: "#202125", su: "#202125", p: "#7CF7A5", op: "#043314", ac: "#4AF88A", note: "download badge #304E51" },
+      { n: "Flat Lime", sc: "light", bg: "#E9EFEB", su: "#D9ECE0", p: "#57BD79", op: "#FFFFFF", ac: "#1DA750", note: "download badge #80CAD3" },
+      { n: "Yotsuba", sc: "light only", bg: "#FAFAFA", su: "#F6EBE7", p: "#ba5427", op: "#FFFFFF", ac: "#dc6d3d", note: "" },
+      { n: "Doki", sc: "dark only", bg: "#040716", su: "#070F2C", p: "#FDE289", op: "#070F2C", ac: "#EABD62", note: "" },
+      { n: "Yin Yang", sc: "dark", bg: "#1C1C1D", su: "#2C2C2C", p: "#dcdcdc", op: "#191919", ac: "#FFFFFF", note: "" },
+      { n: "Yin Yang", sc: "light", bg: "#FAFAFA", su: "#FFFFFF", p: "#333333", op: "#FFFFFF", ac: "#000000", note: "" },
+    ];
+    const typeRows = [
+      { n: "display", v: "700 24/28", u: "details-pane title (full details view: 700 26/30)" },
+      { n: "title", v: "600 17/22", u: "category headers, settings section titles" },
+      { n: "title-sm", v: "600 14/18", u: "pane headings, browse source header" },
+      { n: "body-strong", v: "600 12.5/16", u: "list-row titles, buttons, nav items" },
+      { n: "body", v: "400 12/16", u: "settings rows, chips, segmented controls (11.5 ok)" },
+      { n: "caption", v: "400 11/14", u: "sub-lines, timestamps, chapter meta" },
+      { n: "micro", v: "600 10/12 mono ls .06em", u: "section eyebrows (ACTIVITY, FIT), sync-state tags" },
+      { n: "badge", v: "700 10.5/1", u: "unread / download / IN LIBRARY badges" },
+      { n: "brand", v: "600 12/1 ls .04em", u: "MANAMI wordmark in titlebar, color = primary" },
+    ];
+    const spaceRows = [
+      { n: "xs", v: "2", u: "badge inset from cover corner is 5" },
+      { n: "sm", v: "6", u: "gaps inside segmented/toggle clusters, chip gaps" },
+      { n: "md", v: "10", u: "control gaps in toolbars, card inner gaps" },
+      { n: "base", v: "12", u: "grid gap (covers), list-row gap, panel padding" },
+      { n: "lg", v: "16", u: "screen content padding (main areas), pane padding 14" },
+      { n: "xl", v: "18", u: "details/settings hero padding" },
+    ];
+    const radiusRows = [
+      { n: "sm", v: "4", u: "list thumbnails, small badges" },
+      { n: "md", v: "6–7", u: "cover tiles, buttons, action rows" },
+      { n: "lg", v: "8–10", u: "segmented borders, cards, rail buttons, panels" },
+      { n: "xl", v: "14", u: "floating sheets (reader display sheet)" },
+      { n: "full", v: "999", u: "search pill (h/2=16), chips, toggles, nav pill in reader" },
+    ];
+    const widthRows = [
+      { n: "Library / Browse grid", v: "flexible region; columns = auto-fill, tile min 148 @ default grid-size (slider 110–220); gap 12 fixed" },
+      { n: "Reader canvas", v: "flexible region; page scaled per fit mode, never stretched past 100% unless Custom zoom" },
+      { n: "Webtoon column", v: "clamp(480, 42%, 840) — user slider overrides" },
+      { n: "Search pill", v: "flex:1 up to max 380" },
+      { n: "Details pane §2.10", v: "fixed 392; <1200 → slide-over overlay" },
+      { n: "Activity pane §2.13", v: "fixed 330; <1600 → hidden behind titlebar sync chip" },
+      { n: "Browse source list pane", v: "fixed 430; <1200 → full-width, preview opens as page" },
+    ];
+    const compRows = [
+      { id: "§2.1", n: "Titlebar", spec: "h36, bg surface, border-b divider; brand (type brand) · breadcrumb caption fg60 gap 14 · spacer · sync chip §2.12 · window controls fg35 gap 14. Draggable region." },
+      { id: "§2.2", n: "Nav rail", spec: "w52, bg surface, border-r divider; buttons 36×36 r10, icon 15 stroke 2; active: primary @16% bg + primary icon; order Library/Recents/Browse, spacer, Settings. Tooltips on hover." },
+      { id: "§2.3", n: "Search pill", spec: "h32 r16 bg elevated(+1) fg42, pad-x 13, icon ⌕ 11; focus: 1px primary outline" },
+      { id: "§2.4", n: "Category chips", spec: "h23 r12 pad-x 11 caption; active bg primary + onPrimary 600; idle bg elevated fg60" },
+      { id: "§2.5", n: "Segmented control", spec: "border 1 divider-strong r8, cells pad 6×12 body nowrap; active bg #2a78d6→theme primary + onPrimary 600 (mockups used #2a78d6; ship = primary)" },
+      { id: "§2.6", n: "Cover tile", spec: "ratio 2:3 r6; title scrim: linear-gradient(transparent→rgba(0,0,0,.85)) pad 14/7/6, badge type; unread badge top-left 5,5 r4 pad 1×6 bg primary; download badge top-right 16×16 r4 bg #2E7D32; hover: outline 2 primary" },
+      { id: "§2.7", n: "List row", spec: "h62 (pad-y 7 + thumb 48), gap 12, thumb 34×48 r4; title body-strong, sub caption fg45; right-side order: sync tag (micro, #7ADC77) · unread pill r9 · overflow ⋮; hover bg fg5" },
+      { id: "§2.8", n: "Chapter row", spec: "h ~34 pad 7×8-10, dot 6 (unread=accent, read=transparent), title body (read: fg45), sync tag micro, date caption fg40" },
+      { id: "§2.9", n: "Buttons", spec: "primary: pad 7-8×14-18 r8 bg primary onPrimary 600; secondary: same + border 1 divider-strong, fg75, transparent bg" },
+      { id: "§2.10", n: "Details pane", spec: "w392 border-l divider; hero grad (cover-dominant-color→bg over 300); cover 110×158 r7 shadow 0 8 24 rgba(0,0,0,.5); title 700 18; chips h21 r10 border variant; Continue btn §2.9; chapter list §2.8" },
+      { id: "§2.11", n: "Toggle", spec: "28×16 r8; knob 12 inset 2; on: track primary knob #fff; off: track fg20 knob fg60" },
+      { id: "§2.12", n: "Sync chip / dot", spec: "chip: h22 r11 border divider-strong caption fg55, dot 7; ok #7ADC77 static, active = primary + glow 0 0 6, error #F44336; click → activity flyout w330" },
+      { id: "§2.13", n: "Activity pane / flyout", spec: "w330 bg surface pad 14 gap 12; cards r9 bg elevated pad 9-10×12; progress bar h4 r2 track fg12 fill primary" },
+      { id: "§2.14", n: "Reader overlay bars", spec: "top: gradient rgba(0,0,0,.75)→transparent, pad 10×16, back ← · title body-strong + sub caption · spacer · page counter mono fg60; bottom pill: r22 bg surface@94% pad 8×16, ⏮ page-num slider(w280 h3, knob 11) page-num ⏭; auto-hide 2.5s, reappear on mouse move" },
+      { id: "§2.15", n: "Reader display sheet", spec: "w272 r14 bg surface@97% pad 14 gap 12, anchored right inset 14; tabs Mode/Filters/General; option grids gap 5, cells pad 6 r7 border divider-strong, active bg primary@15% + border primary@50% + primary 600; toggles §2.11" },
+      { id: "§2.16", n: "Settings shell", spec: "left nav w196 bg surface pad 14×8, rows pad 7×10 r7 body, active primary@14%+primary 600; content pad 18, two columns gap 16 ≥1200; section titles title-sm 15" },
+    ];
+    const screens = [
+      { n: "3.1 · App shell (all screens)", rec: "row: [ Titlebar §2.1 (h36) ]\nrow flex: [ Nav rail §2.2 (w52) | screen content ★fills ]" },
+      { n: "3.2 · Library (canvas 2a)", rec: "column: Toolbar h52 (pad 10×16: search §2.3 · ★spacer · Grid/List §2.5 · Details-pane btn · ⚙ Display)\nCategory chip row h31 (chips §2.4 · ★uses toolbar spacer — this row: chips, spacer, sort ⇅ ⟳ caption)\nContent ★flex: grid of §2.6 (auto-fill min 148, gap 12, pad 6 16 16) OR list of §2.7 (pad 2×8)\noptional right: Details pane §2.10 (w392)\nState diffs — empty: centered EmptyView icon+caption; loading: 75px indicator centered; selection: toolbar swaps to count + actions" },
+      { n: "3.3 · Recents (3a)", rec: "column: Toolbar h52 (search · spacer · Grouped/History/Updates §2.5 · ⚙)\nContent ★flex, pad 0 16 16: group header (title 13/600, pad 8 0 6) + rows §2.7; groups: New chapters (↓ button 26×26 r7), Continue reading (▶ Resume §2.9), Newly added\noptional right: Activity pane §2.13 (w330)" },
+      { n: "3.4 · Browse (3b)", rec: "row: Source pane w430 border-r → column: global search h52 · tabs row h31 (Sources / Extensions·n / Migrate §2.4) · PINNED eyebrow · source rows h47 (icon 30 r8 · name body-strong + sub 10.5 · Latest caption · pin ⚲, pinned=primary) · ★spacer\nPreview pane ★flex → column: header h44 (source name title-sm · spacer · sort/lang/filter caption) · grid ★flex §2.6 4-col (IN LIBRARY badge variant)" },
+      { n: "3.5 · Reader (3c)", rec: "stack (immersive, no shell): canvas ★fills — pages per fit mode, sides per Sides token (Blur = page edges blurred 22, 55%)\noverlay top bar §2.14 · overlay bottom pill §2.14 (centered on visible canvas, i.e. offset by open sheet width)\noptional overlay right: display sheet §2.15 (inset 14)\nKeys: ←/→ pages · ↑/↓ scroll · Ctrl+R rotate · F focus · Esc close" },
+      { n: "3.6 · Settings ▸ Sync & Devices (3d)", rec: "row: Settings nav §2.16 (w196) | content pad 18, 2 cols gap 16\ncol A: Devices title · device cards (r10 bg surface pad 12: name+status · storage bar h4 · policy dropdown caption) · Download propagation title · radio rows (13px radio, 9 gap)\ncol B: What-syncs card (6 toggle rows §2.11) · conflict note caption fg50 · Recent activity title · log rows (r8 bg surface pad 8×11) · ★spacer\nTheme picker (3e) lives in Settings ▸ Appearance: Light/Dark/System §2.5 · 2-col swatch tiles r9 (theme bg + two 14px dots primary/accent, selected: outline 2 primary) · AMOLED toggle" },
+    ];
+    const motionRows = [
+      { n: "Hover states", v: "background/outline 120ms ease-out" },
+      { n: "Pane open/close", v: "width (details/activity) 200ms cubic-bezier(.2,0,0,1); overlay slide-over 240ms same" },
+      { n: "Grid⇄List switch", v: "crossfade 150ms ease-out (no layout animation)" },
+      { n: "Reader page turn", v: "opacity+8px translate 150ms ease-out; webtoon = native scroll" },
+      { n: "Overlay bars", v: "opacity 180ms; auto-hide after 2500ms idle" },
+      { n: "Sync dot (active)", v: "opacity .5→1 pulse 1200ms ease-in-out infinite alternate" },
+      { n: "Progress bars", v: "width 300ms ease-out; indeterminate: M3 loading indicator" },
+      { n: "Layout rotation", v: "rotate 0→±90° 320ms cubic-bezier(.2,0,0,1) on root canvas, content crossfade at 50%" },
+    ];
+    return { themeRows, typeRows, spaceRows, radiusRows, widthRows, compRows, screens, motionRows };
+  }
+}
+</script>
+</body>
+</html>

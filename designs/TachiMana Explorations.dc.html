@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&amp;family=Zen+Kaku+Gothic+New:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&amp;display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}
+a{color:#2a78d6}a:hover{color:#1b5aa8}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;margin-bottom:26px}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+.dv-group{font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:rgba(0,0,0,.45);margin:0 0 12px}
+.wf{font-family:'Patrick Hand',cursive;color:#333;background:#fff;font-size:12px;line-height:1.25}
+.b{border:1.5px solid #3a3a3a;border-radius:3px;background:#fff}
+.d{border:1.5px dashed #a8a8a8;border-radius:3px}
+.f{background:repeating-linear-gradient(45deg,#ececec 0 5px,#f8f8f8 5px 10px)}
+.cov{aspect-ratio:2/3;border:1.5px solid #4a4a4a;border-radius:2px;background:repeating-linear-gradient(45deg,#ececec 0 5px,#f8f8f8 5px 10px)}
+.row{display:flex;gap:6px}
+.col{display:flex;flex-direction:column;gap:6px}
+.cap{font:10.5px/1.5 ui-monospace,Menlo,monospace;color:#797979}
+.acc{color:#2a78d6}
+.tb{height:24px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1.5px solid #3a3a3a;font-size:12px}
+.winbtn{font:11px ui-monospace,monospace;color:#888;letter-spacing:3px}
+.pill{border:1.5px solid #3a3a3a;border-radius:999px;padding:1px 10px;font-size:11px;color:#666}
+.rail{width:52px;border-right:1.5px solid #3a3a3a;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 0}
+.ric{width:26px;text-align:center;font-size:10px;color:#555;line-height:1.1}
+.rgl{width:18px;height:18px;border:1.5px solid #555;border-radius:4px;margin:0 auto 2px}
+.chip{border:1.5px solid #3a3a3a;border-radius:3px;padding:1px 7px;font-size:11px}
+.msi,.msf{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.msf{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Hi-fi shell — <a class="dv-oid" href="#1a">1a</a>+<a class="dv-oid" href="#1b">1b</a> merged (rail + master–detail), three visual directions. Tokens grounded in the Yokai repo.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Faithful — Yokai dark tokens verbatim (#1C1C1D · #202125 · #3399FF, M3 shapes, Roboto)</div>
+<div class="dv-card" data-screen-label="2a Faithful shell" style="width:1360px">
+<div style="height:840px;background:#1C1C1D;display:flex;flex-direction:column;font-family:Roboto,sans-serif;color:#fff">
+<div style="height:36px;display:flex;align-items:center;gap:10px;background:#161617;padding-left:14px;flex:none">
+<span style="width:9px;height:9px;border-radius:3px;background:#3399FF"></span>
+<span style="font-size:12.5px;color:rgba(255,255,255,.85)">TachiMana</span>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:rgba(255,255,255,.55)"><span class="msi" style="font-size:14px;color:#99CC99">sync</span>Synced · 2 min ago</span>
+<span style="display:flex">
+<span class="msi" style="font-size:15px;color:rgba(255,255,255,.6);padding:10px 15px" style-hover="background:rgba(255,255,255,.08)">remove</span>
+<span class="msi" style="font-size:15px;color:rgba(255,255,255,.6);padding:10px 15px" style-hover="background:rgba(255,255,255,.08)">crop_square</span>
+<span class="msi" style="font-size:15px;color:rgba(255,255,255,.6);padding:10px 15px" style-hover="background:#c42b1c;color:#fff">close</span>
+</span>
+</div>
+<div style="flex:1;display:flex;min-height:0">
+<div style="width:76px;flex:none;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0">
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+<span style="display:flex;width:52px;height:28px;border-radius:14px;background:rgba(51,153,255,.18);align-items:center;justify-content:center"><span class="msf" style="font-size:21px;color:#3399FF">collections_bookmark</span></span>
+<span style="font-size:10.5px;font-weight:500;color:#fff">Library</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0" style-hover="opacity:.8">
+<span style="display:flex;width:52px;height:28px;align-items:center;justify-content:center"><span class="msi" style="font-size:21px;color:rgba(255,255,255,.76)">history</span></span>
+<span style="font-size:10.5px;color:rgba(255,255,255,.76)">Recents</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0">
+<span style="display:flex;width:52px;height:28px;align-items:center;justify-content:center"><span class="msi" style="font-size:21px;color:rgba(255,255,255,.76)">explore</span></span>
+<span style="font-size:10.5px;color:rgba(255,255,255,.76)">Browse</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0">
+<span style="display:flex;width:52px;height:28px;align-items:center;justify-content:center"><span class="msi" style="font-size:21px;color:rgba(255,255,255,.76)">download</span></span>
+<span style="font-size:10.5px;color:rgba(255,255,255,.76)">Downloads</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0">
+<span style="display:flex;width:52px;height:28px;align-items:center;justify-content:center;position:relative"><span class="msi" style="font-size:21px;color:rgba(255,255,255,.76)">sync</span><span style="position:absolute;top:2px;right:10px;width:7px;height:7px;border-radius:50%;background:#99CC99;border:2px solid #1C1C1D"></span></span>
+<span style="font-size:10.5px;color:rgba(255,255,255,.76)">Sync</span>
+</div>
+<span style="flex:1"></span>
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0" title="Rotate app 90° — Ctrl+Alt+R">
+<span style="display:flex;width:52px;height:28px;align-items:center;justify-content:center"><span class="msi" style="font-size:21px;color:rgba(255,255,255,.76)">screen_rotation</span></span>
+<span style="font-size:10.5px;color:rgba(255,255,255,.76)">Rotate</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0">
+<span style="display:flex;width:52px;height:28px;align-items:center;justify-content:center"><span class="msi" style="font-size:21px;color:rgba(255,255,255,.76)">settings</span></span>
+<span style="font-size:10.5px;color:rgba(255,255,255,.76)">Settings</span>
+</div>
+</div>
+<div style="width:360px;flex:none;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;min-height:0">
+<div style="margin:12px 12px 6px;height:44px;flex:none;border-radius:24px;background:#202125;display:flex;align-items:center;gap:10px;padding:0 16px" style-hover="background:#25262b">
+<span class="msi" style="font-size:20px;color:rgba(255,255,255,.6)">search</span>
+<span style="font-size:14px;color:rgba(255,255,255,.5);flex:1">Search library…</span>
+<span class="msi" style="font-size:20px;color:rgba(255,255,255,.7)">filter_list</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;padding:12px 16px 6px">
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.8)">expand_less</span>
+<span style="font-size:18px;font-weight:500">Reading</span>
+<span style="font-size:12.5px;color:rgba(255,255,255,.5)">42</span>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:4px;font-size:12px;color:rgba(255,255,255,.7)">Last read<span class="msi" style="font-size:16px">sort</span></span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.8)">refresh</span>
+</div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding:0 8px;gap:2px">
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px" style-hover="background:rgba(255,255,255,.05)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#31465c,#1f2d3c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">One<br>Piece</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">One Piece</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 1088 · 2h ago</div></div>
+<span style="display:flex;align-items:center;gap:2px;background:#106010;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px"><span class="msi" style="font-size:12px;font-variation-settings:'FILL' 0,'wght' 600">download_done</span>12</span>
+<span style="background:#3399FF;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px">3</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px;background:rgba(51,153,255,.14)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#3d5c4a,#243a2e);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Frieren</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Frieren: Beyond Journey's End</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 122 · 1d ago</div></div>
+<span style="background:#3399FF;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px">1</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px" style-hover="background:rgba(255,255,255,.05)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#4a3d33,#2b221c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55)">Berserk</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Berserk</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 375 · 2w ago</div></div>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px" style-hover="background:rgba(255,255,255,.05)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#54415c,#32263a);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55)">Danda<br>dan</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Dandadan</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 160 · 3d ago</div></div>
+<span style="background:#3399FF;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px">2</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px" style-hover="background:rgba(255,255,255,.05)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#3c4c5e,#232f3c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Vinland<br>Saga</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Vinland Saga</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 208 · 1mo ago</div></div>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px" style-hover="background:rgba(255,255,255,.05)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#5c3a3a,#361f1f);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Chainsaw<br>Man</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Chainsaw Man</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 155 · 5d ago</div></div>
+<span style="background:#3399FF;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px">5</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px" style-hover="background:rgba(255,255,255,.05)">
+<div style="width:40px;height:57px;flex:none;border-radius:4px;background:linear-gradient(160deg,#3a3f5c,#20243a);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Kagura<br>bachi</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Kagurabachi</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">Ch. 68 · 12h ago</div></div>
+<span style="display:flex;align-items:center;gap:2px;background:#106010;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px"><span class="msi" style="font-size:12px;font-variation-settings:'FILL' 0,'wght' 600">download_done</span>3</span>
+<span style="background:#3399FF;color:#fff;border-radius:5px;font-size:11px;font-weight:600;padding:1px 6px">1</span>
+</div>
+</div>
+<div style="flex:none;padding:10px 16px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid rgba(255,255,255,.06)">
+<div style="display:flex;align-items:center;gap:8px"><span class="msi" style="font-size:18px;color:rgba(255,255,255,.8)">expand_more</span><span style="font-size:18px;font-weight:500;color:rgba(255,255,255,.85)">Plan to Read</span><span style="font-size:12.5px;color:rgba(255,255,255,.5)">56</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span class="msi" style="font-size:18px;color:rgba(255,255,255,.8)">expand_more</span><span style="font-size:18px;font-weight:500;color:rgba(255,255,255,.85)">Completed</span><span style="font-size:12.5px;color:rgba(255,255,255,.5)">128</span></div>
+</div>
+</div>
+<div style="flex:1;display:flex;min-width:0;position:relative">
+<div style="position:absolute;inset:0 0 auto 0;height:250px;background:linear-gradient(180deg,rgba(90,140,110,.14),rgba(90,140,110,0))"></div>
+<div style="width:400px;flex:none;padding:24px;display:flex;flex-direction:column;gap:0;position:relative;min-height:0">
+<div style="display:flex;gap:16px">
+<div style="width:148px;height:211px;flex:none;border-radius:8px;background:linear-gradient(160deg,#3d5c4a,#243a2e);box-shadow:0 4px 14px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.6);text-align:center">Frieren<br>cover</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="font-size:22px;font-weight:500;line-height:1.25">Frieren: Beyond Journey's End</div>
+<div style="font-size:14px;color:rgba(255,255,255,.75);margin-top:6px">Yamada Kanehito · Abe Tsukasa</div>
+<div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:3px">Ongoing · MangaDex (EN)</div>
+<span style="flex:1"></span>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.6)"><span class="msi" style="font-size:16px;color:#99CC99">cloud_done</span>In sync · both devices</div>
+</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+<span style="display:flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:20px;border:1px solid rgba(255,255,255,.28);font-size:13.5px;font-weight:500;color:#3399FF" style-hover="background:rgba(51,153,255,.1)"><span class="msf" style="font-size:18px">favorite</span>In Library</span>
+<span style="display:flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:20px;border:1px solid rgba(255,255,255,.28);font-size:13.5px;font-weight:500;color:#3399FF" style-hover="background:rgba(51,153,255,.1)"><span class="msi" style="font-size:18px">sync_alt</span>Tracking · 2</span>
+<span class="msi" style="font-size:20px;color:rgba(255,255,255,.75);padding:8px" style-hover="background:rgba(255,255,255,.08);border-radius:50%">public</span>
+<span class="msi" style="font-size:20px;color:rgba(255,255,255,.75);padding:8px" style-hover="background:rgba(255,255,255,.08);border-radius:50%">share</span>
+</div>
+<div style="font-size:15px;font-weight:500;margin-top:18px">About this manga</div>
+<div style="font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.7);margin-top:6px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">After the Demon King falls, the elf mage Frieren outlives the heroes she journeyed with. Confronted with the weight of centuries, she sets out again — retracing the party's old route north, taking on new companions, and learning what her short-lived friends truly meant to her.</div>
+<div style="display:flex;justify-content:flex-end"><span style="display:flex;align-items:center;font-size:13px;font-weight:500;color:#3399FF">More<span class="msi" style="font-size:18px">expand_more</span></span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#202125;font-size:12.5px;color:rgba(255,255,255,.8)">Adventure</span>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#202125;font-size:12.5px;color:rgba(255,255,255,.8)">Fantasy</span>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#202125;font-size:12.5px;color:rgba(255,255,255,.8)">Drama</span>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#202125;font-size:12.5px;color:rgba(255,255,255,.8)">Award Winning</span>
+</div>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:20px;background:#3399FF;color:#fff;font-size:14px;font-weight:500;margin-top:16px" style-hover="background:#4da5ff"><span class="msf" style="font-size:18px">play_arrow</span>Continue Reading Ch. 119</span>
+</div>
+<div style="flex:1;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;position:relative;min-width:0">
+<div style="display:flex;align-items:center;gap:8px;padding:18px 20px 10px">
+<span style="font-size:17px;font-weight:500">122 chapters</span>
+<span style="flex:1"></span>
+<span style="font-size:12px;color:rgba(255,255,255,.45)">Unread · Downloaded</span>
+<span class="msi" style="font-size:20px;color:#3399FF">filter_list</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:0 46px 6px 20px;justify-content:flex-end">
+<span class="msi" style="font-size:15px;color:rgba(255,255,255,.4)" title="On phone">smartphone</span>
+<span class="msi" style="font-size:15px;color:rgba(255,255,255,.4)" title="On this desktop">computer</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 122 — A Mage's Duel</div><div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:1px">Today</div></div>
+<span class="msf" style="font-size:17px;color:#99CC99" title="Downloaded on phone">smartphone</span>
+<span style="display:flex;align-items:center;gap:4px;border:1px solid #3399FF;color:#3399FF;border-radius:12px;font-size:11.5px;font-weight:500;padding:2px 10px" style-hover="background:rgba(51,153,255,.12)"><span class="msi" style="font-size:13px">download</span>Pull · 18 MB</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 121 — Sunrise</div><div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:1px">Yesterday</div></div>
+<span class="msf" style="font-size:17px;color:#99CC99">smartphone</span>
+<span class="msf" style="font-size:17px;color:#99CC99">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 120 — The Hero of the Village</div><div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:1px">4 days ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msf" style="font-size:17px;color:#99CC99">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08);position:relative" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 119 — Distant Journey</div><div style="font-size:12px;color:#3399FF;margin-top:1px">Reading · Page 12 of 45</div></div>
+<span class="msf" style="font-size:17px;color:#99CC99">smartphone</span>
+<span class="msf" style="font-size:17px;color:#99CC99">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+<div style="position:absolute;left:20px;bottom:0;width:120px;height:2px;background:rgba(51,153,255,.35)"><div style="width:27%;height:2px;background:#3399FF"></div></div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 118 — Winter Provisions</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">2 weeks ago</div></div>
+<span class="msf" style="font-size:17px;color:#e6c34c">bookmark</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 117 — The Stellar Lake</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">2 weeks ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 116 — Aging</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">3 weeks ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 115 — The First-Class Exam</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">1 month ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 114 — Prelude</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">1 month ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 113 — Northern Plateau</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 112 — A Fellow Traveler</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-top:1px solid rgba(255,255,255,.08)" style-hover="background:rgba(255,255,255,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(255,255,255,.4)">Ch. 111 — Echoes</div><div style="font-size:12px;color:rgba(255,255,255,.3);margin-top:1px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(255,255,255,.25)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(255,255,255,.5)">more_vert</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Evolved — the fork's own midnight #0E1418 + #78bcff, unified 12px radii, icon-only rail</div>
+<div class="dv-card" data-screen-label="2b Evolved shell" style="width:1360px">
+<div style="height:840px;background:#0E1418;display:flex;flex-direction:column;font-family:Roboto,sans-serif;color:#E8EEF4">
+<div style="height:36px;display:flex;align-items:center;gap:10px;background:#0A0F13;padding-left:14px;flex:none">
+<span style="width:9px;height:9px;border-radius:50%;background:#78bcff"></span>
+<span style="font-size:12.5px;color:rgba(232,238,244,.85)">TachiMana</span>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:rgba(232,238,244,.5)"><span class="msi" style="font-size:14px;color:#7ADC77">sync</span>Synced · 2 min ago</span>
+<span style="display:flex">
+<span class="msi" style="font-size:15px;color:rgba(232,238,244,.55);padding:10px 15px" style-hover="background:rgba(255,255,255,.08)">remove</span>
+<span class="msi" style="font-size:15px;color:rgba(232,238,244,.55);padding:10px 15px" style-hover="background:rgba(255,255,255,.08)">crop_square</span>
+<span class="msi" style="font-size:15px;color:rgba(232,238,244,.55);padding:10px 15px" style-hover="background:#c42b1c;color:#fff">close</span>
+</span>
+</div>
+<div style="flex:1;display:flex;min-height:0">
+<div style="width:60px;flex:none;border-right:1px solid rgba(120,188,255,.08);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0">
+<span style="display:flex;width:44px;height:44px;border-radius:12px;background:rgba(120,188,255,.16);align-items:center;justify-content:center" title="Library"><span class="msf" style="font-size:22px;color:#78bcff">collections_bookmark</span></span>
+<span style="display:flex;width:44px;height:44px;border-radius:12px;align-items:center;justify-content:center" title="Recents" style-hover="background:rgba(120,188,255,.08)"><span class="msi" style="font-size:22px;color:rgba(232,238,244,.65)">history</span></span>
+<span style="display:flex;width:44px;height:44px;border-radius:12px;align-items:center;justify-content:center" title="Browse" style-hover="background:rgba(120,188,255,.08)"><span class="msi" style="font-size:22px;color:rgba(232,238,244,.65)">explore</span></span>
+<span style="display:flex;width:44px;height:44px;border-radius:12px;align-items:center;justify-content:center" title="Downloads" style-hover="background:rgba(120,188,255,.08)"><span class="msi" style="font-size:22px;color:rgba(232,238,244,.65)">download</span></span>
+<span style="display:flex;width:44px;height:44px;border-radius:12px;align-items:center;justify-content:center;position:relative" title="Sync" style-hover="background:rgba(120,188,255,.08)"><span class="msi" style="font-size:22px;color:rgba(232,238,244,.65)">sync</span><span style="position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:#7ADC77;border:2px solid #0E1418"></span></span>
+<span style="flex:1"></span>
+<span style="display:flex;width:44px;height:44px;border-radius:12px;align-items:center;justify-content:center" title="Rotate app 90° — Ctrl+Alt+R" style-hover="background:rgba(120,188,255,.08)"><span class="msi" style="font-size:22px;color:rgba(232,238,244,.65)">screen_rotation</span></span>
+<span style="display:flex;width:44px;height:44px;border-radius:12px;align-items:center;justify-content:center" title="Settings" style-hover="background:rgba(120,188,255,.08)"><span class="msi" style="font-size:22px;color:rgba(232,238,244,.65)">settings</span></span>
+</div>
+<div style="width:380px;flex:none;border-right:1px solid rgba(120,188,255,.08);display:flex;flex-direction:column;min-height:0">
+<div style="margin:14px 14px 8px;height:44px;flex:none;border-radius:12px;background:#182028;display:flex;align-items:center;gap:10px;padding:0 14px" style-hover="background:#1c2630">
+<span class="msi" style="font-size:20px;color:rgba(232,238,244,.55)">search</span>
+<span style="font-size:14px;color:rgba(232,238,244,.45);flex:1">Search library…</span>
+<span style="font-size:11px;color:rgba(232,238,244,.4);border:1px solid rgba(232,238,244,.2);border-radius:5px;padding:1px 6px">Ctrl K</span>
+<span class="msi" style="font-size:20px;color:rgba(232,238,244,.65)">filter_list</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;padding:14px 18px 8px">
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.7)">expand_less</span>
+<span style="font-size:17px;font-weight:500">Reading</span>
+<span style="font-size:11.5px;font-weight:600;color:#78bcff;background:rgba(120,188,255,.14);border-radius:10px;padding:1px 8px">42</span>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:4px;font-size:12px;color:rgba(232,238,244,.6)">Last read<span class="msi" style="font-size:16px">sort</span></span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.7)">refresh</span>
+</div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding:0 10px;gap:3px">
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px" style-hover="background:rgba(120,188,255,.07)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#31465c,#1f2d3c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">One<br>Piece</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">One Piece</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 1088 · 2h ago</div></div>
+<span style="display:flex;align-items:center;gap:2px;color:#7ADC77;font-size:11.5px;font-weight:600"><span class="msi" style="font-size:14px;font-variation-settings:'FILL' 0,'wght' 600">download_done</span>12</span>
+<span style="background:#78bcff;color:#071D39;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px">3</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px;background:rgba(120,188,255,.13)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#3d5c4a,#243a2e);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55)">Frieren</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Frieren: Beyond Journey's End</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 122 · 1d ago</div></div>
+<span style="background:#78bcff;color:#071D39;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px">1</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px" style-hover="background:rgba(120,188,255,.07)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#4a3d33,#2b221c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55)">Berserk</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Berserk</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 375 · 2w ago</div></div>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px" style-hover="background:rgba(120,188,255,.07)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#54415c,#32263a);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Danda<br>dan</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Dandadan</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 160 · 3d ago</div></div>
+<span style="background:#78bcff;color:#071D39;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px">2</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px" style-hover="background:rgba(120,188,255,.07)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#3c4c5e,#232f3c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Vinland<br>Saga</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Vinland Saga</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 208 · 1mo ago</div></div>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px" style-hover="background:rgba(120,188,255,.07)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#5c3a3a,#361f1f);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Chainsaw<br>Man</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Chainsaw Man</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 155 · 5d ago</div></div>
+<span style="background:#78bcff;color:#071D39;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px">5</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:7px 8px;border-radius:12px" style-hover="background:rgba(120,188,255,.07)">
+<div style="width:42px;height:60px;flex:none;border-radius:6px;background:linear-gradient(160deg,#3a3f5c,#20243a);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Kagura<br>bachi</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Kagurabachi</div><div style="font-size:12px;color:rgba(232,238,244,.5);margin-top:2px">Ch. 68 · 12h ago</div></div>
+<span style="display:flex;align-items:center;gap:2px;color:#7ADC77;font-size:11.5px;font-weight:600"><span class="msi" style="font-size:14px;font-variation-settings:'FILL' 0,'wght' 600">download_done</span>3</span>
+<span style="background:#78bcff;color:#071D39;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px">1</span>
+</div>
+</div>
+<div style="flex:none;padding:12px 18px 16px;display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(120,188,255,.08)">
+<div style="display:flex;align-items:center;gap:8px"><span class="msi" style="font-size:18px;color:rgba(232,238,244,.7)">expand_more</span><span style="font-size:17px;font-weight:500;color:rgba(232,238,244,.85)">Plan to Read</span><span style="font-size:11.5px;font-weight:600;color:rgba(232,238,244,.5);background:rgba(232,238,244,.08);border-radius:10px;padding:1px 8px">56</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span class="msi" style="font-size:18px;color:rgba(232,238,244,.7)">expand_more</span><span style="font-size:17px;font-weight:500;color:rgba(232,238,244,.85)">Completed</span><span style="font-size:11.5px;font-weight:600;color:rgba(232,238,244,.5);background:rgba(232,238,244,.08);border-radius:10px;padding:1px 8px">128</span></div>
+</div>
+</div>
+<div style="flex:1;display:flex;min-width:0;position:relative">
+<div style="position:absolute;inset:0 0 auto 0;height:260px;background:linear-gradient(180deg,rgba(90,150,120,.13),rgba(90,150,120,0))"></div>
+<div style="width:400px;flex:none;padding:26px 24px;display:flex;flex-direction:column;position:relative;min-height:0">
+<div style="display:flex;gap:16px">
+<div style="width:148px;height:211px;flex:none;border-radius:12px;background:linear-gradient(160deg,#3d5c4a,#243a2e);box-shadow:0 6px 18px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.6);text-align:center">Frieren<br>cover</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="font-size:22px;font-weight:500;line-height:1.25">Frieren: Beyond Journey's End</div>
+<div style="font-size:14px;color:rgba(232,238,244,.7);margin-top:6px">Yamada Kanehito · Abe Tsukasa</div>
+<div style="font-size:13px;color:rgba(232,238,244,.5);margin-top:3px">Ongoing · MangaDex (EN)</div>
+<span style="flex:1"></span>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(232,238,244,.55)"><span class="msi" style="font-size:16px;color:#7ADC77">cloud_done</span>In sync · both devices</div>
+</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+<span style="display:flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:12px;border:1px solid rgba(120,188,255,.35);font-size:13.5px;font-weight:500;color:#78bcff" style-hover="background:rgba(120,188,255,.1)"><span class="msf" style="font-size:18px">favorite</span>In Library</span>
+<span style="display:flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:12px;border:1px solid rgba(120,188,255,.35);font-size:13.5px;font-weight:500;color:#78bcff" style-hover="background:rgba(120,188,255,.1)"><span class="msi" style="font-size:18px">sync_alt</span>Tracking · 2</span>
+<span class="msi" style="font-size:20px;color:rgba(232,238,244,.7);padding:8px;border-radius:12px" style-hover="background:rgba(120,188,255,.1)">public</span>
+<span class="msi" style="font-size:20px;color:rgba(232,238,244,.7);padding:8px;border-radius:12px" style-hover="background:rgba(120,188,255,.1)">share</span>
+</div>
+<div style="font-size:15px;font-weight:500;margin-top:20px">About this manga</div>
+<div style="font-size:13.5px;line-height:1.65;color:rgba(232,238,244,.65);margin-top:6px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">After the Demon King falls, the elf mage Frieren outlives the heroes she journeyed with. Confronted with the weight of centuries, she sets out again — retracing the party's old route north, taking on new companions, and learning what her short-lived friends truly meant to her.</div>
+<div style="display:flex;justify-content:flex-end"><span style="display:flex;align-items:center;font-size:13px;font-weight:500;color:#78bcff">More<span class="msi" style="font-size:18px">expand_more</span></span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#182028;font-size:12.5px;color:rgba(232,238,244,.75)">Adventure</span>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#182028;font-size:12.5px;color:rgba(232,238,244,.75)">Fantasy</span>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#182028;font-size:12.5px;color:rgba(232,238,244,.75)">Drama</span>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:#182028;font-size:12.5px;color:rgba(232,238,244,.75)">Award Winning</span>
+</div>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;justify-content:center;gap:8px;height:42px;border-radius:12px;background:#78bcff;color:#071D39;font-size:14px;font-weight:600;margin-top:16px" style-hover="background:#8fc9ff"><span class="msf" style="font-size:18px">play_arrow</span>Continue Reading Ch. 119</span>
+</div>
+<div style="flex:1;border-left:1px solid rgba(120,188,255,.08);display:flex;flex-direction:column;position:relative;min-width:0">
+<div style="display:flex;align-items:center;gap:8px;padding:20px 20px 10px">
+<span style="font-size:17px;font-weight:500">122 chapters</span>
+<span style="flex:1"></span>
+<span style="font-size:12px;color:rgba(232,238,244,.4)">Unread · Downloaded</span>
+<span class="msi" style="font-size:20px;color:#78bcff">filter_list</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:0 46px 6px 20px;justify-content:flex-end">
+<span class="msi" style="font-size:15px;color:rgba(232,238,244,.35)" title="On phone">smartphone</span>
+<span class="msi" style="font-size:15px;color:rgba(232,238,244,.35)" title="On this desktop">computer</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 122 — A Mage's Duel</div><div style="font-size:12px;color:rgba(232,238,244,.45);margin-top:2px">Today</div></div>
+<span class="msf" style="font-size:17px;color:#7ADC77" title="Downloaded on phone">smartphone</span>
+<span style="display:flex;align-items:center;gap:4px;border:1px solid rgba(120,188,255,.5);color:#78bcff;border-radius:8px;font-size:11.5px;font-weight:500;padding:2px 10px" style-hover="background:rgba(120,188,255,.12)"><span class="msi" style="font-size:13px">download</span>Pull · 18 MB</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 121 — Sunrise</div><div style="font-size:12px;color:rgba(232,238,244,.45);margin-top:2px">Yesterday</div></div>
+<span class="msf" style="font-size:17px;color:#7ADC77">smartphone</span>
+<span class="msf" style="font-size:17px;color:#7ADC77">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 120 — The Hero of the Village</div><div style="font-size:12px;color:rgba(232,238,244,.45);margin-top:2px">4 days ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msf" style="font-size:17px;color:#7ADC77">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09);position:relative" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 119 — Distant Journey</div><div style="font-size:12px;color:#78bcff;margin-top:2px">Reading · Page 12 of 45</div></div>
+<span class="msf" style="font-size:17px;color:#7ADC77">smartphone</span>
+<span class="msf" style="font-size:17px;color:#7ADC77">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+<div style="position:absolute;left:20px;bottom:0;width:120px;height:2px;background:rgba(120,188,255,.3)"><div style="width:27%;height:2px;background:#78bcff"></div></div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 118 — Winter Provisions</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">2 weeks ago</div></div>
+<span class="msf" style="font-size:17px;color:#e6c34c">bookmark</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 117 — The Stellar Lake</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">2 weeks ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 116 — Aging</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">3 weeks ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 115 — The First-Class Exam</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">1 month ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 114 — Prelude</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">1 month ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 113 — Northern Plateau</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 112 — A Fellow Traveler</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(120,188,255,.09)" style-hover="background:rgba(120,188,255,.05)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(232,238,244,.38)">Ch. 111 — Echoes</div><div style="font-size:12px;color:rgba(232,238,244,.28);margin-top:2px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(232,238,244,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(232,238,244,.45)">more_vert</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Fresh — TachiMana ink &amp; vermilion (#C14033 from the repo), print-flavored, Zen Kaku Gothic</div>
+<div class="dv-card" data-screen-label="2c Fresh shell" style="width:1360px">
+<div style="height:840px;background:#141112;display:flex;flex-direction:column;font-family:'Zen Kaku Gothic New',sans-serif;color:#F2EDE7">
+<div style="height:36px;display:flex;align-items:center;gap:10px;background:#0F0D0E;padding-left:14px;flex:none">
+<span style="width:10px;height:10px;background:#C14033"></span>
+<span style="font-size:11px;letter-spacing:.22em;font-weight:700;color:rgba(242,237,231,.9)">TACHIMANA</span>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:rgba(242,237,231,.5)"><span class="msi" style="font-size:14px;color:#8fae6d">sync</span>Synced · 2 min ago</span>
+<span style="display:flex">
+<span class="msi" style="font-size:15px;color:rgba(242,237,231,.55);padding:10px 15px" style-hover="background:rgba(255,255,255,.08)">remove</span>
+<span class="msi" style="font-size:15px;color:rgba(242,237,231,.55);padding:10px 15px" style-hover="background:rgba(255,255,255,.08)">crop_square</span>
+<span class="msi" style="font-size:15px;color:rgba(242,237,231,.55);padding:10px 15px" style-hover="background:#c42b1c;color:#fff">close</span>
+</span>
+</div>
+<div style="flex:1;display:flex;min-height:0">
+<div style="width:84px;flex:none;border-right:1px solid rgba(242,237,231,.1);display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 0">
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-left:3px solid #C14033;margin-left:-3px">
+<span class="msf" style="font-size:21px;color:#F2EDE7">collections_bookmark</span>
+<span style="font-size:9.5px;letter-spacing:.14em;font-weight:700;color:#F2EDE7">LIBRARY</span>
+</div>
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-left:3px solid transparent;margin-left:-3px" style-hover="background:rgba(242,237,231,.05)">
+<span class="msi" style="font-size:21px;color:rgba(242,237,231,.55)">history</span>
+<span style="font-size:9.5px;letter-spacing:.14em;color:rgba(242,237,231,.55)">RECENTS</span>
+</div>
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-left:3px solid transparent;margin-left:-3px" style-hover="background:rgba(242,237,231,.05)">
+<span class="msi" style="font-size:21px;color:rgba(242,237,231,.55)">explore</span>
+<span style="font-size:9.5px;letter-spacing:.14em;color:rgba(242,237,231,.55)">BROWSE</span>
+</div>
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-left:3px solid transparent;margin-left:-3px" style-hover="background:rgba(242,237,231,.05)">
+<span class="msi" style="font-size:21px;color:rgba(242,237,231,.55)">download</span>
+<span style="font-size:9.5px;letter-spacing:.14em;color:rgba(242,237,231,.55)">QUEUE</span>
+</div>
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-left:3px solid transparent;margin-left:-3px;position:relative" style-hover="background:rgba(242,237,231,.05)">
+<span class="msi" style="font-size:21px;color:rgba(242,237,231,.55)">sync</span>
+<span style="font-size:9.5px;letter-spacing:.14em;color:rgba(242,237,231,.55)">SYNC</span>
+<span style="position:absolute;top:8px;right:24px;width:6px;height:6px;background:#8fae6d"></span>
+</div>
+<span style="flex:1"></span>
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0" title="Rotate app 90° — Ctrl+Alt+R" style-hover="background:rgba(242,237,231,.05)">
+<span class="msi" style="font-size:21px;color:rgba(242,237,231,.55)">screen_rotation</span>
+<span style="font-size:9.5px;letter-spacing:.14em;color:rgba(242,237,231,.55)">ROTATE</span>
+</div>
+<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0" style-hover="background:rgba(242,237,231,.05)">
+<span class="msi" style="font-size:21px;color:rgba(242,237,231,.55)">settings</span>
+<span style="font-size:9.5px;letter-spacing:.14em;color:rgba(242,237,231,.55)">CONFIG</span>
+</div>
+</div>
+<div style="width:370px;flex:none;border-right:1px solid rgba(242,237,231,.1);display:flex;flex-direction:column;min-height:0">
+<div style="margin:14px 14px 8px;height:42px;flex:none;border:1px solid rgba(242,237,231,.16);background:#1D191A;display:flex;align-items:center;gap:10px;padding:0 14px" style-hover="border-color:rgba(242,237,231,.3)">
+<span class="msi" style="font-size:19px;color:rgba(242,237,231,.5)">search</span>
+<span style="font-size:13.5px;color:rgba(242,237,231,.4);flex:1">Search library…</span>
+<span class="msi" style="font-size:19px;color:rgba(242,237,231,.6)">filter_list</span>
+</div>
+<div style="display:flex;align-items:center;gap:9px;padding:14px 18px 8px">
+<span style="width:9px;height:9px;background:#C14033"></span>
+<span style="font-size:13px;font-weight:700;letter-spacing:.12em">READING</span>
+<span style="font-size:12px;color:rgba(242,237,231,.45)">42</span>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:rgba(242,237,231,.55)">LAST READ<span class="msi" style="font-size:15px">sort</span></span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.65)">refresh</span>
+</div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07)" style-hover="background:rgba(242,237,231,.04)">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#31465c,#1f2d3c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">One<br>Piece</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">One Piece</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 1088 · 2h ago</div></div>
+<span style="display:flex;align-items:center;gap:2px;color:#8fae6d;font-size:11.5px;font-weight:700"><span class="msi" style="font-size:14px;font-variation-settings:'FILL' 0,'wght' 600">download_done</span>12</span>
+<span style="background:#C14033;color:#F2EDE7;font-size:11px;font-weight:700;padding:1px 7px">3</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07);background:rgba(193,64,51,.14);box-shadow:inset 3px 0 0 #C14033">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#3d5c4a,#243a2e);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55)">Frieren</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Frieren: Beyond Journey's End</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 122 · 1d ago</div></div>
+<span style="background:#C14033;color:#F2EDE7;font-size:11px;font-weight:700;padding:1px 7px">1</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07)" style-hover="background:rgba(242,237,231,.04)">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#4a3d33,#2b221c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55)">Berserk</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Berserk</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 375 · 2w ago</div></div>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07)" style-hover="background:rgba(242,237,231,.04)">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#54415c,#32263a);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Danda<br>dan</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Dandadan</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 160 · 3d ago</div></div>
+<span style="background:#C14033;color:#F2EDE7;font-size:11px;font-weight:700;padding:1px 7px">2</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07)" style-hover="background:rgba(242,237,231,.04)">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#3c4c5e,#232f3c);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Vinland<br>Saga</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Vinland Saga</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 208 · 1mo ago</div></div>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07)" style-hover="background:rgba(242,237,231,.04)">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#5c3a3a,#361f1f);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Chainsaw<br>Man</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Chainsaw Man</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 155 · 5d ago</div></div>
+<span style="background:#C14033;color:#F2EDE7;font-size:11px;font-weight:700;padding:1px 7px">5</span>
+</div>
+<div style="display:flex;gap:12px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(242,237,231,.07)" style-hover="background:rgba(242,237,231,.04)">
+<div style="width:40px;height:57px;flex:none;background:linear-gradient(160deg,#3a3f5c,#20243a);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.55);text-align:center">Kagura<br>bachi</div>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Kagurabachi</div><div style="font-size:11.5px;color:rgba(242,237,231,.5);margin-top:2px">Ch. 68 · 12h ago</div></div>
+<span style="display:flex;align-items:center;gap:2px;color:#8fae6d;font-size:11.5px;font-weight:700"><span class="msi" style="font-size:14px;font-variation-settings:'FILL' 0,'wght' 600">download_done</span>3</span>
+<span style="background:#C14033;color:#F2EDE7;font-size:11px;font-weight:700;padding:1px 7px">1</span>
+</div>
+</div>
+<div style="flex:none;padding:12px 18px 16px;display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(242,237,231,.1)">
+<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border:1.5px solid rgba(242,237,231,.4)"></span><span style="font-size:13px;font-weight:700;letter-spacing:.12em;color:rgba(242,237,231,.75)">PLAN TO READ</span><span style="font-size:12px;color:rgba(242,237,231,.45)">56</span></div>
+<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border:1.5px solid rgba(242,237,231,.4)"></span><span style="font-size:13px;font-weight:700;letter-spacing:.12em;color:rgba(242,237,231,.75)">COMPLETED</span><span style="font-size:12px;color:rgba(242,237,231,.45)">128</span></div>
+</div>
+</div>
+<div style="flex:1;display:flex;min-width:0;position:relative">
+<div style="position:absolute;inset:0 0 auto 0;height:250px;background:linear-gradient(180deg,rgba(143,174,109,.09),rgba(143,174,109,0))"></div>
+<div style="width:400px;flex:none;padding:26px 24px;display:flex;flex-direction:column;position:relative;min-height:0">
+<div style="display:flex;gap:16px">
+<div style="width:148px;height:211px;flex:none;background:linear-gradient(160deg,#3d5c4a,#243a2e);box-shadow:6px 6px 0 rgba(193,64,51,.35);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.6);text-align:center">Frieren<br>cover</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="font-size:21px;font-weight:700;line-height:1.3">Frieren: Beyond Journey's End</div>
+<div style="font-size:13.5px;color:rgba(242,237,231,.7);margin-top:6px">Yamada Kanehito · Abe Tsukasa</div>
+<div style="font-size:12.5px;color:rgba(242,237,231,.5);margin-top:3px">Ongoing · MangaDex (EN)</div>
+<span style="flex:1"></span>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(242,237,231,.55)"><span class="msi" style="font-size:16px;color:#8fae6d">cloud_done</span>In sync · both devices</div>
+</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+<span style="display:flex;align-items:center;gap:6px;height:36px;padding:0 16px;border:1px solid rgba(242,237,231,.3);font-size:13px;font-weight:700;color:#F2EDE7" style-hover="border-color:#C14033;color:#C14033"><span class="msf" style="font-size:17px;color:#C14033">favorite</span>IN LIBRARY</span>
+<span style="display:flex;align-items:center;gap:6px;height:36px;padding:0 16px;border:1px solid rgba(242,237,231,.3);font-size:13px;font-weight:700;color:#F2EDE7" style-hover="border-color:#C14033;color:#C14033"><span class="msi" style="font-size:17px">sync_alt</span>TRACKING · 2</span>
+<span class="msi" style="font-size:19px;color:rgba(242,237,231,.7);padding:8px" style-hover="background:rgba(242,237,231,.07)">public</span>
+<span class="msi" style="font-size:19px;color:rgba(242,237,231,.7);padding:8px" style-hover="background:rgba(242,237,231,.07)">share</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:20px"><span style="width:9px;height:9px;background:#C14033"></span><span style="font-size:12.5px;font-weight:700;letter-spacing:.12em">ABOUT</span></div>
+<div style="font-size:13px;line-height:1.7;color:rgba(242,237,231,.65);margin-top:6px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">After the Demon King falls, the elf mage Frieren outlives the heroes she journeyed with. Confronted with the weight of centuries, she sets out again — retracing the party's old route north, taking on new companions, and learning what her short-lived friends truly meant to her.</div>
+<div style="display:flex;justify-content:flex-end"><span style="display:flex;align-items:center;font-size:12px;font-weight:700;letter-spacing:.08em;color:#C14033">MORE<span class="msi" style="font-size:17px">expand_more</span></span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+<span style="height:26px;display:flex;align-items:center;padding:0 11px;border:1px solid rgba(242,237,231,.2);font-size:11.5px;color:rgba(242,237,231,.75)">Adventure</span>
+<span style="height:26px;display:flex;align-items:center;padding:0 11px;border:1px solid rgba(242,237,231,.2);font-size:11.5px;color:rgba(242,237,231,.75)">Fantasy</span>
+<span style="height:26px;display:flex;align-items:center;padding:0 11px;border:1px solid rgba(242,237,231,.2);font-size:11.5px;color:rgba(242,237,231,.75)">Drama</span>
+<span style="height:26px;display:flex;align-items:center;padding:0 11px;border:1px solid rgba(242,237,231,.2);font-size:11.5px;color:rgba(242,237,231,.75)">Award Winning</span>
+</div>
+<span style="flex:1"></span>
+<span style="display:flex;align-items:center;justify-content:center;gap:8px;height:42px;background:#C14033;color:#F2EDE7;font-size:13px;font-weight:700;letter-spacing:.06em;margin-top:16px" style-hover="background:#d24d40"><span class="msf" style="font-size:18px">play_arrow</span>CONTINUE READING · CH. 119</span>
+</div>
+<div style="flex:1;border-left:1px solid rgba(242,237,231,.1);display:flex;flex-direction:column;position:relative;min-width:0">
+<div style="display:flex;align-items:center;gap:9px;padding:22px 20px 10px">
+<span style="width:9px;height:9px;background:#C14033"></span>
+<span style="font-size:12.5px;font-weight:700;letter-spacing:.12em">122 CHAPTERS</span>
+<span style="flex:1"></span>
+<span style="font-size:11.5px;color:rgba(242,237,231,.4)">Unread · Downloaded</span>
+<span class="msi" style="font-size:19px;color:#C14033">filter_list</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:0 46px 6px 20px;justify-content:flex-end">
+<span class="msi" style="font-size:15px;color:rgba(242,237,231,.35)" title="On phone">smartphone</span>
+<span class="msi" style="font-size:15px;color:rgba(242,237,231,.35)" title="On this desktop">computer</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 122 — A Mage's Duel</div><div style="font-size:11.5px;color:rgba(242,237,231,.45);margin-top:2px">Today</div></div>
+<span class="msf" style="font-size:17px;color:#8fae6d" title="Downloaded on phone">smartphone</span>
+<span style="display:flex;align-items:center;gap:4px;border:1px solid #C14033;color:#C14033;font-size:11px;font-weight:700;padding:2px 9px" style-hover="background:rgba(193,64,51,.15)"><span class="msi" style="font-size:13px">download</span>PULL · 18 MB</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 121 — Sunrise</div><div style="font-size:11.5px;color:rgba(242,237,231,.45);margin-top:2px">Yesterday</div></div>
+<span class="msf" style="font-size:17px;color:#8fae6d">smartphone</span>
+<span class="msf" style="font-size:17px;color:#8fae6d">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 120 — The Hero of the Village</div><div style="font-size:11.5px;color:rgba(242,237,231,.45);margin-top:2px">4 days ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msf" style="font-size:17px;color:#8fae6d">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08);position:relative" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">Ch. 119 — Distant Journey</div><div style="font-size:11.5px;color:#C14033;margin-top:2px;font-weight:700">READING · PAGE 12 OF 45</div></div>
+<span class="msf" style="font-size:17px;color:#8fae6d">smartphone</span>
+<span class="msf" style="font-size:17px;color:#8fae6d">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+<div style="position:absolute;left:20px;bottom:0;width:120px;height:2px;background:rgba(193,64,51,.3)"><div style="width:27%;height:2px;background:#C14033"></div></div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 118 — Winter Provisions</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">2 weeks ago</div></div>
+<span class="msf" style="font-size:17px;color:#d3a94c">bookmark</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 117 — The Stellar Lake</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">2 weeks ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 116 — Aging</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">3 weeks ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 115 — The First-Class Exam</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">1 month ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 114 — Prelude</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">1 month ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 113 — Northern Plateau</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 112 — A Fellow Traveler</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-top:1px solid rgba(242,237,231,.08)" style-hover="background:rgba(242,237,231,.04)">
+<div style="flex:1;min-width:0"><div style="font-size:14px;color:rgba(242,237,231,.38)">Ch. 111 — Echoes</div><div style="font-size:11.5px;color:rgba(242,237,231,.28);margin-top:2px">2 months ago</div></div>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">smartphone</span>
+<span class="msi" style="font-size:17px;color:rgba(242,237,231,.22)">computer</span>
+<span class="msi" style="font-size:18px;color:rgba(242,237,231,.45)">more_vert</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p class="dv-next">Try next: "commit to <a class="dv-oid" href="#2a">2a</a>/<a class="dv-oid" href="#2b">2b</a>/<a class="dv-oid" href="#2c">2c</a> — build the reader, sync hub &amp; recents" · "mix <a class="dv-oid" href="#2b">2b</a> colors with <a class="dv-oid" href="#2c">2c</a> type" · "show the light theme of the winner"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">TachiMana desktop — wireframe explorations (shell · reader · rotation · sync)</span></div>
+
+<div class="wf" style="max-width:900px;margin:0 0 26px;border:1px dashed #bbb;border-radius:6px;padding:12px 16px;background:#fbfaf7">
+<div style="font-size:14px;margin-bottom:4px">Assumptions &amp; context</div>
+<div class="cap">· TachiMana = your fork of Yōkai (J2K lineage: Library w/ collapsible categories, Recents, Browse, cover-themed details, configurable reader). Desktop target: Compose Multiplatform, Windows + Linux, dark-first.<br>
+· These are structure sketches, not visuals — pick a shell, a reader model, and a sync model; visual-skin options come next round.<br>
+· Rotation feature: whole app rotates 90° inside the window (monitor physically rotates on the arm; OS stays landscape). Triggered by toolbar button + shortcut.<br>
+· Downloads sync = selective per-manga/per-device (your answer) — reflected in the sync wireframes.</div>
+</div>
+
+<p class="dv-group">A · App shell</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Nav rail + content — closest to Yokai's bottom nav, turned 90°</div>
+<div class="dv-card wf" style="width:520px">
+<div class="tb"><span>TachiMana</span><span class="winbtn">— ▢ ✕</span></div>
+<div class="row" style="gap:0;height:330px">
+<div class="rail" style="gap:7px">
+<div class="ric" style="color:#2a78d6"><div class="rgl" style="border-color:#2a78d6;background:#eaf2fc"></div>Library</div>
+<div class="ric"><div class="rgl"></div>Recents</div>
+<div class="ric"><div class="rgl"></div>Browse</div>
+<div class="ric"><div class="rgl"></div>Downloads</div>
+<div class="ric"><div class="rgl"></div>Sync</div>
+<div style="flex:1"></div>
+<div class="ric"><div class="rgl" style="border-radius:50%"></div>⟳ rotate</div>
+<div class="ric"><div class="rgl"></div>Settings</div>
+</div>
+<div class="col" style="flex:1;padding:10px 12px;gap:8px">
+<div class="row" style="justify-content:space-between;align-items:center">
+<span style="font-size:15px">Library</span>
+<span class="pill">⌕ search library…</span>
+<span class="chip">filter ▾</span>
+</div>
+<div style="font-size:12px;color:#444">▾ Reading <span class="cap">(42)</span></div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:7px">
+<div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div>
+</div>
+<div style="font-size:12px;color:#444">▸ Completed <span class="cap">(128)</span> · ▸ Plan to read <span class="cap">(56)</span></div>
+<div class="cap">categories stay collapsible like Yokai · unread badges on covers</div>
+</div>
+</div>
+</div>
+<div class="cap" style="max-width:520px">Safe, familiar. Every screen is a full-width page; details/reader navigate away like on the phone.</div>
+</div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Master–detail panes — details never leave the library</div>
+<div class="dv-card wf" style="width:560px">
+<div class="tb"><span>TachiMana</span><span class="winbtn">— ▢ ✕</span></div>
+<div class="row" style="gap:0;height:300px">
+<div class="rail" style="width:40px"><div class="ric" style="color:#2a78d6"><div class="rgl" style="border-color:#2a78d6"></div></div><div class="ric"><div class="rgl"></div></div><div class="ric"><div class="rgl"></div></div><div class="ric"><div class="rgl"></div></div></div>
+<div class="col" style="width:190px;border-right:1.5px dashed #aaa;padding:8px;gap:5px">
+<span class="pill" style="align-self:stretch;text-align:center">⌕ filter…</span>
+<div class="row b" style="padding:4px;border-color:#2a78d6;background:#eaf2fc"><div class="cov" style="width:24px"></div><div style="flex:1">One Piece<br><span class="cap">ch. 1088 · 3 new</span></div></div>
+<div class="row" style="padding:4px"><div class="cov" style="width:24px"></div><div style="flex:1">Berserk<br><span class="cap">ch. 375</span></div></div>
+<div class="row" style="padding:4px"><div class="cov" style="width:24px"></div><div style="flex:1">Frieren<br><span class="cap">ch. 122 · 1 new</span></div></div>
+<div class="row" style="padding:4px"><div class="cov" style="width:24px"></div><div style="flex:1">Dandadan<br><span class="cap">ch. 160</span></div></div>
+<div class="cap">list view = J2K's single-list library</div>
+</div>
+<div class="col" style="flex:1;padding:10px;gap:7px">
+<div class="row">
+<div class="cov" style="width:64px"></div>
+<div class="col" style="gap:3px;flex:1">
+<span style="font-size:15px">One Piece</span>
+<span class="cap">Oda Eiichiro · Ongoing · MangaDex</span>
+<div class="row"><span class="chip" style="border-color:#2a78d6;color:#2a78d6">▶ Resume ch. 1086</span><span class="chip">♥</span><span class="chip">track</span><span class="chip">sync ▾</span></div>
+</div>
+</div>
+<div class="d" style="padding:4px 8px">ch. 1088 · today · <span class="cap">⬇ on phone — click to pull</span></div>
+<div class="d" style="padding:4px 8px">ch. 1087 · 3d ago · <span class="cap">✓ synced both devices</span></div>
+<div class="d" style="padding:4px 8px;color:#999">ch. 1086 · read ◐</div>
+<div class="cap">chapter rows show per-device download state inline</div>
+</div>
+</div>
+</div>
+<div class="cap" style="max-width:560px">Desktop-native: browse + inspect without losing your place. Reader still opens full-window.</div>
+</div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Phone-familiar centered column — zero relearning</div>
+<div class="dv-card wf" style="width:380px">
+<div class="tb"><span>TachiMana</span><span class="winbtn">— ▢ ✕</span></div>
+<div class="row" style="gap:0;height:280px;background:repeating-linear-gradient(45deg,#f3f3f3 0 6px,#fafafa 6px 12px)">
+<div style="flex:1"></div>
+<div class="col" style="width:200px;background:#fff;border-left:1.5px solid #3a3a3a;border-right:1.5px solid #3a3a3a;gap:0">
+<div class="col" style="flex:1;padding:8px;gap:6px">
+<span class="pill">⌕ search</span>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+<div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div><div class="cov"></div>
+</div>
+</div>
+<div class="row" style="border-top:1.5px solid #3a3a3a;justify-content:space-around;padding:5px 0;font-size:10px">
+<span class="acc">Library</span><span>Recents</span><span>Browse</span><span>More</span>
+</div>
+</div>
+<div style="flex:1"></div>
+</div>
+</div>
+<div class="cap" style="max-width:380px">The phone layout, letterboxed. Honest baseline — but it's the "thin zoomed-out browser tab" you said you hate. Included to rule it out consciously.</div>
+</div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Tabbed workspace — series open like browser tabs</div>
+<div class="dv-card wf" style="width:520px">
+<div class="tb" style="justify-content:flex-start;gap:4px;border-bottom:none;padding-top:4px;height:26px">
+<span class="chip" style="border-bottom:none;border-radius:5px 5px 0 0">▦ Library</span>
+<span class="chip" style="border-bottom:none;border-radius:5px 5px 0 0;background:#eaf2fc;border-color:#2a78d6">One Piece — ch. 1088 ✕</span>
+<span class="chip" style="border-bottom:none;border-radius:5px 5px 0 0;color:#888">Berserk ✕</span>
+<span style="color:#888">+</span>
+<span style="flex:1"></span><span class="winbtn">— ▢ ✕</span>
+</div>
+<div class="col" style="height:280px;border-top:1.5px solid #3a3a3a;padding:8px;gap:6px;align-items:center;justify-content:center">
+<div class="row" style="height:220px">
+<div class="b f" style="width:74px"></div>
+<div class="b f" style="width:74px"></div>
+</div>
+<div class="row" style="align-items:center;width:80%"><span class="cap">1088</span><div style="flex:1;border-top:1.5px solid #555;position:relative"><div style="position:absolute;left:35%;top:-4px;width:8px;height:8px;border-radius:50%;background:#2a78d6"></div></div><span class="cap">12-13/45</span></div>
+</div>
+</div>
+<div class="cap" style="max-width:520px">Reader isn't modal — keep 3 series open, jump between them. Library is just the pinned first tab. Novel for manga apps; heavier to build.</div>
+</div>
+</div>
+
+<p class="dv-group">B · Reader on a wide landscape monitor</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Double-page spread — treat the monitor like an open book</div>
+<div class="dv-card wf" style="width:520px;background:#e9e9e9">
+<div class="col" style="height:300px;align-items:center;justify-content:center;gap:8px">
+<div class="row" style="height:230px;gap:0">
+<div class="b f" style="width:150px;border-right:none;border-radius:3px 0 0 3px"></div>
+<div class="b f" style="width:150px;border-radius:0 3px 3px 0"></div>
+</div>
+<div class="row" style="align-items:center;width:70%"><span class="cap">◀ next</span><div style="flex:1;border-top:1.5px solid #555;position:relative"><div style="position:absolute;left:60%;top:-4px;width:8px;height:8px;border-radius:50%;background:#2a78d6"></div></div><span class="cap">prev ▶ (RTL)</span></div>
+<div class="cap">Yokai's "combine 2 pages" mode as the desktop default · spread-aware (respects cover / offset pages)</div>
+</div>
+</div>
+<div class="cap" style="max-width:520px">Uses the width the honest way manga is printed. Controls auto-hide; toolbar on hover.</div>
+</div>
+
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Fit-height page + working side panels</div>
+<div class="dv-card wf" style="width:560px">
+<div class="row" style="gap:0;height:300px">
+<div class="col" style="width:74px;border-right:1.5px dashed #aaa;padding:6px;gap:4px;align-items:center">
+<span class="cap">pages ◂</span>
+<div class="cov" style="width:34px"></div><div class="cov" style="width:34px;border-color:#2a78d6;border-width:2px"></div><div class="cov" style="width:34px"></div><div class="cov" style="width:34px"></div>
+</div>
+<div class="col" style="flex:1;background:#e9e9e9;align-items:center;justify-content:center">
+<div class="b f" style="width:150px;height:270px"></div>
+</div>
+<div class="col" style="width:120px;border-left:1.5px dashed #aaa;padding:6px;gap:4px">
+<span class="cap">▸ chapters</span>
+<div class="d" style="padding:2px 5px;font-size:10.5px;border-color:#2a78d6;color:#2a78d6">ch. 1088 ●</div>
+<div class="d" style="padding:2px 5px;font-size:10.5px">ch. 1087</div>
+<div class="d" style="padding:2px 5px;font-size:10.5px">ch. 1086</div>
+<span class="cap" style="margin-top:6px">▸ tracking<br>▸ page info</span>
+</div>
+</div>
+</div>
+<div class="cap" style="max-width:560px">The dead side space becomes thumbnails + chapter list ("view all chapters in reader" is already a J2K feature). Panels collapse to go zen.</div>
+</div>
+
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Vertical strip, centered column — webtoon-first</div>
+<div class="dv-card wf" style="width:440px;background:#e9e9e9">
+<div class="row" style="gap:0;height:300px">
+<div class="col" style="width:26px;align-items:center;padding:8px 0"><div style="width:5px;flex:1;background:#d0d0d0;border-radius:3px;position:relative"><div style="position:absolute;top:20%;left:0;width:5px;height:18%;background:#2a78d6;border-radius:3px"></div></div><span class="cap" style="writing-mode:vertical-rl">minimap</span></div>
+<div class="col" style="flex:1;align-items:center;gap:2px;padding:6px 0;overflow:hidden">
+<div class="b f" style="width:170px;height:120px"></div>
+<div class="b f" style="width:170px;height:150px"></div>
+<div class="b f" style="width:170px;height:80px"></div>
+</div>
+<div class="col" style="width:40px;align-items:center;justify-content:center;gap:8px">
+<span class="chip" style="border-radius:50%;padding:3px 6px">Aa</span>
+<span class="chip" style="border-radius:50%;padding:3px 6px">⚙</span>
+<span class="chip" style="border-radius:50%;padding:3px 6px">⤢</span>
+</div>
+</div>
+</div>
+<div class="cap" style="max-width:440px">Long-strip mode: fixed comfortable column width, gutters host a scroll minimap + floating controls. Column width is a user dial, not a zoom.</div>
+</div>
+</div>
+
+<p class="dv-group">C · Portrait rotation (the monitor-arm trick)</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Whole-app 90° rotation — storyboard</div>
+<div class="dv-card wf" style="width:640px;padding:14px">
+<div class="row" style="gap:22px;align-items:flex-start">
+<div class="col" style="align-items:center;gap:6px;width:180px">
+<div class="b" style="width:170px;height:100px;padding:4px">
+<div class="row" style="gap:3px;height:100%">
+<div style="width:16px;border-right:1px solid #999"></div>
+<div class="col" style="flex:1;gap:3px"><div class="d" style="height:10px"></div><div class="f" style="flex:1;border:1px solid #bbb"></div></div>
+</div>
+</div>
+<div style="width:30px;border-left:1.5px solid #555;height:10px;margin-top:-4px"></div>
+<span class="cap" style="text-align:center">1 · normal landscape.<br>Press <b>⟳</b> in the rail or <b>Ctrl+Alt+R</b></span>
+</div>
+<div class="col" style="align-items:center;gap:6px;width:180px">
+<div class="b" style="width:170px;height:100px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#111">
+<div style="width:56px;height:96px;transform:rotate(-90deg);background:#fff;border:1px solid #888;display:flex;flex-direction:column;gap:2px;padding:3px">
+<div class="d" style="height:8px"></div><div class="f" style="flex:1;border:1px solid #bbb"></div><div class="d" style="height:8px"></div>
+</div>
+</div>
+<div style="width:30px;border-left:1.5px solid #555;height:10px;margin-top:-4px"></div>
+<span class="cap" style="text-align:center">2 · app re-lays-out as portrait, drawn sideways; unused area black.<br><span class="acc">OS untouched.</span></span>
+</div>
+<div class="col" style="align-items:center;gap:6px;width:130px">
+<div class="b" style="width:70px;height:120px;padding:3px">
+<div class="col" style="height:100%;gap:2px"><div class="d" style="height:8px"></div><div class="f" style="flex:1;border:1px solid #bbb"></div><div class="d" style="height:8px"></div></div>
+</div>
+<div style="width:26px;border-left:1.5px solid #555;height:10px;margin-top:-4px"></div>
+<span class="cap" style="text-align:center">3 · you rotate the monitor on the arm → tall, phone-like reading. Rotate back anytime.</span>
+</div>
+</div>
+<div class="cap" style="margin-top:12px">Feasible in Compose: render the whole scene into a 90°-rotated canvas w/ swapped width/height + remapped pointer input. Fullscreen/borderless recommended while rotated. Rotation state is per-window and remembered.</div>
+</div>
+</div>
+</div>
+
+<p class="dv-group">D · Sync model (library · progress · tracking · selective downloads)</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1i"><div class="dv-olabel"><a class="dv-oid" href="#1i">1i</a>Self-hosted server hub — one source of truth</div>
+<div class="dv-card wf" style="width:520px;padding:10px">
+<div class="col" style="gap:8px">
+<div class="b" style="padding:6px 10px"><span class="acc">●</span> tachimana.home.lan:4242 · <span class="cap">connected · last full sync 2 min ago</span></div>
+<div class="row">
+<div class="d" style="flex:1;padding:6px 8px">📱 Pixel 8 <span class="cap">· synced 2m ago<br>⬇ 3.2 GB local</span></div>
+<div class="d" style="flex:1;padding:6px 8px">🖥 Desktop (this) <span class="cap">· live<br>⬇ 1.1 GB local</span></div>
+</div>
+<div style="font-size:13px">What syncs</div>
+<div class="row" style="flex-wrap:wrap;gap:5px">
+<span class="chip">✓ Library</span><span class="chip">✓ Categories</span><span class="chip">✓ Read progress</span><span class="chip">✓ Tracking</span><span class="chip">✓ History</span><span class="chip" style="border-color:#2a78d6;color:#2a78d6">Downloads: selective ▾</span>
+</div>
+<div class="d" style="padding:6px 8px">
+<div class="cap" style="margin-bottom:4px">DOWNLOAD SYNC — per manga, per device</div>
+<div class="row" style="font-size:11px;gap:0"><span style="flex:1">One Piece</span><span style="width:60px">📱 ✓</span><span style="width:60px">🖥 ✓</span></div>
+<div class="row" style="font-size:11px;gap:0"><span style="flex:1">Berserk</span><span style="width:60px">📱 ✓</span><span style="width:60px;color:#bbb">🖥 —</span></div>
+<div class="row" style="font-size:11px;gap:0"><span style="flex:1">Frieren</span><span style="width:60px;color:#bbb">📱 —</span><span style="width:60px">🖥 ✓</span></div>
+</div>
+</div>
+</div>
+<div class="cap" style="max-width:520px">Server (NAS/VPS) holds library DB + downloaded archives; devices subscribe. Most robust; works away from home; you run one service.</div>
+</div>
+
+<div class="dv-opt" id="1j"><div class="dv-olabel"><a class="dv-oid" href="#1j">1j</a>Direct LAN pairing — no server</div>
+<div class="dv-card wf" style="width:440px;padding:12px">
+<div class="row" style="align-items:center;justify-content:center;gap:14px">
+<div class="b" style="width:60px;height:100px;display:flex;align-items:center;justify-content:center">📱</div>
+<div class="col" style="align-items:center;gap:4px;width:130px;text-align:center">
+<span class="cap" style="white-space:nowrap">⇄ LAN · paired</span>
+<span class="chip" style="font-family:ui-monospace;letter-spacing:2px">482-913</span>
+<span class="cap">syncing when both awake</span>
+</div>
+<div class="b" style="width:120px;height:80px;display:flex;align-items:center;justify-content:center">🖥</div>
+</div>
+<div class="d" style="margin-top:10px;padding:5px 8px;font-size:11px">transfer queue: One Piece ch. 1088 <span class="acc">▮▮▮▮▯▯ 64%</span> · 3 queued</div>
+</div>
+<div class="cap" style="max-width:440px">Devices talk directly when on the same network. Zero infrastructure, fully private — but no sync while away, and both must be online to hand off.</div>
+</div>
+
+<div class="dv-opt" id="1k"><div class="dv-olabel"><a class="dv-oid" href="#1k">1k</a>Cloud storage backend — WebDAV / S3 / Drive</div>
+<div class="dv-card wf" style="width:440px;padding:12px">
+<div class="row" style="align-items:center;justify-content:center;gap:14px">
+<div class="b" style="width:60px;height:100px;display:flex;align-items:center;justify-content:center">📱</div>
+<div class="col" style="align-items:center;gap:2px">
+<span class="cap">⇅</span>
+<div class="d" style="padding:6px 12px;border-radius:999px">☁ webdav://box/tachimana</div>
+<span class="cap">⇅</span>
+</div>
+<div class="b" style="width:120px;height:80px;display:flex;align-items:center;justify-content:center">🖥</div>
+</div>
+<div class="cap" style="margin-top:10px">library.db + CBZ archives live in the bucket; devices pull/push on schedule. Works anywhere, nothing to host — but conflict resolution is on the app, and full-archive sync can be slow/pricey.</div>
+</div>
+<div class="cap" style="max-width:440px">Middle ground. Pairs well with Yokai's existing cloud-backup habit.</div>
+</div>
+</div>
+
+<p class="dv-next">Try next: "shell <a class="dv-oid" href="#1b">1b</a> + reader <a class="dv-oid" href="#1e">1e</a>/<a class="dv-oid" href="#1f">1f</a>, sync <a class="dv-oid" href="#1i">1i</a> — go hi-fi" · "riff more on the tabbed idea <a class="dv-oid" href="#1d">1d</a>" · "show visual-skin directions for the winner"</p>
+</section>
+</x-dc>
+</body>
+</html>

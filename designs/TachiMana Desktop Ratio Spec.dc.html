@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+doc-page:not(:defined){visibility:hidden}
+body{margin:0;background:#33343a}
+.rs{font-family:Inter,system-ui,sans-serif;color:#1b1c20;font-size:10.5pt;line-height:1.5}
+.rs h1{font-size:26pt;font-weight:700;letter-spacing:-.02em;margin:0 0 4px;color:#101114}
+.rs h2{font-size:15pt;font-weight:700;letter-spacing:-.01em;margin:26px 0 8px;padding-bottom:5px;border-bottom:2px solid #3399FF;color:#101114}
+.rs h3{font-size:11.5pt;font-weight:600;margin:16px 0 5px;color:#22242a}
+.rs p{margin:0 0 8px;text-wrap:pretty}
+.rs .lead{font-size:11pt;color:#4a4d55;margin-bottom:2px}
+.rs .sub{color:#6a6d76;font-size:9pt;margin-bottom:14px}
+.rs code{font-family:'JetBrains Mono',monospace;font-size:8.8pt;background:#eef1f5;color:#1c3a5e;padding:1px 4px;border-radius:3px;white-space:nowrap}
+.rs strong{font-weight:600;color:#101114}
+.rs ol,.rs ul{margin:0 0 8px;padding-left:20px}
+.rs li{margin:2px 0;text-wrap:pretty}
+.rs table{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:8.8pt}
+.rs th{background:#1c1c1d;color:#fff;text-align:left;font-weight:600;padding:5px 8px;border:1px solid #1c1c1d}
+.rs td{padding:4px 8px;border:1px solid #dfe3e9;vertical-align:top}
+.rs tbody tr:nth-child(even) td,.rs tr:nth-child(even) td{background:#f6f8fa}
+.rs td code{background:#e7ebf1;font-size:8.2pt}
+.rs .callout{border-left:3px solid #3399FF;background:#eef5fe;padding:9px 13px;border-radius:0 6px 6px 0;margin:10px 0;font-size:9.3pt;color:#254}
+.rs .callout.warn{border-color:#C14033;background:#fdf0ee;color:#5a2620}
+.rs .callout b{color:#101114}
+.rs .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin-right:5px;border:1px solid rgba(0,0,0,.15)}
+.rs .tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:7.5pt;font-weight:600;padding:1px 5px;border-radius:3px;vertical-align:middle}
+.rs .tag.fix{background:#e6ebf1;color:#3a4657}
+.rs .tag.scl{background:#e2f0ff;color:#1668c4}
+.rs .meta{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0 4px;font-size:9pt;color:#4a4d55}
+.rs .meta b{display:block;font-size:7.5pt;text-transform:uppercase;letter-spacing:.08em;color:#8a8d96;font-weight:600;margin-bottom:1px}
+.rs .themead{border-bottom-color:#78bcff}
+.rs section{break-inside:auto}
+.rs .kbd{font-family:'JetBrains Mono',monospace;font-size:8pt;border:1px solid #b8bdc7;border-bottom-width:2px;border-radius:4px;padding:1px 6px;background:#fafbfc}
+.rs .foot{display:flex;align-items:center;gap:8px;font-size:8pt;color:#8a8d96;font-family:'JetBrains Mono',monospace}
+.rs .foot .d{width:6px;height:6px;border-radius:2px;background:#3399FF}
+</style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="letter" margin="0.7in" hint-size="816px,1056px">
+<div slot="footer" class="rs foot" style="justify-content:space-between;padding-top:6px;border-top:1px solid #e2e5ea"><span><span class="d"></span> TachiMana Desktop · Ratio Spec</span><span>Compose Multiplatform · Windows + Linux</span></div>
+<div class="rs">
+
+<h1>TachiMana Desktop</h1>
+<p class="lead">Ratio Spec — resolution-independent layout handoff</p>
+<p class="sub">Desktop fork of Yōkai (<code>null2264/yokai</code>) · target <strong>Compose Multiplatform</strong> (JVM desktop). Companion to the prototype <code>TachiMana Desktop.dc.html</code> and skin studies <code>TachiMana Explorations.dc.html</code>.</p>
+<p>Implement to this document, not to screenshots. Every number is tagged <span class="tag fix">FIXED</span> density or <span class="tag scl">SCALING</span> width-class; the vertical axis is always an ordered flex stack with a single weighted spacer — never a coordinate table.</p>
+
+<section>
+<h2>§0 · How to read this spec</h2>
+<p>Every dimension is one of three kinds:</p>
+<ul>
+<li><strong>(a) Density — fixed.</strong> Type size, radius, stroke, icon glyph, elevation, padding, gap, fixed row/bar/chip heights. In <code>dp</code> (<code>sp</code> for text). Compose density handles HiDPI — never multiply by window width.</li>
+<li><strong>(b) Width-class — scaling.</strong> Only the elements in <strong>§1.6</strong> track window width, via <strong>window size-class breakpoints</strong> (not a raw %).</li>
+<li><strong>(c) Vertical position.</strong> Never a top/height % table. Each screen is a <code>Column</code>/<code>Row</code> of fixed/intrinsic blocks with <strong>exactly one</strong> <code>Modifier.weight(1f)</code> spacer (or a <code>LazyColumn</code> that absorbs slack).</li>
+</ul>
+<p><strong>Baseline reference size:</strong> <code>1360 × 840 dp</code> content area (prototype canvas). Production target <code>1920 × 1080</code>. All ratios computed <code>@1360</code> unless noted.</p>
+<h3>§0.1 · Window size-class breakpoints</h3>
+<table>
+<tr><th>Class</th><th>Window width</th><th>Library master pane</th><th>Detail split</th><th>Rail</th></tr>
+<tr><td><code>COMPACT</code></td><td><code>&lt; 900</code></td><td>list OR detail (single, back-nav)</td><td>stacked, tabs</td><td>icons only <code>60</code></td></tr>
+<tr><td><code>MEDIUM</code></td><td><code>900–1439</code></td><td><code>340</code> list + detail</td><td>info + chapters side-by-side</td><td>icon+label <code>76</code></td></tr>
+<tr><td><code>EXPANDED</code></td><td><code>≥ 1440</code></td><td><code>360</code> list + detail</td><td>info <code>400</code> + chapters flex</td><td>icon+label <code>76</code></td></tr>
+</table>
+<p>Fixed panes keep their <code>dp</code> width across the class; the <strong>detail/chapters pane is the flexing region</strong> — it absorbs all extra window width. Below <code>COMPACT</code>, master–detail collapses to Yōkai's phone single-pane behavior.</p>
+</section>
+
+<section>
+<h2>§1 · Foundation tokens</h2>
+<p>Three shipping themes (all approved). <strong>Yokai Dark is the default</strong> and the prototype skin. Midnight and Ink&nbsp;&amp;&nbsp;Vermilion are selectable in Settings → Appearance; each theme has a light variant.</p>
+
+<h3>§1.1 · Color — Yokai Dark (default) / Yokai Light</h3>
+<p class="sub" style="margin:-2px 0 8px">Verbatim from <code>app/src/main/res/values*/colors.xml</code>.</p>
+<table>
+<tr><th>Token</th><th>Dark</th><th>Light</th><th>Usage</th></tr>
+<tr><td><code>background</code></td><td><span class="sw" style="background:#1C1C1D"></span><code>#1C1C1D</code></td><td><span class="sw" style="background:#FAFAFA"></span><code>#FAFAFA</code></td><td>app canvas</td></tr>
+<tr><td><code>surface</code></td><td><span class="sw" style="background:#202125"></span><code>#202125</code></td><td><span class="sw" style="background:#E5ECF4"></span><code>#E5ECF4</code></td><td>search pill, chips, cards, sheets</td></tr>
+<tr><td><code>surfaceTitlebar</code></td><td><span class="sw" style="background:#161617"></span><code>#161617</code></td><td><span class="sw" style="background:#EDEDED"></span><code>#EDEDED</code></td><td>window titlebar</td></tr>
+<tr><td><code>primary</code></td><td><span class="sw" style="background:#78BCFF"></span><code>#78BCFF</code></td><td><span class="sw" style="background:#54759E"></span><code>#54759E</code></td><td>subtle brand accents</td></tr>
+<tr><td><code>secondary</code> / <strong>accent</strong></td><td><span class="sw" style="background:#3399FF"></span><code>#3399FF</code></td><td><span class="sw" style="background:#2979FF"></span><code>#2979FF</code></td><td>active nav, buttons, links, progress, selection</td></tr>
+<tr><td><code>accentRipple</code></td><td><code>#1F3399FF</code></td><td><code>#1F2979FF</code></td><td>pressed / ripple</td></tr>
+<tr><td><code>onBackground</code></td><td><span class="sw" style="background:#fff"></span><code>#FFFFFF</code></td><td><code>#DE000000</code></td><td>primary text</td></tr>
+<tr><td><code>onBackgroundMed</code></td><td><code>#FFFFFF 55%</code></td><td><code>#000000 54%</code></td><td>secondary text</td></tr>
+<tr><td><code>onBackgroundDim</code></td><td><code>#FFFFFF 30%</code></td><td><code>#000000 38%</code></td><td>tertiary / read chapters</td></tr>
+<tr><td><code>railInactive</code></td><td><code>#FFFFFF 76%</code></td><td><span class="sw" style="background:#424242"></span><code>#C2424242</code></td><td>inactive rail icon/label</td></tr>
+<tr><td><code>divider</code></td><td><code>#FFFFFF 6–8%</code></td><td><code>#1F000000</code></td><td>hairlines</td></tr>
+<tr><td><code>unreadBadge</code> bg/fg</td><td><span class="sw" style="background:#3399FF"></span><code>#3399FF</code>/<code>#FFF</code></td><td>same</td><td>unread count</td></tr>
+<tr><td><code>downloadBadge</code> bg/fg</td><td><span class="sw" style="background:#106010"></span><code>#106010</code>/<code>#FFF</code></td><td><span class="sw" style="background:#99CC99"></span><code>#99CC99</code>/<code>#000</code></td><td>downloaded count</td></tr>
+<tr><td><code>syncOk</code></td><td><span class="sw" style="background:#99CC99"></span><code>#99CC99</code></td><td><span class="sw" style="background:#4C8C4C"></span><code>#4C8C4C</code></td><td>synced / present-on-device</td></tr>
+<tr><td><code>bookmark</code></td><td><span class="sw" style="background:#E6C34C"></span><code>#E6C34C</code></td><td><span class="sw" style="background:#C9A227"></span><code>#C9A227</code></td><td>bookmarked page</td></tr>
+<tr><td><code>closeHover</code></td><td><span class="sw" style="background:#C42B1C"></span><code>#C42B1C</code></td><td><code>#C42B1C</code></td><td>window close hover</td></tr>
+</table>
+
+<h3 class="themead">§1.2 · Color — Midnight &amp; Ink &amp; Vermilion (alt themes)</h3>
+<p>Structural token roles identical to §1.1; only values change.</p>
+<p><strong><span class="sw" style="background:#0E1418"></span>Midnight</strong> (fork's own <code>yokai_background</code>): <code>background #0E1418</code> · <code>surface #182028</code> · <code>surfaceTitlebar #0A0F13</code> · <code>accent #78BCFF</code> · <code>unreadBadge #78BCFF</code>/fg <code>#071D39</code> · <code>syncOk #7ADC77</code> · <code>onBackground #E8EEF4</code>. Radii unified to <code>12</code> (§1.5). Rail is <strong>icon-only</strong> at <code>60</code>.</p>
+<p><strong><span class="sw" style="background:#141112"></span>Ink &amp; Vermilion</strong>: <code>background #141112</code> · <code>surface #1D191A</code> · <code>surfaceTitlebar #0F0D0E</code> · <strong>accent <span class="sw" style="background:#C14033"></span><code>#C14033</code></strong> (repo <code>primaryRed</code>) · badges square (<code>radius 0</code>) accent-filled · <code>syncOk #8FAE6D</code> · <code>bookmark #D3A94C</code> · <code>onBackground #F2EDE7</code>. Type = Zen Kaku Gothic New, heavier weights, UPPERCASE tracked labels. Rail item = left <code>3dp</code> accent bar. Cover shadow = hard offset <code>6dp 6dp 0 accent@35%</code>, not blur.</p>
+
+<h3>§1.3 · Type scale</h3>
+<p>Default <strong>Roboto</strong> (Yokai Dark / Midnight). Ink &amp; Vermilion swaps to <strong>Zen Kaku Gothic New</strong> and renders <code>*_LABEL</code> styles UPPERCASE, <code>+0.12em</code> tracking.</p>
+<table>
+<tr><th>Style</th><th>Family · weight</th><th>Size / line-height</th><th>Usage</th></tr>
+<tr><td><code>screenTitle</code></td><td>Roboto 500</td><td><code>24 / 30</code></td><td>page headers (Recents, Browse, Settings, Sync)</td></tr>
+<tr><td><code>detailTitle</code></td><td>Roboto 500</td><td><code>22 / 28</code></td><td>manga title on detail</td></tr>
+<tr><td><code>sectionHeader</code></td><td>Roboto 500</td><td><code>18 / 24</code></td><td>library category header, "122 chapters"</td></tr>
+<tr><td><code>titleMedium</code></td><td>Roboto 500</td><td><code>17 / 22</code></td><td>detail section subheads</td></tr>
+<tr><td><code>body</code></td><td>Roboto 400</td><td><code>14.5 / 20</code></td><td>row titles, recents primary</td></tr>
+<tr><td><code>bodyRow</code></td><td>Roboto 500</td><td><code>14 / 19</code></td><td>list/chapter row title</td></tr>
+<tr><td><code>bodySmall</code></td><td>Roboto 400</td><td><code>13.5 / 18</code></td><td>descriptions, source rows</td></tr>
+<tr><td><code>caption</code></td><td>Roboto 400</td><td><code>12 / 16</code></td><td>subtitles, dates</td></tr>
+<tr><td><code>label</code></td><td>Roboto 500</td><td><code>13 / 16</code></td><td>buttons, chips, tab labels</td></tr>
+<tr><td><code>badge</code></td><td>Roboto 600</td><td><code>11 / 14</code></td><td>unread/download counts</td></tr>
+<tr><td><code>railLabel</code></td><td>Roboto 500/400</td><td><code>10.5 / 13</code></td><td>rail item labels</td></tr>
+<tr><td><code>pageNum</code></td><td>Roboto 400</td><td><code>15 / 20</code></td><td>reader page numbers</td></tr>
+<tr><td><code>mono</code></td><td>ui-monospace</td><td><code>13</code></td><td>shortcut hints, sync codes, page markers</td></tr>
+</table>
+
+<div style="display:flex;gap:16px;break-inside:avoid">
+<div style="flex:1">
+<h3>§1.4 · Spacing scale <span class="tag fix">FIXED dp</span></h3>
+<table>
+<tr><th>Token</th><th>Val</th><th>Usage</th></tr>
+<tr><td><code>xxs</code></td><td><code>2</code></td><td>badge internal, thumb gaps</td></tr>
+<tr><td><code>xs</code></td><td><code>4</code></td><td>icon-to-text, chip inner</td></tr>
+<tr><td><code>sm</code></td><td><code>6</code></td><td>list row vertical, chip gap</td></tr>
+<tr><td><code>md</code></td><td><code>8</code></td><td>rail gap, button row, gutter</td></tr>
+<tr><td><code>base</code></td><td><code>10</code></td><td>row gap, section inner</td></tr>
+<tr><td><code>lg</code></td><td><code>12</code></td><td>pane pad-v, card gap</td></tr>
+<tr><td><code>xl</code></td><td><code>16</code></td><td>content edge, detail gap</td></tr>
+<tr><td><code>2xl</code></td><td><code>20</code></td><td>reader nav, sheet row pad</td></tr>
+<tr><td><code>3xl</code></td><td><code>24</code></td><td>detail pane pad, header top</td></tr>
+</table>
+</div>
+<div style="flex:1">
+<h3>§1.5 · Corner-radius <span class="tag fix">FIXED dp</span></h3>
+<table>
+<tr><th>Token</th><th>Dark</th><th>Mid</th><th>Ink</th><th>Usage</th></tr>
+<tr><td><code>sm</code></td><td><code>4</code></td><td><code>6</code></td><td><code>0</code></td><td>thumbs, badges</td></tr>
+<tr><td><code>md</code></td><td><code>8</code></td><td><code>12</code></td><td><code>0</code></td><td>detail cover, chips</td></tr>
+<tr><td><code>lg</code></td><td><code>10</code></td><td><code>12</code></td><td><code>0</code></td><td>row hover, dl rows</td></tr>
+<tr><td><code>xl</code></td><td><code>12</code></td><td><code>12</code></td><td><code>0</code></td><td>preview/sync cards</td></tr>
+<tr><td><code>pill</code></td><td><code>20</code></td><td><code>12</code></td><td><code>0</code></td><td>search, primary btn, filter</td></tr>
+<tr><td><code>chip</code></td><td><code>16</code></td><td><code>12</code></td><td><code>0</code></td><td>segmented tabs, lang chips</td></tr>
+<tr><td><code>full</code></td><td colspan="3" style="text-align:center"><code>50%</code></td><td>round icon btns, dots</td></tr>
+</table>
+</div>
+</div>
+<div class="callout"><b>Methodology:</b> radius is <b>density</b>, not width-class. Theme switching remaps the token table — it never recomputes per window size.</div>
+
+<h3>§1.6 · Width-class ratios — the ONLY adaptive elements <span class="tag scl">SCALING</span></h3>
+<p>Everything not in this table is a <strong>fixed <code>dp</code></strong> value. On desktop, "scaling" = the §0.1 size-class rules plus the two clamped elements below.</p>
+<table>
+<tr><th>Element</th><th>Rule</th><th>Note</th></tr>
+<tr><td>Detail / chapters pane</td><td><code>flex: 1</code> — absorbs leftover window width</td><td>the single flexing region; min <code>520</code>, above which chapters column grows</td></tr>
+<tr><td>Reader strip column</td><td><code>clamp(440, 42vw, 720)</code></td><td>webtoon comfort column; <strong>user dial</strong>, not a zoom — persists per manga</td></tr>
+<tr><td>Reader spread / fit page</td><td>height-bound <code>100%</code>, <code>aspect-ratio 2/3</code></td><td>never width-scaled; two pages side-by-side in spread</td></tr>
+<tr><td>Single-column screens</td><td><code>max-width 860</code>, left-aligned</td><td>Recents / Browse / Downloads / Settings don't stretch full width</td></tr>
+<tr><td>Sync screen</td><td><code>max-width 900</code></td><td>—</td></tr>
+</table>
+<p class="sub">Rail (<code>60/76</code>), library list pane (<code>340/360/400</code>), detail info column (<code>400</code>), reader side rail (<code>88</code>) and chapter panel (<code>230</code>) are all <strong>fixed</strong> per size-class — in §0.1 / §2, not here.</p>
+</section>
+
+<section>
+<h2>§2 · Shared components</h2>
+<p>Specified once; screen recipes reference by number.</p>
+<h3>§2.1 · Window titlebar</h3>
+<p>Height <code>36</code> · bg <code>surfaceTitlebar</code>. Row: <code>xl</code> left → brand dot (<code>9</code>, <code>accent</code>) → <code>md</code> → wordmark <code>caption</code>@85% → <code>weight(1f)</code> → <strong>sync status</strong> (<code>sync</code> 14 <code>syncOk</code> + "Synced · 2 min ago") → window controls: three glyphs <code>remove</code>/<code>crop_square</code>/<code>close</code> <code>15</code>@60%, hit <code>45×36</code>, hover <code>#FFF 8%</code>; <code>close</code> hover <code>closeHover</code>+white. Custom-drawn borderless window; <code>WindowDraggableArea</code> on brand/wordmark.</p>
+<h3>§2.2 · Navigation rail (left)</h3>
+<p>Width <code>76</code> (<code>MEDIUM/EXPANDED</code>) / <code>60</code> (<code>COMPACT</code>) · right divider · top pad <code>lg</code>, item gap <code>md</code>. <strong>Top:</strong> Library, Recents, Browse, Downloads, Sync. <strong>Bottom</strong> (after <code>weight(1f)</code>): Rotate, Settings. Item = <code>Column</code>: capsule <code>52×28</code> + <code>railLabel</code>. Active: capsule <code>accentRipple→18%</code>, <strong>filled</strong> glyph <code>21</code> <code>accent</code>, label accent/white 500. Inactive: transparent, outline glyph <code>railInactive</code>. Sync item carries a <code>7</code> <code>syncOk</code> dot. Ink&amp;V variant: no capsule; full-width item, left <code>3</code> accent bar when active.</p>
+<h3>§2.3 · Search field</h3>
+<p>Height <code>44</code> · radius <code>pill</code> · bg <code>surface</code> · pad <code>xl</code>. <code>search</code> 20@60% → placeholder <code>body</code>@50% → optional <code>Ctrl K</code> mono hint (Midnight) → trailing <code>filter_list</code> 20@70%. Browse variant: <code>travel_explore</code> + "Global search — all sources…".</p>
+<h3>§2.4 · Library list row (master pane)</h3>
+<p><code>Row</code> v-center · pad <code>sm md</code> · radius <code>lg</code> · gap <code>base</code>. Cover <code>40×57</code> radius <code>sm</code>. Middle: title <code>bodyRow</code> ellipsized · subtitle <code>caption</code>@55%. Trailing (gap <code>xs</code>): download badge §2.8, unread badge §2.8. Hover <code>#FFF 5%</code>. <strong>Selected</strong> <code>accentRipple→14%</code>.</p>
+<h3>§2.5 · Category header (library)</h3>
+<p><code>Row</code> pad <code>lg xl</code>: chevron <code>18</code> → title <code>sectionHeader</code> → count <code>caption</code>@50% → <code>weight(1f)</code> → sort label <code>caption</code>@70% + <code>sort</code> 16 → <code>refresh</code> 18. Collapsed categories render header only.</p>
+<h3>§2.6 · Chapter row (detail + reader panel)</h3>
+<p><code>Row</code> v-center pad <code>sm 2xl</code> · top divider · gap <code>base</code>. Leading: title <code>bodyRow</code> (read → @40%) · status <code>caption</code> ("Reading · Page 12 of 45" → <code>accent</code>). <strong>Device cluster</strong> (gap <code>base</code>): <code>smartphone</code> + <code>computer</code> <code>17</code> — <strong>filled <code>syncOk</code></strong> = on that device, <strong>outline @25%</strong> = absent; optional <code>bookmark</code>. Not-on-desktop → <strong>Pull pill</strong>: <code>download</code> 13 + "Pull · N MB", outlined <code>accent</code>, radius <code>12</code>. Trailing <code>more_vert</code> 18@50%. Header row: right-aligned <code>smartphone</code>/<code>computer</code> 15@40% legend.</p>
+<h3>§2.7 · Buttons</h3>
+<ul>
+<li><strong>Primary</strong> (Continue Reading, Sync now): height <code>40</code> · radius <code>pill</code> · bg <code>accent</code> · fg white (Midnight <code>#071D39</code>) · <code>label</code> 14/500 · leading filled glyph <code>18</code> · hover +10% L. Full-width in detail info column.</li>
+<li><strong>Outlined</strong> (In Library, Tracking, Pause all): height <code>36</code> · radius <code>pill</code> · <code>1dp</code> <code>#FFF 28%</code> border · fg <code>accent</code> · hover <code>accentRipple→10%</code>.</li>
+<li><strong>Icon button</strong>: glyph <code>20</code>@75% · <code>8dp</code> pad · radius <code>full</code> · hover <code>#FFF 8%</code>.</li>
+<li><strong>Text action</strong> (Latest, Browse, Configure, More): <code>label</code> <code>accent</code> · <code>6 10</code> pad · radius <code>md</code> hover.</li>
+</ul>
+<h3>§2.8 · Badges</h3>
+<p>Unread: bg <code>accent</code>, fg white, radius <code>sm</code> (Ink&amp;V <code>0</code>), <code>badge</code>, pad <code>1 6</code>. Download: bg <code>downloadBadge</code>, <code>download_done</code> 12 + count. On covers stack top-left <code>3dp</code> margins; in list sit inline right (§2.4).</p>
+<h3>§2.9 · Filter / segmented chips</h3>
+<p>Height <code>32</code> · radius <code>chip</code> · pad <code>xl</code>. Active <code>accentRipple→18%</code> + accent label; inactive bg <code>surface</code> + <code>onBackgroundMed</code>. Used in Recents tabs, Browse actions, Sync backend selector.</p>
+<h3>§2.10 · Reader top app bar</h3>
+<p>Height <code>48</code> · bg <code>surfaceTitlebar</code>@96% · bottom hairline. <code>arrow_back</code> icon-btn → title <code>Column</code> (manga <code>body</code>/500 ellipsized + chapter <code>caption</code>@55%) → <code>weight(1f)</code> → <code>bookmark_add</code>, <code>screen_rotation</code>, <code>more_vert</code>. Auto-hides on idle in production.</p>
+<h3>§2.11 · Reader bottom nav bar</h3>
+<p>Two rows, bg <code>surfaceTitlebar</code>@96%, top hairline. <strong>Row 1</strong> (pad <code>md 2xl</code>): <code>skip_previous</code> → page label <code>pageNum</code> <code>44</code>w → <strong>slider</strong> §2.13 (<code>direction:rtl</code> for RTL) → total <code>32</code>w → <code>skip_next</code>. <strong>Row 2</strong> (center gap <code>26</code>): <code>format_list_numbered</code> (sheet) + <strong>fit-mode trio</strong> <code>auto_stories</code>·<code>crop_portrait</code>·<code>swap_vert</code> (active accent) + <code>crop</code> + <code>tune</code>. Chapters sheet §2.12 expands below.</p>
+<h3>§2.12 · Chapters sheet (reader)</h3>
+<p>Slide-up, max-height <code>220</code>, own scroll, top hairline. Rows: pad <code>sm 2xl</code> — title <code>bodySmall</code> (current → accent/500, read → @45%) + <code>weight(1f)</code> + meta <code>caption</code>. Mirrors Yōkai <code>reader_chapters_sheet.xml</code>; on desktop an inline expandable, not a gesture sheet.</p>
+<div style="display:flex;gap:16px;break-inside:avoid">
+<div style="flex:1">
+<h3>§2.13 · Slider</h3>
+<p>Track <code>4dp</code> · radius <code>2</code> · inactive <code>accentRipple→30%</code> · active <code>accent</code>. Thumb <code>14</code> circle <code>accent</code>. Reader slider stepped (1..pageCount), RTL for right-to-left titles.</p>
+<h3>§2.14 · Toggle</h3>
+<p>Material switch, <code>toggle_on</code> filled <code>accent</code> / <code>toggle_off</code> <code>20</code>@35%. Sync matrix: one per device column per manga row.</p>
+</div>
+<div style="flex:1">
+<h3>§2.15 · Device card (sync)</h3>
+<p><code>Row</code> pad <code>lg</code> radius <code>xl</code> bg <code>surface</code>: device glyph <code>22</code>@75% → <code>Column</code>(name <code>bodySmall</code>/500 + status <code>caption</code>@50%) → <code>weight(1f)</code> → dot <code>8</code> <code>syncOk</code>. <strong>This device</strong>: <code>1dp</code> <code>accentRipple→40%</code> border.</p>
+<h3>§2.16 · Theme preview card</h3>
+<p>Width <code>190</code> · radius <code>xl</code> · <code>2dp</code> border (accent if selected). Top <code>100</code>h mini-mock in the theme's own tokens. Bottom strip bg <code>surface</code>: <code>check_circle</code>/<code>circle</code> + name <code>label</code>.</p>
+</div>
+</div>
+<h3>§2.17 · Source row (browse)</h3>
+<p><code>Row</code> pad <code>md md</code> radius <code>lg</code>: logo <code>40×40</code> radius <code>md</code> (2-letter) → <code>Column</code>(name <code>body</code>/500 + "lang · version"; update flagged bookmark-yellow) → "Latest"/"Browse" §2.7 → <code>push_pin</code> 18 (accent filled if pinned). Grouped under <code>caption</code>/500@60% language headers.</p>
+
+<div class="callout warn" style="break-inside:avoid">
+<h3 style="margin:0 0 4px">§2.18 · App rotation transform <span style="font-weight:400;font-size:9pt">— the monitor-arm feature</span></h3>
+<p style="margin:0 0 6px">Whole-app 90° layout rotation for a physically rotated monitor; OS stays landscape.</p>
+<ul style="margin:0">
+<li><strong>Trigger:</strong> rail Rotate item (§2.2) OR global shortcut <span class="kbd">Ctrl + Alt + R</span>.</li>
+<li><strong>Compose Desktop:</strong> rotate the <strong>root content</strong>, not the window. Swap constraints to <code>width = windowHeight</code>, <code>height = windowWidth</code>, wrap in <code>Modifier.graphicsLayer { rotationZ = 90f }</code> centered, and <strong>remap pointer input</strong> (rotate coords −90° so hit-testing matches).</li>
+<li>Area outside the rotated content is black. State is <strong>per-window and remembered</strong> across launch (§3.7 toggle).</li>
+<li><strong>Window-chrome rule (user decision):</strong> because TachiMana draws its own custom titlebar §2.1 inside the rotated root, rotation is a <strong>free-floating, optional windowed mode</strong> — the whole app incl. titlebar spins, window keeps its bounds. If a platform forces a native non-rotatable OS titlebar, rotation <strong>must force borderless/fullscreen</strong> (drop native chrome) so no un-rotated bar strands at top. Detect chrome capability at runtime; prefer the custom-titlebar path so windowed rotation stays available.</li>
+</ul>
+</div>
+<h3>§2.19 · Motion primitives</h3>
+<p>Sync spinner (<code>sync</code> <code>rotate 360°/1000ms linear</code> while syncing), download progress bar (width-driven), rail active-capsule cross-fade, rotation transform (§2.18, §4).</p>
+<h3>§2.20 · Library view toggle + grid cell</h3>
+<p>Toggle in the category-header row §2.5: two-icon segmented (<code>grid_view</code> / <code>view_list</code>) in a <code>7</code>-radius <code>1dp</code> group; active cell bg <code>accent</code>+white, inactive transparent. <strong>Grid</strong> variant: <code>LazyVerticalGrid</code> <strong>3 cols</strong> (fixed in the 360 pane), gap <code>md</code>, pad <code>sm lg</code>. Cell = <code>2/3</code> cover radius <code>sm</code>; unread badge §2.8 top-left, download badge top-right; title overlay bottom (<code>caption</code>/500 white on <code>transparent→#000 .85</code> gradient). Hover <code>2dp accent</code> outline. Toggle swaps only the master pane.</p>
+<h3>§2.21 · Reader display sheet</h3>
+<p>Right drawer, width <code>284</code>, inset <code>14</code>, radius <code>xl</code>, bg <code>surface</code>@98%, <code>z 6</code>, own scroll; opened by the reader-nav <code>tune</code> icon (active → <code>accent</code>). Four <code>caption</code>-mono uppercase groups of seg buttons: <strong>Reading mode</strong> 2×2 (Paged RTL / LTR / Vertical / Webtoon — last two force strip fit), <strong>Fit</strong> (Height / Width / Double + full-width Original 1:1), <strong>Side margins</strong> (Black / Blur / Theme), <strong>Rotate layout</strong> 1×4 (0° / 90°⟳ / 90°⟲ / 180°; 90°⟳ drives §2.18). Divider + three §2.14 toggles (Remember for series [on], Crop borders, Follow monitor rotation).</p>
+<h3>§2.22 · Tracking dialog (modal)</h3>
+<p>Centered modal via §2.27, width <code>390</code>. Linked-tracker card (<code>1dp</code> border radius <code>md</code>): brand chip <code>28²</code> + name + "Linked · updates on read · synced" <code>syncOk</code>; a 3-cell <strong>STATUS / CHAPTERS / SCORE</strong> grid (status & score <code>accent</code> <code>▾</code>, chapters <code>− n / total +</code> stepper). Add-tracker rows (dashed, hover→<code>accent</code>): AniList / Kitsu / MangaUpdates + <code>+ Add</code>. Opened from detail "Tracking · N" §3.1.</p>
+<h3>§2.23 · Browse sub-tabs · extension row · migrate row</h3>
+<p>Sub-tab row: three §2.9 chips Sources / Extensions (badge "2") / Migrate; header <code>Repos</code> chip (badge <code>syncOk</code> "3"). <strong>Extension row</strong>: chip <code>32²</code> → <code>Column</code>(name + <code>verified</code> <code>syncOk</code> trust / <code>18+</code> NSFW tag · lang·version, pending shows <code>old → new</code> in <code>bookmark</code>-yellow) → <strong>Update</strong>/<strong>Install</strong> outlined-pill / <strong>Uninstall</strong> text. Groups: UPDATE PENDING (+ "Update all") / INSTALLED / AVAILABLE. <strong>Migrate row</strong>: chip + name + "N series" + <code>chevron_right</code> under MIGRATE FROM; <code>surface</code> tip banner.</p>
+<h3>§2.24 · Storage-policy card + propagation radios</h3>
+<p><strong>Storage card</strong> per device (in a <code>Row</code>): <code>surface</code> radius <code>xl</code> — device glyph + name + "N GB free"; <code>4</code>-tall used-bar (<code>syncOk</code> healthy / <code>bookmark</code>-yellow tight); "Policy: {value} ▾" <code>accent</code> (Keep everything / Last 10 chapters). <strong>Propagation radios</strong> §2.27: Auto-pull here too / Follow device's storage policy / Manual only, each with a rationale <code>caption</code>. Conflict note ("newest wins; ties keep both") closes the group.</p>
+<h3>§2.25 · Theme controls</h3>
+<p><strong>Light/Dark/System</strong> segmented (three <code>30</code>-tall <code>15</code>-radius chips). <strong>Preview cards</strong> §2.16 (Yokai Dark selected · Midnight · Ink&amp;Vermilion). <strong>Optional swatch tile</strong> (extra Yōkai themes: MidnightDusk, Strawberry, Green Apple, Tidal Wave, Tako, Yin&amp;Yang, Teal&amp;Sakura, Lavender): <code>9</code>-radius tile in that theme's <code>background</code>, two <code>14</code> color dots + name; 4-col grid under "More themes · optional — carried over from Yōkai". <strong>AMOLED</strong> toggle row.</p>
+<h3>§2.26 · Recents activity pane</h3>
+<p>Optional right pane, width <code>300</code>, left divider, bg <code>surface</code>. <code>caption</code>-mono "ACTIVITY"; a library-update progress card (label + "42 / 64" + <code>4</code> <code>accent</code> bar); sync-log cards (<code>#2a2c31</code>: title + <code>@45%</code> detail). Collapsible; hidden → feed keeps its <code>860</code> cap.</p>
+<h3>§2.27 · Modal &amp; radio primitives</h3>
+<p><strong>Modal shell</strong>: <code>position absolute; inset 0; z 30</code>; full-bleed backdrop <code>#000 60%</code> (click = dismiss) + centered card <code>surface</code> radius <code>xl</code> pad <code>18 20</code> shadow <code>0 20 60 #000 60%</code>. <strong>Radio</strong>: <code>radio_button_checked</code> (<code>accent</code>) / <code>radio_button_unchecked</code> (<code>@40%</code>) <code>19</code> as a labelled row.</p>
+</section>
+
+<section>
+<h2>§3 · Screen recipes</h2>
+<p>Ordered top-to-bottom blocks. <strong>Exactly one</strong> <code>weight(1f)</code>/scroll region per column, marked <strong>⟨flex⟩</strong>. Titlebar §2.1 + rail §2.2 wrap every screen (omitted below); nav switches the content region only.</p>
+
+<h3>§3.1 · Library (master–detail)</h3>
+<p>Content <code>Row</code> of two regions.</p>
+<p><strong>Master pane</strong> (fixed §0.1 width, <code>Column</code>):</p>
+<ol>
+<li>Search field §2.3 — margin <code>lg</code>, height <code>44</code></li>
+<li>Category header "Reading 42" §2.5 — intrinsic</li>
+<li><strong>⟨flex⟩</strong> rows <code>LazyColumn</code> §2.4 (One Piece … Kagurabachi)</li>
+<li>Collapsed footers "Plan to Read 56", "Completed 128" §2.5 — top divider</li>
+</ol>
+<p><strong>Detail region</strong> (⟨flex⟩ §1.6, <code>Row</code> of two columns; top <code>250</code>h cover-tint gradient):</p>
+<p style="margin:2px 0 2px"><em>Info column</em> <code>400</code> fixed, scroll:</p>
+<ol>
+<li>Header <code>Row</code>: cover <code>148×211</code> radius <code>md</code> + <code>Column</code>(detailTitle · author <code>body</code>@75% · "Ongoing · MangaDex (EN)" <code>caption</code>@55% · <code>weight(1f)</code> · "In sync · both devices" + <code>cloud_done</code> <code>syncOk</code>)</li>
+<li>Action <code>Row</code> §2.7: In Library · Tracking · <code>public</code> · <code>share</code></li>
+<li>"About this manga" <code>titleMedium</code> + 4-line clamp <code>bodySmall</code>@70% + "More" text action</li>
+<li>Genre chip <code>Row</code> (Adventure/Fantasy/Drama/Award Winning) radius <code>md</code> bg <code>surface</code></li>
+<li><strong>⟨flex⟩</strong> spacer</li>
+<li>Primary "Continue Reading Ch. 119" §2.7 full-width — bottom-pinned</li>
+</ol>
+<p style="margin:2px 0 2px"><em>Chapters column</em> ⟨flex⟩, left divider:</p>
+<ol>
+<li>Header <code>Row</code>: "122 chapters" <code>titleMedium</code> + <code>weight(1f)</code> + "Unread · Downloaded" <code>caption</code>@45% + <code>filter_list</code> accent</li>
+<li>Device legend <code>Row</code> (right-aligned <code>smartphone</code>/<code>computer</code> 15@40%)</li>
+<li><strong>⟨flex⟩</strong> chapter rows §2.6 <code>LazyColumn</code> (Ch. 122 → Ch. 113)</li>
+</ol>
+<p class="sub"><em>Detail empty state</em> (no selection): centered <code>Column</code> — <code>menu_book</code> 48@25% + "Select a manga" <code>body</code>@55%. (Diff only.)</p>
+
+<h3>§3.2 · Reader (overlay, above content) — §2.18-rotatable</h3>
+<p><code>Column</code>, absolute-fills content region:</p>
+<ol>
+<li>Reader top bar §2.10 — height <code>48</code></li>
+<li><strong>⟨flex⟩</strong> page area — one of three fits:
+<ul>
+<li><strong>Spread</strong>: centered <code>Row</code>, two height-bound <code>2/3</code> pages, RTL (right = current)</li>
+<li><strong>Fit + panels</strong>: <code>Row</code> — thumb rail <code>88</code> fixed ⟨own scroll⟩ · centered fit page ⟨flex⟩ + floating <code>left_panel_close</code> toggle · chapters panel <code>230</code> fixed ⟨own scroll⟩. Panels collapse.</li>
+<li><strong>Strip</strong>: centered scroll column §1.6 width, stacked full-width panels gap <code>xxs</code></li>
+</ul></li>
+<li>Reader bottom nav §2.11 (+ chapters sheet §2.12 when open)</li>
+</ol>
+
+<div style="break-inside:avoid">
+<h3>§3.3 · Recents</h3>
+<p><code>Column</code>, max-width <code>860</code>:</p>
+<ol>
+<li>Header <code>Row</code>: "Recents" <code>screenTitle</code> + <code>weight(1f)</code> + <code>search</code> + <code>refresh</code></li>
+<li>Segmented tabs §2.9 (Grouped·All·History·Updates)</li>
+<li><strong>⟨flex⟩</strong> <code>LazyColumn</code>: day sub-headers <code>body</code>/500 + recent rows (cover <code>44×63</code> · <code>Column</code>{title · chapter <code>caption</code> accent-if-new · context @50%} · download/pull · <code>play_circle</code> 20)</li>
+</ol>
+</div>
+<div style="break-inside:avoid">
+<h3>§3.4 · Browse</h3>
+<p><code>Column</code>, max-width <code>860</code>:</p>
+<ol>
+<li>Header <code>Row</code>: "Browse" <code>screenTitle</code> + <code>weight(1f)</code> + Extensions chip (badge "2") + Migrate chip §2.9</li>
+<li>Global search field §2.3 (<code>travel_explore</code>)</li>
+<li><strong>⟨flex⟩</strong> <code>LazyColumn</code>: language group headers <code>caption</code>/500@60% + source rows §2.17</li>
+</ol>
+</div>
+<div style="break-inside:avoid">
+<h3>§3.5 · Downloads</h3>
+<p><code>Column</code>, max-width <code>860</code>:</p>
+<ol>
+<li>Header <code>Row</code>: "Download queue" <code>screenTitle</code> + <code>weight(1f)</code> + "Pause all" outlined §2.7</li>
+<li><strong>⟨flex⟩</strong> <code>LazyColumn</code>: active/queued rows (<code>drag_indicator</code>@35% · cover <code>38×54</code> · <code>Column</code>{title · status <code>caption</code>@55% · progress bar <code>4</code>h §2.13} · pause/play + close). Active bg <code>#FFF 3%</code>. Selective-sync info banner (<code>surface</code>, <code>sync</code> <code>syncOk</code> + caption). "COMPLETED TODAY" header + completed rows (<code>download_done</code> <code>syncOk</code>)</li>
+</ol>
+</div>
+
+<div style="break-inside:avoid">
+<h3>§3.6 · Sync</h3>
+<p><code>Column</code>, max-width <code>900</code>, scroll:</p>
+<ol>
+<li>Header <code>Row</code>: "Sync" <code>screenTitle</code> + <code>weight(1f)</code> + "Sync now" primary §2.7</li>
+<li>Backend selector chips §2.9 (Self-hosted server · Direct LAN · Cloud storage) — active drives §3</li>
+<li><strong>Backend status card</strong> (one of) — <code>surface</code> radius <code>xl</code>, glyph <code>22</code> <code>syncOk</code> + <code>Column</code>(endpoint + status <code>caption</code>) + Configure/Re-pair action:
+<ul><li><em>Server</em>: <code>dns</code> · "tachimana.home.lan:4242" · "● Connected · TLS · last full sync 2 min ago"</li>
+<li><em>LAN</em>: <code>lan</code> · "Paired directly · code 482-913" · "● Pixel 8 visible on LAN"</li>
+<li><em>Cloud</em>: <code>cloud</code> · "webdav://…/tachimana" · "● Reachable · library.db + CBZ archives"</li></ul></li>
+<li>Device cards <code>Row</code>: two §2.15 (Pixel 8 · Desktop-this)</li>
+<li>"What syncs" <code>titleMedium</code> + wrap check-chips (Library·Progress·Tracking·History·Reader settings <code>check</code> accent; "Downloads: selective ▾" outlined)</li>
+<li>"Download sync — per manga, per device" <code>titleMedium</code> + <strong>matrix card</strong> (<code>surface</code> radius <code>xl</code>): header (Manga | 📱 Pixel 8 | 💻 Desktop) + one row per manga, two toggles §2.14</li>
+<li>"Activity" <code>titleMedium</code> + log lines <code>caption</code>@60% (✓ <code>syncOk</code>)</li>
+<li><strong>⟨flex⟩</strong> trailing scroll slack</li>
+</ol>
+</div>
+<div style="break-inside:avoid">
+<h3>§3.7 · Settings</h3>
+<p><code>Column</code>, max-width <code>860</code>, scroll. Section headers <code>label</code>/500 accent, tracked.</p>
+<ol>
+<li>"Settings" <code>screenTitle</code></li>
+<li><strong>APPEARANCE</strong>: theme preview <code>Row</code> — three §2.16 cards (Yokai Dark selected · Midnight · Ink&amp;Vermilion) + "Follow system light/dark" toggle §2.14</li>
+<li><strong>ROTATION</strong>: "Portrait rotation shortcut" row + <span class="kbd">Ctrl+Alt+R</span> chip; "Remember rotation per window" toggle</li>
+<li><strong>SYNC</strong>: "Sync backend &amp; rules" nav row (→ §3.6) with <code>chevron_right</code></li>
+<li><strong>ABOUT</strong>: "TachiMana 1.0.0 · A fork of Yōkai · Apache-2.0"</li>
+<li><strong>⟨flex⟩</strong> trailing scroll slack</li>
+</ol>
+<p class="sub">Setting-row pattern: <code>Row</code> pad <code>lg xl</code> radius <code>lg</code> hover — leading glyph <code>20</code>@70% · <code>Column</code>(title <code>body</code> + desc <code>caption</code>@50%) · <code>weight(1f)</code> · trailing control (toggle / kbd chip / chevron).</p>
+</div>
+</section>
+
+<section style="break-inside:avoid">
+<h2>§4 · Motion / dynamic quick-reference</h2>
+<table>
+<tr><th>Effect</th><th>Property</th><th>From → To</th><th>Duration · Easing</th></tr>
+<tr><td>App rotation (§2.18)</td><td>root <code>rotationZ</code> + constraint swap</td><td><code>0° → 90°</code></td><td><code>350ms</code> · ease-in-out</td></tr>
+<tr><td>Nav rail select</td><td>capsule bg + glyph fill</td><td>inactive → active</td><td><code>150ms</code> · ease</td></tr>
+<tr><td>Page-fit switch</td><td>crossfade page area</td><td>mode A → B</td><td><code>120ms</code> · linear</td></tr>
+<tr><td>Reader chrome auto-hide</td><td>bar <code>alpha</code> + <code>translateY</code></td><td>shown → hidden (idle 2.5s)</td><td><code>200ms</code> · ease</td></tr>
+<tr><td>Chapters sheet</td><td>max-height + <code>alpha</code></td><td><code>0 → 220</code></td><td><code>220ms</code> · ease-out</td></tr>
+<tr><td>Sync spinner</td><td><code>sync</code> glyph <code>rotationZ</code></td><td><code>0 → 360°</code> loop</td><td><code>1000ms</code> · linear (while syncing)</td></tr>
+<tr><td>Download progress</td><td>bar width</td><td><code>0 → 100%</code></td><td>data-driven</td></tr>
+<tr><td>Row / chip hover</td><td>bg <code>alpha</code></td><td>base → +5–8% L</td><td><code>100ms</code> · ease</td></tr>
+<tr><td>Primary btn press</td><td>ripple <code>accentRipple</code></td><td>radial</td><td>Material default</td></tr>
+<tr><td>Backend card swap</td><td>crossfade §3.6 status card</td><td>A → B</td><td><code>150ms</code> · ease</td></tr>
+</table>
+<p class="sub" style="margin-top:12px">Baseline <code>1360×840</code> → production <code>1920×1080</code>. Fixed dimensions are <code>dp</code>/<code>sp</code>; only §1.6 elements + §0.1 pane rules scale with window width. One weighted spacer per column. Themes remap token tables (§1.1/§1.2/§1.5), never the layout. Reader and whole-app rotation per §2.18.</p>
+</section>
+
+</div>
+</x-import>
+</x-dc>
+</body>
+</html>

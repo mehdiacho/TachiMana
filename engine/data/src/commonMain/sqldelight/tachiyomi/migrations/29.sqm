@@ -1,0 +1,23 @@
+-- Columns Mihon added to the library model after Tachiyomi stopped being updated.
+-- We carry them so a `.tachibk` round-trip (Mihon -> TachiMana -> Mihon) is lossless:
+-- without these, a restore-then-export silently dropped the user's per-manga notes and
+-- the version/last-modified counters Mihon's sync uses to resolve conflicts.
+ALTER TABLE mangas ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+ALTER TABLE mangas ADD COLUMN version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE mangas ADD COLUMN last_modified_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE mangas ADD COLUMN favorite_modified_at INTEGER;
+ALTER TABLE mangas ADD COLUMN memo TEXT NOT NULL DEFAULT '{}';
+
+ALTER TABLE chapters ADD COLUMN last_modified_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE chapters ADD COLUMN version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE chapters ADD COLUMN memo TEXT NOT NULL DEFAULT '{}';
+
+-- Verbatim carrier for backup sections we deliberately do not interpret (Mihon's app and
+-- per-source preference messages, tags 104/105). We have no mapping for Mihon's preference
+-- keys, but dropping them would corrupt a Mihon -> TachiMana -> Mihon round-trip, so the raw
+-- encoded sub-messages are parked here and re-emitted unchanged on export.
+CREATE TABLE backup_passthrough(
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    payload BLOB NOT NULL
+);

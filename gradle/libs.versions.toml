@@ -1,0 +1,130 @@
+[versions]
+kotlin = "2.3.10"
+compose = "1.9.3"
+coroutines = "1.10.2"
+serialization = "1.8.1"
+sqldelight = "2.2.1"
+koin = "4.0.4"
+okhttp = "5.4.0"          # stable 5.x — matches the ABI Tachiyomi extensions are built against
+okio = "3.17.0"
+ktor = "3.0.3"
+jmdns = "3.5.9"
+# --- Extension system (AndroidCompat vendor) ---
+dex2jar = "2.4.37"
+polyglot = "25.0.3"
+twelvemonkeys = "3.13.1"
+settingsmp = "1.3.0"
+jcef = "144.0.15-g72717cf-chromium-144.0.7559.172-api-1.21-262-b37"
+
+[libraries]
+# --- Kotlinx ---
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+serialization-protobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "serialization" }
+immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version = "0.4.0" }
+
+# --- Networking (JVM) ---
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-logging = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
+okhttp-brotli = { module = "com.squareup.okhttp3:okhttp-brotli", version.ref = "okhttp" }
+okhttp-zstd = { module = "com.squareup.okhttp3:okhttp-zstd", version.ref = "okhttp" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+
+# --- LAN discovery ---
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+
+# --- DI ---
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+
+# --- Persistence ---
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+sqldelight-dialect-sql = { module = "app.cash.sqldelight:sqlite-3-38-dialect", version.ref = "sqldelight" }
+
+# --- Reactive (source-api legacy RxJava 1) ---
+rxjava = { module = "io.reactivex:rxjava", version = "1.3.8" }
+
+# --- Settings store (replaces androidx.preference) ---
+multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version = "1.3.0" }
+
+# --- Archives (CBZ/CBR extraction) ---
+commons-compress = { module = "org.apache.commons:commons-compress", version = "1.27.1" }
+junrar = { module = "com.github.junrar:junrar", version = "7.5.5" }
+xz = { module = "org.tukaani:xz", version = "1.10" }
+
+# --- HTML parsing (source api) ---
+jsoup = { module = "org.jsoup:jsoup", version = "1.18.3" }
+
+# --- Logging ---
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version = "2.0.16" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version = "2.0.16" }
+
+# === Extension system: AndroidCompat vendor (Apache-2.0) + loader (from Suwayomi, MPL-2.0) ===
+kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "coroutines" }
+serialization-json-okio = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json-okio", version.ref = "serialization" }
+logback = { module = "ch.qos.logback:logback-classic", version = "1.5.34" }
+kotlinlogging = { module = "io.github.oshai:kotlin-logging-jvm", version = "8.0.4" }
+appdirs = { module = "ca.gosyer:kotlin-multiplatform-appdirs", version = "2.0.0" }
+config = { module = "com.typesafe:config", version = "1.4.9" }
+config4k = { module = "io.github.config4k:config4k", version = "0.7.0" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version = "2.22" }
+injekt = { module = "com.github.null2264:injekt-koin", version = "ee267b2e27" }
+asm = { module = "org.ow2.asm:asm", version = "9.9.1" }
+asm-analysis = { module = "org.ow2.asm:asm-analysis", version = "9.9.1" }
+asm-tree = { module = "org.ow2.asm:asm-tree", version = "9.9.1" }
+dex2jar-translator = { module = "de.femtopedia.dex2jar:dex-translator", version.ref = "dex2jar" }
+dex2jar-tools = { module = "de.femtopedia.dex2jar:dex-tools", version.ref = "dex2jar" }
+apk-parser = { module = "net.dongliu:apk-parser", version = "2.6.10" }
+apksig = { module = "com.android.tools.build:apksig", version = "9.2.1" }
+axml = { module = "com.github.Aliucord:axml", version = "ed26565eb0" }
+xmlpull = { module = "xmlpull:xmlpull", version = "1.1.3.4a" }
+android-stubs = { module = "com.github.Suwayomi:android-jar", version = "1.0.0" }
+android-annotations = { module = "androidx.annotation:annotation", version = "1.10.0" }
+polyglot-core = { module = "org.graalvm.polyglot:polyglot", version.ref = "polyglot" }
+polyglot-graaljs = { module = "org.graalvm.polyglot:js-community", version.ref = "polyglot" }
+settings-core = { module = "com.russhwolf:multiplatform-settings-jvm", version.ref = "settingsmp" }
+settings-serialization = { module = "com.russhwolf:multiplatform-settings-serialization-jvm", version.ref = "settingsmp" }
+icu4j = { module = "com.ibm.icu:icu4j", version = "78.3" }
+twelvemonkeys-common-lang = { module = "com.twelvemonkeys.common:common-lang", version.ref = "twelvemonkeys" }
+twelvemonkeys-common-io = { module = "com.twelvemonkeys.common:common-io", version.ref = "twelvemonkeys" }
+twelvemonkeys-common-image = { module = "com.twelvemonkeys.common:common-image", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-core = { module = "com.twelvemonkeys.imageio:imageio-core", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-metadata = { module = "com.twelvemonkeys.imageio:imageio-metadata", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-jpeg = { module = "com.twelvemonkeys.imageio:imageio-jpeg", version.ref = "twelvemonkeys" }
+twelvemonkeys-imageio-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
+imageio-webp = { module = "com.github.usefulness:webp-imageio", version = "0.11.0" }
+jcef = { module = "org.jetbrains.intellij.deps.jcef:jcef", version.ref = "jcef" }
+
+[bundles]
+serialization = [ "serialization-json", "serialization-protobuf" ]
+archives = [ "commons-compress", "junrar", "xz" ]
+# AndroidCompat's "shared" dependency set (mirrors Suwayomi's bundle).
+androidcompat-shared = [
+    "kotlin-stdlib-jdk8", "kotlin-reflect", "coroutines-core", "coroutines-jdk8",
+    "serialization-json", "serialization-json-okio", "serialization-protobuf",
+    "koin-core", "slf4j-api", "logback", "kotlinlogging", "appdirs", "rxjava", "jsoup",
+    "config", "config4k", "dex2jar-translator", "dex2jar-tools", "apk-parser", "axml",
+    "jackson-annotations", "jcef",
+]
+polyglot = [ "polyglot-core", "polyglot-graaljs" ]
+settings = [ "settings-core", "settings-serialization" ]
+twelvemonkeys = [
+    "twelvemonkeys-common-lang", "twelvemonkeys-common-io", "twelvemonkeys-common-image",
+    "twelvemonkeys-imageio-core", "twelvemonkeys-imageio-metadata",
+    "twelvemonkeys-imageio-jpeg", "twelvemonkeys-imageio-webp",
+]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose = { id = "org.jetbrains.compose", version.ref = "compose" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
