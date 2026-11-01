@@ -27,7 +27,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.MenuBook
@@ -532,6 +534,7 @@ private fun DetailPane(
 ) {
     val c = LocalTachiColors.current
     val chapters by remember(manga._id) { container.library.chaptersFlow(manga._id) }.collectAsState(initial = emptyList())
+    val remoteChanges by container.remoteIndex.changes.collectAsState(initial = Unit)
 
     Row(Modifier.fillMaxSize()) {
         // Info column
@@ -584,7 +587,17 @@ private fun DetailPane(
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 itemsIndexed(chapters, key = { _, ch -> ch._id }) { index, ch ->
-                    ChapterRow(ch) { onOpenChapter(manga, chapters, index) }
+                    val isDownloaded = container.downloads.isDownloaded(manga.source, manga.url, ch.url)
+                    val isRemote = remember(ch._id, remoteChanges) {
+                        container.remoteMirror.holds(
+                            sourceId = manga.source,
+                            mangaTitle = manga.title,
+                            chapterName = ch.name,
+                            chapterScanlator = ch.scanlator,
+                            chapterUrl = ch.url,
+                        )
+                    }
+                    ChapterRow(ch, isRemote = isRemote, isDownloaded = isDownloaded) { onOpenChapter(manga, chapters, index) }
                 }
             }
         }
@@ -592,7 +605,12 @@ private fun DetailPane(
 }
 
 @Composable
-private fun ChapterRow(chapter: Chapters, onClick: () -> Unit) {
+private fun ChapterRow(
+    chapter: Chapters,
+    isRemote: Boolean = false,
+    isDownloaded: Boolean = false,
+    onClick: () -> Unit,
+) {
     val c = LocalTachiColors.current
     Column {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.divider))
@@ -611,6 +629,24 @@ private fun ChapterRow(chapter: Chapters, onClick: () -> Unit) {
                 if (progress != null) {
                     TText(progress, style = TachiType.caption, color = c.accent)
                 }
+            }
+            if (isRemote) {
+                Spacer(Modifier.width(Spacing.sm))
+                Icon(
+                    Icons.Outlined.Cloud,
+                    contentDescription = "Available on remote server",
+                    tint = c.accent,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            if (isDownloaded) {
+                Spacer(Modifier.width(Spacing.sm))
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Downloaded locally",
+                    tint = c.syncOk,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }

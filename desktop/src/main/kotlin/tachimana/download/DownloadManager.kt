@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import tachimana.local.ArchiveReader
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicLong
@@ -22,6 +23,14 @@ import java.util.concurrent.atomic.AtomicLong
  */
 fun interface ChapterPageOpener {
     suspend fun open(sourceId: Long, chapterUrl: String, chapterName: String): List<suspend () -> ByteArray?>
+}
+
+/**
+ * Optional hook to retrieve an already-mirrored chapter archive from a remote WebDAV server,
+ * skipping source downloads and rate limits.
+ */
+fun interface RemoteChapterFetcher {
+    suspend fun fetch(sourceId: Long, mangaTitle: String, chapterName: String, chapterUrl: String): File?
 }
 
 /** Status of a single chapter download. */
@@ -63,6 +72,7 @@ class DownloadManager(
     private val root: File,
     private val opener: ChapterPageOpener,
     private val scope: CoroutineScope,
+    private val remoteFetcher: RemoteChapterFetcher? = null,
 ) {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val queue = Channel<DownloadJob>(Channel.UNLIMITED)
@@ -147,6 +157,30 @@ class DownloadManager(
     }
 
     private suspend fun download(job: DownloadJob) {
+        // Fast path: if remote storage has this chapter, pull the archive directly
+        val fetcher = remoteFetcher
+        if (fetcher != null) {
+            val remoteCbz = runCatching { fetcher.fetch(job.sourceId, job.mangaTitle, job.chapterName, job.chapterUrl) }.getOrNull()
+            if (remoteCbz != null && remoteCbz.exists()) {
+                val pages = ArchiveReader.pages(remoteCbz)
+                if (pages.isNotEmpty()) {
+                    update(job.id) { it.copy(total = pages.size) }
+                    val dir = chapterDir(job.sourceId, job.mangaUrl, job.chapterUrl)
+                    dir.deleteRecursively()
+                    dir.mkdirs()
+                    pages.forEachIndexed { index, p ->
+                        val bytes = p.load()
+                        val ext = sniffExtension(bytes)
+                        File(dir, "%03d.%s".format(index + 1, ext)).writeBytes(bytes)
+                        update(job.id) { it.copy(downloaded = index + 1) }
+                    }
+                    writeMeta(dir, job, pages.size)
+                    doneMarker(dir).writeText(pages.size.toString())
+                    return
+                }
+            }
+        }
+
         val loaders = opener.open(job.sourceId, job.chapterUrl, job.chapterName)
         require(loaders.isNotEmpty()) { "Chapter has no pages" }
         update(job.id) { it.copy(total = loaders.size) }

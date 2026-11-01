@@ -76,7 +76,13 @@ object ExtensionSpike {
         check("package name matches index", loaded.packageName == ext.pkgName)
 
         // 6. Invoke getPopularManga on the first catalogue source.
-        val catalogue = loaded.sources.filterIsInstance<CatalogueSource>().firstOrNull()
+        // Multi-language extensions load one source per language, in whatever order the jar lists
+        // them; MangaDex 1.6.0 starts with Afrikaans, whose popular list is empty. English, or the
+        // language-neutral source, is the one with something to show.
+        val catalogues = loaded.sources.filterIsInstance<CatalogueSource>()
+        val catalogue = catalogues.firstOrNull { it.lang == "en" }
+            ?: catalogues.firstOrNull { it.lang == "all" }
+            ?: catalogues.firstOrNull()
         check("has a CatalogueSource", catalogue != null)
         if (catalogue == null) {
             summary(checks, passed); return

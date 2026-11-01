@@ -18,6 +18,11 @@ import tachimana.sync.BackupRepo
 import tachimana.sync.DeviceIdentity
 import tachimana.sync.SyncManager
 import tachimana.track.AniListTracker
+import tachimana.remote.RemoteIndex
+import tachimana.remote.RemoteMirror
+import tachimana.remote.RemoteStorage
+import tachimana.remote.WebDavClient
+import okhttp3.OkHttpClient
 import yokai.data.DatabaseFactory
 import java.io.File
 
@@ -47,6 +52,41 @@ class AppContainer private constructor(
     val extensionRepos = ExtensionRepoStore(dbHandle.handler)
     val tracker = AniListTracker(dbHandle.handler, AppPaths.dataDir)
     val settings = AppSettings(AppPaths.settingsFile)
+    val httpClient = OkHttpClient.Builder().build()
+
+    fun buildRemoteStorage(): RemoteStorage? {
+        val url = settings.remoteCollectionUrl()
+        if (url.isBlank()) return null
+        return runCatching {
+            WebDavClient(
+                client = httpClient,
+                baseUrl = url,
+                username = settings.state.value.remoteStorageUsername,
+                password = settings.state.value.remoteStoragePassword,
+            )
+        }.getOrNull()
+    }
+
+    val remoteIndex =
+        RemoteIndex(
+            settings = settings,
+            clientSupplier = ::buildRemoteStorage,
+            file = File(AppPaths.dataDir, "remote_index.json"),
+            scope = appScope,
+        )
+
+    val remoteMirror =
+        RemoteMirror(
+            settings = settings,
+            clientSupplier = ::buildRemoteStorage,
+            index = remoteIndex,
+            cacheDir = AppPaths.remoteCacheDir,
+            scope = appScope,
+            sourceResolver = { id ->
+                extensions.catalogueSource(id)?.toString()
+            },
+        )
+
     val downloads =
         DownloadManager(
             root = AppPaths.downloadsRoot,
@@ -56,6 +96,13 @@ class AppContainer private constructor(
                 val source = extensions.catalogueSource(sourceId) ?: error("Source $sourceId not installed")
                 val sChapter = eu.kanade.tachiyomi.source.model.SChapter.create().apply { url = chapterUrl; name = chapterName }
                 source.getPageList(sChapter).map { page -> suspend { extensions.loadPage(source, page) } }
+            },
+            remoteFetcher = { sourceId, mangaTitle, chapterName, chapterUrl ->
+                if (remoteMirror.isEnabled && remoteMirror.redownloadFromRemote) {
+                    remoteMirror.fetchChapter(sourceId, mangaTitle, chapterName, null, chapterUrl)
+                } else {
+                    null
+                }
             },
         )
 

@@ -99,6 +99,13 @@ tasks.register<JavaExec>("browseSelfTest") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
+tasks.register<JavaExec>("remoteSelfTest") {
+    group = "verification"
+    description = "Verifies the Mihon WebDAV remote storage slice (WebDavClient, index caching, remote mirror fetch & reader extraction)."
+    mainClass.set("tachimana.remote.RemoteSelfTestKt")
+    classpath = sourceSets["main"].runtimeClasspath
+}
+
 // ---------------------------------------------------------------------------------------------
 // Packaging
 //

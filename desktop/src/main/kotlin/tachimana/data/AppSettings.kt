@@ -28,6 +28,17 @@ data class AppSettingsData(
     val libraryUnreadOnly: Boolean = false,
     /** Library filter: only manga with at least one downloaded chapter. */
     val libraryDownloadedOnly: Boolean = false,
+
+    // === Remote Storage (Mihon WebDAV Mirror) ===
+    val remoteStorageEnabled: Boolean = false,
+    val remoteStorageHost: String = "",
+    val remoteStoragePort: String = "",
+    val remoteStorageUseHttps: Boolean = true,
+    val remoteStorageFolder: String = "",
+    val remoteStorageUsername: String = "",
+    val remoteStoragePassword: String = "",
+    val remoteStorageCacheMb: Int = 2048,
+    val remoteStorageRedownloadFromRemote: Boolean = true,
 )
 
 /**
@@ -41,6 +52,7 @@ class AppSettings(private val file: File) {
     val state: StateFlow<AppSettingsData> = _state.asStateFlow()
 
     val cloudflareBypassEnabled: Boolean get() = _state.value.cloudflareBypassEnabled
+    val remoteStorageEnabled: Boolean get() = _state.value.remoteStorageEnabled && _state.value.remoteStorageHost.isNotBlank()
 
     fun setCloudflareBypassEnabled(enabled: Boolean) = update { it.copy(cloudflareBypassEnabled = enabled) }
 
@@ -58,6 +70,32 @@ class AppSettings(private val file: File) {
     fun setLibraryUnreadOnly(on: Boolean) = update { it.copy(libraryUnreadOnly = on) }
 
     fun setLibraryDownloadedOnly(on: Boolean) = update { it.copy(libraryDownloadedOnly = on) }
+
+    // === Remote storage setters ===
+    fun setRemoteStorageEnabled(enabled: Boolean) = update { it.copy(remoteStorageEnabled = enabled) }
+    fun setRemoteStorageHost(host: String) = update { it.copy(remoteStorageHost = host) }
+    fun setRemoteStoragePort(port: String) = update { it.copy(remoteStoragePort = port) }
+    fun setRemoteStorageUseHttps(useHttps: Boolean) = update { it.copy(remoteStorageUseHttps = useHttps) }
+    fun setRemoteStorageFolder(folder: String) = update { it.copy(remoteStorageFolder = folder) }
+    fun setRemoteStorageUsername(user: String) = update { it.copy(remoteStorageUsername = user) }
+    fun setRemoteStoragePassword(pass: String) = update { it.copy(remoteStoragePassword = pass) }
+    fun setRemoteStorageCacheMb(mb: Int) = update { it.copy(remoteStorageCacheMb = mb) }
+    fun setRemoteStorageRedownloadFromRemote(on: Boolean) = update { it.copy(remoteStorageRedownloadFromRemote = on) }
+
+    fun remoteServerUrl(): String {
+        val h = _state.value.remoteStorageHost.trim().trimEnd('/').substringAfter("://")
+        if (h.isEmpty()) return ""
+        val scheme = if (_state.value.remoteStorageUseHttps) "https" else "http"
+        val port = _state.value.remoteStoragePort.trim().toIntOrNull()?.takeIf { it in 1..65535 }
+        return if (port == null) "$scheme://$h" else "$scheme://$h:$port"
+    }
+
+    fun remoteCollectionUrl(): String {
+        val server = remoteServerUrl()
+        if (server.isEmpty()) return ""
+        val folder = _state.value.remoteStorageFolder.trim().trim('/')
+        return if (folder.isEmpty()) server else "$server/$folder"
+    }
 
     private fun update(transform: (AppSettingsData) -> AppSettingsData) {
         val next = transform(_state.value)

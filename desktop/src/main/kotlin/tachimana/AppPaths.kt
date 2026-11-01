@@ -50,4 +50,7 @@ object AppPaths {
 
     /** Offline downloads: <root>/<sourceId>/<mangaHash>/<chapterHash>/NNN.<ext> + meta/marker. */
     val downloadsRoot: File by lazy { File(dataDir, "downloads").apply { mkdirs() } }
+
+    /** Cache for chapter archives fetched from the remote WebDAV mirror. */
+    val remoteCacheDir: File by lazy { File(dataDir, "cache/remote_mirror").apply { mkdirs() } }
 }
