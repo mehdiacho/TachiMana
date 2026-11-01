@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Search
@@ -761,6 +762,23 @@ private fun MangaDetailView(
                                     }
                                     val job = dlJobs.firstOrNull {
                                         it.sourceId == source.id && it.mangaUrl == manga.url && it.chapterUrl == ch.url
+                                    }
+                                    val isRemote = remember(ch.url, dlJobs) {
+                                        container.remoteMirror.holds(
+                                            sourceId = source.id,
+                                            mangaTitle = info.title,
+                                            chapterName = ch.name,
+                                            chapterScanlator = ch.scanlator,
+                                            chapterUrl = ch.url,
+                                        )
+                                    }
+                                    if (isRemote) {
+                                        Icon(
+                                            Icons.Outlined.Cloud,
+                                            contentDescription = "Available on remote server",
+                                            tint = c.accent,
+                                            modifier = Modifier.padding(end = Spacing.sm).size(18.dp),
+                                        )
                                     }
                                     Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
                                         when {

@@ -154,17 +154,33 @@ fun FrameWindowScope.AppShell(
                     }
                 } else {
                     ReaderChapter(ch.name, onProgress) {
-                        // Prefer offline downloads; fall back to streaming from the source.
+                        // 1. Prefer offline downloads
                         val offline = cont.downloads.downloadedPages(manga.source, manga.url, ch.url)
                         if (offline.isNotEmpty()) {
                             offline.mapIndexed { i, f -> ReaderPage("dl:${manga.source}:${ch.url}:$i") { f.readBytes() } }
                         } else {
-                            cont.extensions.boot()
-                            val source = cont.extensions.catalogueSource(manga.source)
-                                ?: error("Source not installed for this manga")
-                            val sChapter = SChapter.create().apply { url = ch.url; name = ch.name }
-                            source.getPageList(sChapter).map { pg ->
-                                ReaderPage("${source.id}:${ch.url}:${pg.index}") { cont.extensions.loadPage(source, pg) }
+                            // 2. Check remote WebDAV storage (Mihon server mirror)
+                            val remoteCbz = if (cont.remoteMirror.isEnabled) {
+                                cont.remoteMirror.fetchChapter(
+                                    sourceId = manga.source,
+                                    mangaTitle = manga.title,
+                                    chapterName = ch.name,
+                                    chapterScanlator = ch.scanlator,
+                                    chapterUrl = ch.url,
+                                )
+                            } else null
+
+                            if (remoteCbz != null && remoteCbz.exists()) {
+                                ArchiveReader.pages(remoteCbz).map { p -> ReaderPage("${remoteCbz.path}#${p.name}") { p.load() } }
+                            } else {
+                                // 3. Fall back to streaming from the online extension
+                                cont.extensions.boot()
+                                val source = cont.extensions.catalogueSource(manga.source)
+                                    ?: error("Source not installed for this manga")
+                                val sChapter = SChapter.create().apply { url = ch.url; name = ch.name }
+                                source.getPageList(sChapter).map { pg ->
+                                    ReaderPage("${source.id}:${ch.url}:${pg.index}") { cont.extensions.loadPage(source, pg) }
+                                }
                             }
                         }
                     }
@@ -225,8 +241,22 @@ fun FrameWindowScope.AppShell(
                                         if (offline.isNotEmpty()) {
                                             offline.mapIndexed { i, f -> ReaderPage("dl:${source.id}:${ch.url}:$i") { f.readBytes() } }
                                         } else {
-                                            source.getPageList(ch).map { pg ->
-                                                ReaderPage("${source.id}:${ch.url}:${pg.index}") { container.extensions.loadPage(source, pg) }
+                                            val remoteCbz = if (container.remoteMirror.isEnabled) {
+                                                container.remoteMirror.fetchChapter(
+                                                    sourceId = source.id,
+                                                    mangaTitle = manga.title,
+                                                    chapterName = ch.name,
+                                                    chapterScanlator = ch.scanlator,
+                                                    chapterUrl = ch.url,
+                                                )
+                                            } else null
+
+                                            if (remoteCbz != null && remoteCbz.exists()) {
+                                                ArchiveReader.pages(remoteCbz).map { p -> ReaderPage("${remoteCbz.path}#${p.name}") { p.load() } }
+                                            } else {
+                                                source.getPageList(ch).map { pg ->
+                                                    ReaderPage("${source.id}:${ch.url}:${pg.index}") { container.extensions.loadPage(source, pg) }
+                                                }
                                             }
                                         }
                                     }
@@ -238,7 +268,7 @@ fun FrameWindowScope.AppShell(
                     }
                     Page.DOWNLOADS -> if (container != null) DownloadsScreen(container) else PlaceholderPage(page)
                     Page.SYNC -> if (container != null) SyncPage(container.sync) else PlaceholderPage(page)
-                    Page.SETTINGS -> SettingsPage(theme = theme, onThemeChange = onThemeChange)
+                    Page.SETTINGS -> SettingsPage(container = container, theme = theme, onThemeChange = onThemeChange)
                     else -> PlaceholderPage(page)
                 }
                 val target = reader

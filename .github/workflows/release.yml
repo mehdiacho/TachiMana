@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"           # e.g. v1.0.3
+  workflow_dispatch:       # manual trigger for testing
+
+permissions:
+  contents: write          # needed to create releases & upload assets
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      # ── checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── JDK ──────────────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # ── extract version from the tag ─────────────────────────────────
+      - name: Determine version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $v = "${{ github.ref_name }}" -replace '^v',''
+          } else {
+            $v = "1.0.0"
+          }
+          echo "version=$v" >> $Env:GITHUB_OUTPUT
+          echo "tag=v$v"    >> $Env:GITHUB_OUTPUT
+          echo "Resolved version: $v"
+
+      # ── build the portable EXE ───────────────────────────────────────
+      - name: Build Windows EXE installer
+        shell: pwsh
+        run: |
+          ./gradlew.bat :desktop:packageExe `
+            -Ptachimana.version=${{ steps.ver.outputs.version }}
+
+      # ── locate the EXE and compute SHA-256 ───────────────────────────
+      - name: Locate EXE & compute SHA-256
+        id: sha
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "desktop/build/compose/binaries/main/exe" -Filter "*.exe" -Recurse |
+                   Select-Object -First 1
+          if (-not $exe) {
+            Write-Error "No EXE found under desktop/build/compose/binaries/"
+            exit 1
+          }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe.FullName).Hash.ToLower()
+          echo "exe_path=$($exe.FullName)" >> $Env:GITHUB_OUTPUT
+          echo "exe_name=$($exe.Name)"     >> $Env:GITHUB_OUTPUT
+          echo "sha256=$hash"              >> $Env:GITHUB_OUTPUT
+          echo "Found: $($exe.Name) — SHA-256: $hash"
+
+      # ── generate update.json for the in-app updater ──────────────────
+      - name: Generate update.json
+        shell: pwsh
+        run: |
+          $baseUrl = "https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}"
+          $json = @{
+            version  = "${{ steps.ver.outputs.version }}"
+            notes    = "Release ${{ steps.ver.outputs.version }}"
+            pub_date = (Get-Date -Format o)
+            platforms = @{
+              windows = @{
+                url    = "$baseUrl/${{ steps.sha.outputs.exe_name }}"
+                sha256 = "${{ steps.sha.outputs.sha256 }}"
+              }
+            }
+          } | ConvertTo-Json -Depth 4
+          $json | Set-Content -Path "update.json" -Encoding utf8
+          Write-Host "update.json written:"
+          Get-Content update.json
+
+      # ── create the GitHub Release with both assets ───────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: TachiMana ${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.sha.outputs.exe_path }}
+            update.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
