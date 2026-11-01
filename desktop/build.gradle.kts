@@ -144,6 +144,31 @@ compose.desktop {
             description = "A desktop-first manga reader"
             vendor = "mehdiacho"
 
+            // jpackage's jlink image only gets Compose's default modules unless we list more, and
+            // the installed app then dies at startup with NoClassDefFoundError: java/sql/DriverManager
+            // (no library DB). The first nine are `./gradlew :desktop:suggestRuntimeModules` (jdeps
+            // over the runtime classpath) — re-run it after dependency changes. The rest are loaded
+            // via ServiceLoader/reflection, which jdeps cannot see:
+            //  - jdk.zipfs: dex2jar writes the converted extension jar through the "zip" FileSystem
+            //    provider ("cant find zipfs support" otherwise), so no APK extension could install.
+            //  - jdk.charsets: non-UTF-8 site encodings (Shift_JIS, EUC-KR, GBK, Big5, windows-125x)
+            //    used by third-party sources; without it OkHttp silently decodes them as UTF-8.
+            //  - jdk.localedata: non-English locale data for sources parsing localized dates.
+            modules(
+                "java.instrument",
+                "java.management",
+                "java.naming",
+                "java.prefs",
+                "java.scripting",
+                "java.sql",
+                "jdk.httpserver",
+                "jdk.javadoc",
+                "jdk.unsupported",
+                "jdk.zipfs",
+                "jdk.charsets",
+                "jdk.localedata",
+            )
+
             windows {
                 // A STABLE uuid is what makes an install an *upgrade* rather than a second copy
                 // sitting beside the old one. Never change it.
