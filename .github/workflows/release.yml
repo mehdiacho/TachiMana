@@ -43,8 +43,10 @@ jobs:
       - name: Build Windows EXE installer
         shell: pwsh
         run: |
+          # Quoted: unquoted, PowerShell splits -Ptachimana.version=... at the dot and Gradle
+          # receives ".version=1.0.0" as a task name.
           ./gradlew.bat :desktop:packageExe `
-            -Ptachimana.version=${{ steps.ver.outputs.version }}
+            "-Ptachimana.version=${{ steps.ver.outputs.version }}"
 
       # ── locate the EXE and compute SHA-256 ───────────────────────────
       - name: Locate EXE & compute SHA-256
