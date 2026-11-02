@@ -13,6 +13,7 @@ on:
       - "gradle/**"
       - "settings.gradle.kts"
       - "build.gradle.kts"
+      - "app/crates/tm-exthost/**"
       - ".github/workflows/ext-host.yml"
   workflow_dispatch:
 
@@ -43,24 +44,21 @@ jobs:
         run: bash ./gradlew --no-daemon :ext-host:selfTest
 
       - name: Start-up contract (java -jar, ready line, bearer token, exit on stdin close)
+        # Git Bash on Windows cannot hold a native process's stdin open reliably, so Windows checks
+        # the same contract through the Rust client below, which is how the app starts the host.
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
+          trap 'echo "--- host stderr ---"; cat "$RUNNER_TEMP/err" || true' ERR
           dir="$RUNNER_TEMP/exthost-data"
           export TM_EXTHOST_TOKEN=0123456789abcdef0123456789abcdef
-          mkfifo "$RUNNER_TEMP/in" 2>/dev/null || true
-          if [ -p "$RUNNER_TEMP/in" ]; then
-            # Hold the host's stdin open through a FIFO so closing it can be tested.
-            java -jar ext-host/build/ext-host/ext-host.jar --data-dir "$dir" --port 0 \
-              < "$RUNNER_TEMP/in" > "$RUNNER_TEMP/out" 2> "$RUNNER_TEMP/err" &
-            pid=$!
-            exec 3> "$RUNNER_TEMP/in"
-          else
-            # Windows Git Bash has no FIFOs: keep stdin open with a sleeping writer instead.
-            (sleep 600) | java -jar ext-host/build/ext-host/ext-host.jar --data-dir "$dir" --port 0 \
-              > "$RUNNER_TEMP/out" 2> "$RUNNER_TEMP/err" &
-            pid=$!
-          fi
+          mkfifo "$RUNNER_TEMP/in"
+          # Hold the host's stdin open through a FIFO so closing it can be tested.
+          java -jar ext-host/build/ext-host/ext-host.jar --data-dir "$dir" --port 0 \
+            < "$RUNNER_TEMP/in" > "$RUNNER_TEMP/out" 2> "$RUNNER_TEMP/err" &
+          pid=$!
+          exec 3> "$RUNNER_TEMP/in"
           for i in $(seq 1 60); do
             grep -q '^TM_EXTHOST_READY port=' "$RUNNER_TEMP/out" && break
             sleep 1
@@ -69,22 +67,22 @@ jobs:
           port=$(sed -n 's/^TM_EXTHOST_READY port=\([0-9]*\).*/\1/p' "$RUNNER_TEMP/out")
           test -n "$port"
           test "$(wc -l < "$RUNNER_TEMP/out")" -eq 1
-          code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/v1/health")
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/v1/health" || true)
           echo "no token: $code"; test "$code" = 401
           curl -sf -H "Authorization: Bearer $TM_EXTHOST_TOKEN" "http://127.0.0.1:$port/v1/health"
           echo
-          if [ -p "$RUNNER_TEMP/in" ]; then
-            exec 3>&-   # close stdin: the host must exit by itself
-            for i in $(seq 1 20); do kill -0 $pid 2>/dev/null || break; sleep 1; done
-            if kill -0 $pid 2>/dev/null; then echo "host still running after stdin closed"; cat "$RUNNER_TEMP/err"; exit 1; fi
-            echo "exited after stdin closed"
-          else
-            curl -sf -X POST -H "Authorization: Bearer $TM_EXTHOST_TOKEN" "http://127.0.0.1:$port/v1/shutdown"
-            echo
-            for i in $(seq 1 20); do kill -0 $pid 2>/dev/null || break; sleep 1; done
-            if kill -0 $pid 2>/dev/null; then echo "host still running after /v1/shutdown"; cat "$RUNNER_TEMP/err"; exit 1; fi
-            echo "exited after /v1/shutdown"
-          fi
+          exec 3>&-   # close stdin: the host must exit by itself
+          for i in $(seq 1 20); do kill -0 $pid 2>/dev/null || break; sleep 1; done
+          if kill -0 $pid 2>/dev/null; then echo "host still running after stdin closed"; cat "$RUNNER_TEMP/err"; exit 1; fi
+          echo "exited after stdin closed"
+
+      - name: Rust client against the real host (spawn, ready line, install, browse, read, shutdown)
+        if: hashFiles('app/crates/tm-exthost/Cargo.toml') != ''
+        shell: bash
+        working-directory: app
+        env:
+          TM_EXTHOST_DIR: ${{ github.workspace }}/ext-host/build/ext-host
+        run: cargo test -p tm-exthost --test real_host -- --ignored --nocapture
 
       - name: Upload the host
         if: matrix.os == 'windows-latest'
