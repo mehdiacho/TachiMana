@@ -149,8 +149,25 @@ fn is_online_chapter(state: &AppState, chapter_id: i64) -> bool {
     }
 }
 
+/// Whether a chapter of an online manga is complete on disk.
+fn is_downloaded_chapter(state: &AppState, chapter_id: i64) -> bool {
+    let Ok(Some(ch)) = state.db.chapter(chapter_id) else {
+        return false;
+    };
+    match state.db.manga(ch.manga_id) {
+        Ok(Some(m)) => crate::downloads::is_downloaded(state, &m, &ch),
+        _ => false,
+    }
+}
+
 fn page(state: &AppState, chapter_id: i64, index: usize) -> Response<Vec<u8>> {
-    if is_online_chapter(state, chapter_id) {
+    // A finished download wins over the network.
+    let on_disk = state
+        .chapters()
+        .map(|t| t.contains_key(&chapter_id))
+        .unwrap_or(false)
+        || is_downloaded_chapter(state, chapter_id);
+    if !on_disk && is_online_chapter(state, chapter_id) {
         return match crate::online::page_bytes(state, chapter_id, index) {
             Ok(bytes) => image(bytes, true),
             Err(e) => {

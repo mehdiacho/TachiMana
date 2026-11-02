@@ -117,3 +117,41 @@
   color: var(--tm-color-on-background);
   padding: 0 var(--tm-space-md);
 }
+.nas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-md);
+  padding: 0 var(--tm-space-xl) var(--tm-space-lg) calc(var(--tm-space-xl) + 20px + var(--tm-space-lg));
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--tm-space-md) var(--tm-space-lg);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-xs);
+}
+.fieldLabel {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-med);
+  overflow-wrap: anywhere;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-md);
+  align-items: center;
+}
+.ok {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-sync-ok);
+}
+.field > input {
+  /* The shared field grows along a row; in this column it keeps its height. */
+  flex: none;
+}
+.field > button {
+  align-self: flex-start;
+}

@@ -299,6 +299,10 @@ pub async fn browse_sources(state: State<'_, AppState>) -> R<Vec<SourceDto>> {
             .cmp(&b.name.to_lowercase())
             .then(a.lang.cmp(&b.lang))
     });
+    state.nas.remember_sources(
+        out.iter()
+            .map(|s| (s.id, crate::nas::source_label(&s.name, &s.lang))),
+    );
     Ok(out)
 }
 

@@ -111,6 +111,8 @@ pub struct ChapterDto {
     pub id: i64,
     #[ts(type = "number")]
     pub manga_id: i64,
+    /// The source's chapter url (a relative path for local chapters).
+    pub url: String,
     pub name: String,
     pub scanlator: Option<String>,
     pub read: bool,
@@ -124,6 +126,8 @@ pub struct ChapterDto {
     pub source_order: i64,
     #[ts(type = "number")]
     pub date_upload: i64,
+    /// Complete on disk (downloaded); always false for local chapters, which are files already.
+    pub downloaded: bool,
 }
 
 impl From<&tm_db::Chapter> for ChapterDto {
@@ -131,6 +135,7 @@ impl From<&tm_db::Chapter> for ChapterDto {
         Self {
             id: c.id,
             manga_id: c.manga_id,
+            url: c.url.clone(),
             name: c.name.clone(),
             scanlator: c.scanlator.clone(),
             read: c.read,
@@ -140,8 +145,67 @@ impl From<&tm_db::Chapter> for ChapterDto {
             chapter_number: c.chapter_number,
             source_order: c.source_order,
             date_upload: c.date_upload,
+            downloaded: false,
         }
     }
+}
+
+/// One row of the download queue, sent as the `downloads` event.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadJobDto {
+    #[ts(type = "number")]
+    pub id: u64,
+    /// Source ids are 64-bit and exceed 2^53, so they travel as strings.
+    pub source_id: String,
+    pub manga_url: String,
+    pub manga_title: String,
+    pub chapter_url: String,
+    pub chapter_name: String,
+    /// `QUEUED`, `DOWNLOADING`, `DONE` or `FAILED`.
+    pub status: String,
+    pub downloaded: u32,
+    pub total: u32,
+    pub error: Option<String>,
+}
+
+impl From<&tm_download::DownloadJob> for DownloadJobDto {
+    fn from(j: &tm_download::DownloadJob) -> Self {
+        let status = match j.status {
+            tm_download::DownloadStatus::Queued => "QUEUED",
+            tm_download::DownloadStatus::Downloading => "DOWNLOADING",
+            tm_download::DownloadStatus::Done => "DONE",
+            tm_download::DownloadStatus::Failed => "FAILED",
+        };
+        Self {
+            id: j.id,
+            source_id: j.chapter.source_id.to_string(),
+            manga_url: j.chapter.manga_url.clone(),
+            manga_title: j.chapter.manga_title.clone(),
+            chapter_url: j.chapter.chapter_url.clone(),
+            chapter_name: j.chapter.chapter_name.clone(),
+            status: status.into(),
+            downloaded: j.downloaded,
+            total: j.total,
+            error: j.error.clone(),
+        }
+    }
+}
+
+/// A downloaded chapter found on disk (the Downloads screen's "On this computer" list).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DownloadedChapterDto {
+    /// Library rows, when the manga and chapter are in the database.
+    #[ts(type = "number | null")]
+    pub manga_id: Option<i64>,
+    #[ts(type = "number | null")]
+    pub chapter_id: Option<i64>,
+    pub manga_title: String,
+    pub chapter_name: String,
+    pub page_count: u32,
 }
 
 /// Manga detail: the manga and its chapters, newest first (by `source_order`).
@@ -492,4 +556,16 @@ pub struct RefreshDto {
     pub chapters_added: u32,
     /// Set when the source failed; the detail is then what was stored before.
     pub error: Option<String>,
+}
+
+/// One row of reading history (`recentsFlow`): the manga, the chapter last read and when.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecentDto {
+    pub manga: MangaDto,
+    pub chapter: ChapterDto,
+    /// Epoch milliseconds.
+    #[ts(type = "number")]
+    pub last_read: i64,
 }

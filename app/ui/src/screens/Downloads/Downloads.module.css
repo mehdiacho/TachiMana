@@ -1,0 +1,70 @@
+/* Downloads and Recents: one centred column of rows. Row pieces come from Browse.module.css. */
+.screen {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--tm-space-3xl);
+}
+.col {
+  max-width: var(--tm-content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-xs);
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-base);
+  margin-bottom: var(--tm-space-md);
+}
+.title {
+  font: var(--tm-type-screen-title);
+}
+.active {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-accent);
+}
+.grow {
+  flex: 1;
+}
+.section {
+  font: var(--tm-type-label);
+  color: var(--tm-color-accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: var(--tm-space-xl) 0 var(--tm-space-sm);
+}
+.status {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--tm-color-on-background-dim);
+}
+.status[data-status="DONE"] {
+  color: var(--tm-color-sync-ok);
+}
+.status[data-status="FAILED"] {
+  color: var(--tm-color-close-hover);
+}
+.ring {
+  color: var(--tm-color-accent);
+}
+.thumb {
+  width: 36px;
+  height: 52px;
+  flex: none;
+  border-radius: var(--tm-radius-sm);
+}
+.when {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+  white-space: nowrap;
+}
+.group {
+  font: var(--tm-type-body-row);
+  color: var(--tm-color-on-background-med);
+  padding: var(--tm-space-md) var(--tm-space-md) var(--tm-space-xs);
+}

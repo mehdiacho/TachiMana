@@ -1,16 +1,20 @@
 // Manga detail (spec §3.1 detail region): info column and chapter list.
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, CheckCheck, Circle, CircleCheck, Heart, Play, RefreshCw, Tags } from "lucide-react";
+import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Download, Heart, Play, RefreshCw, Tags } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, useCategories, useLibraryInvalidate, useMangaDetail, useSources } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
 import { Cover, ErrorState, IconButton, Loading, OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
 import type { ChapterDto } from "../../gen/ChapterDto";
 import type { CmdError } from "../../gen/CmdError";
+import type { DownloadJobDto } from "../../gen/DownloadJobDto";
 import { chapterStatus, continueTarget, newestFirst } from "../../lib/chapters";
+import { jobKey, jobsByChapter } from "../../lib/downloads";
+import { useDownloads } from "../../store/downloads";
+import { ProgressRing } from "../Downloads/DownloadsScreen";
 import { useUi } from "../../store/ui";
 import s from "./Library.module.css";
 
@@ -57,7 +61,32 @@ function CategoryMenu({ mangaId, current }: { mangaId: number; current: number[]
   );
 }
 
-function ChapterList({ chapters, onOpen, onToggleRead }: { chapters: ChapterDto[]; onOpen: (c: ChapterDto) => void; onToggleRead: (c: ChapterDto) => void }) {
+/** Download state of one online chapter: a button to download, progress, or a delete button. */
+function DownloadControl({ c, job, onDownload, onDelete }: { c: ChapterDto; job: DownloadJobDto | undefined; onDownload: () => void; onDelete: () => void }) {
+  if (c.downloaded) return <IconButton icon={ArrowDownToLine} label={`Delete download of ${c.name}`} size={18} active onClick={onDelete} />;
+  if (job?.status === "DOWNLOADING")
+    return (
+      <span className={s.dlBusy} title={`${job.downloaded}/${job.total || "…"}`}>
+        <ProgressRing done={job.downloaded} total={job.total} size={18} />
+      </span>
+    );
+  if (job?.status === "QUEUED")
+    return (
+      <span className={s.dlBusy} title="Queued">
+        <ProgressRing done={0} total={0} size={18} />
+      </span>
+    );
+  if (job?.status === "FAILED") return <IconButton icon={CircleAlert} label={`Retry download of ${c.name}: ${job.error ?? "failed"}`} size={18} onClick={onDownload} />;
+  return <IconButton icon={Download} label={`Download ${c.name}`} size={18} onClick={onDownload} />;
+}
+
+interface Downloads {
+  jobFor: (c: ChapterDto) => DownloadJobDto | undefined;
+  onDownload: (c: ChapterDto) => void;
+  onDelete: (c: ChapterDto) => void;
+}
+
+function ChapterList({ chapters, onOpen, onToggleRead, downloads }: { chapters: ChapterDto[]; onOpen: (c: ChapterDto) => void; onToggleRead: (c: ChapterDto) => void; downloads: Downloads | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({ count: chapters.length, getScrollElement: () => ref.current, estimateSize: () => 53, overscan: 10 });
   return (
@@ -76,6 +105,7 @@ function ChapterList({ chapters, onOpen, onToggleRead }: { chapters: ChapterDto[
                     {[st.text, c.scanlator].filter(Boolean).join(" · ")}
                   </span>
                 </button>
+                {downloads && <DownloadControl c={c} job={downloads.jobFor(c)} onDownload={() => downloads.onDownload(c)} onDelete={() => downloads.onDelete(c)} />}
                 <IconButton icon={c.read ? CircleCheck : Circle} label={c.read ? "Mark unread" : "Mark read"} size={18} active={c.read} onClick={() => onToggleRead(c)} />
               </div>
             </div>
@@ -144,6 +174,8 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setError(null), [mangaId]);
   const online = d.data ? !d.data.manga.isLocal : false;
+  const jobs = useDownloads((x) => x.jobs);
+  const byChapter = useMemo(() => jobsByChapter(jobs), [jobs]);
   // Only asked for online manga, so a local-only library never starts the extension host.
   const sources = useSources(online);
   if (d.isLoading) return <Loading />;
@@ -169,6 +201,32 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
     }
   };
   const started = target && !target.read && target.lastPageRead > 0;
+  const fail = (e: unknown) => setError((e as CmdError).message);
+  const downloads: Downloads | null = manga.isLocal
+    ? null
+    : {
+        jobFor: (c) => byChapter.get(jobKey(manga.source, manga.url, c.url)),
+        onDownload: (c) => {
+          setError(null);
+          api.downloadChapters(mangaId, [c.id]).catch(fail);
+        },
+        onDelete: (c) => {
+          setError(null);
+          api
+            .downloadDelete(mangaId, [c.id])
+            .catch(fail)
+            .finally(() => invalidate());
+        },
+      };
+  const downloadUnread = () => {
+    setError(null);
+    api
+      .downloadUnread(mangaId)
+      .then((n) => {
+        if (n === 0) setError("Every unread chapter is already downloaded or queued.");
+      })
+      .catch(fail);
+  };
   return (
     <>
       <div className={s.tint} />
@@ -220,6 +278,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
           </span>
           <span className={s.meta}>{unread} unread</span>
           <span className={s.grow} />
+          {downloads && <IconButton icon={Download} label="Download unread" size={18} disabled={unread === 0} onClick={downloadUnread} />}
           <IconButton icon={CheckCheck} label="Mark all read" size={18} disabled={unread === 0} onClick={() => void markAllRead()} />
         </div>
         {chapters.length === 0 ? (
@@ -227,7 +286,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
             {manga.isLocal ? "No chapters found. Check the manga's folder and rescan." : "The source lists no chapters for this title yet."}
           </div>
         ) : (
-          <ChapterList chapters={chapters} onOpen={open} onToggleRead={(c) => void toggleRead(c)} />
+          <ChapterList chapters={chapters} onOpen={open} onToggleRead={(c) => void toggleRead(c)} downloads={downloads} />
         )}
       </div>
     </>

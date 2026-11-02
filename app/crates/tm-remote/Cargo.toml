@@ -1,0 +1,39 @@
+[package]
+name = "tm-remote"
+description = "NAS storage over WebDAV: Mihon file names, the remote index, the read mirror and the upload queue"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+quick-xml = "0.42"
+url = "2"
+percent-encoding = "2"
+md-5 = "0.10"
+sha2 = "0.10"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio = { version = "1", features = ["fs", "io-util", "sync"] }
+tm-archive = { path = "../tm-archive" }
+# Test support: an in-memory WebDAV server (feature `fake-server`).
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"], optional = true }
+
+[features]
+fake-server = ["dep:axum", "tokio/net", "tokio/rt"]
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }
+tm-remote = { path = ".", features = ["fake-server"] }
+
+[[example]]
+name = "fake_dav"
+required-features = ["fake-server"]

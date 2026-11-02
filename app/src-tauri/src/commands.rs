@@ -1,6 +1,7 @@
 //! Tauri commands. Each one is thin: check the input, call a crate, map the error.
 
 use std::collections::{BTreeSet, HashMap};
+use std::path::PathBuf;
 
 use tauri::State;
 use tm_core::settings::keys;
@@ -63,8 +64,23 @@ pub fn library(state: State<'_, AppState>) -> R<Vec<LibraryEntryDto>> {
                 .get(&m.id)
                 .map(|s| s.iter().copied().collect())
                 .unwrap_or_default(),
-            downloaded: false,
+            downloaded: crate::downloads::has_any(&state, m),
             latest_chapter: latest.get(&m.id).cloned(),
+        })
+        .collect())
+}
+
+/// Recently read chapters, newest first (at most 50, one per chapter).
+#[tauri::command]
+pub fn recents(state: State<'_, AppState>) -> R<Vec<crate::dto::RecentDto>> {
+    Ok(state
+        .db
+        .recents()?
+        .iter()
+        .map(|r| crate::dto::RecentDto {
+            manga: MangaDto::from(&r.manga),
+            chapter: ChapterDto::from(&r.chapter),
+            last_read: r.last_read,
         })
         .collect())
 }
@@ -132,7 +148,13 @@ pub fn detail_of(state: &AppState, id: i64) -> R<MangaDetailDto> {
     let cats = state.db.category_assignments()?;
     Ok(MangaDetailDto {
         manga: MangaDto::from(&manga),
-        chapters: chapters.iter().map(ChapterDto::from).collect(),
+        chapters: chapters
+            .iter()
+            .map(|c| ChapterDto {
+                downloaded: crate::downloads::is_downloaded(state, &manga, c),
+                ..ChapterDto::from(c)
+            })
+            .collect(),
         category_ids: cats
             .get(&id)
             .map(|s| s.iter().copied().collect())
@@ -164,8 +186,9 @@ pub fn chapter_or_404(state: &AppState, id: i64) -> R<Chapter> {
         .ok_or_else(|| CmdError::not_found("That chapter"))
 }
 
-/// Resolve where a chapter's pages live. Local manga only for now; downloads, NAS and online
-/// sources join in P5/P6 (plan §5.4 order).
+/// Resolve where a chapter's pages live on disk: the local folder, or a finished download of an
+/// online chapter (plan §5.4 order; the NAS joins later). Online chapters that are not downloaded
+/// come through the extension host instead (`online::page_bytes`).
 pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
     if let Some(open) = state.chapters()?.get(&chapter_id) {
         return Ok(open.clone());
@@ -175,19 +198,17 @@ pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
         .db
         .manga(ch.manga_id)?
         .ok_or_else(|| CmdError::not_found("That manga"))?;
-    if !manga.is_local() {
-        return Err(CmdError::new(
-            "unsupported",
-            "Online chapters arrive with the extension host. Only local manga can be read in this build.",
-        ));
-    }
-    let path =
+    let path = if manga.is_local() {
         tm_local::chapter_path(&state.paths.local_library_dir(), &ch.url).ok_or_else(|| {
             CmdError::new(
                 "invalid",
                 "This chapter's path is not inside the local folder.",
             )
-        })?;
+        })?
+    } else {
+        crate::downloads::downloaded_dir(state, &manga, &ch)
+            .ok_or_else(|| CmdError::not_found("A download of that chapter"))?
+    };
     let names = tm_archive::page_names(&path)?;
     if names.len() > MAX_PAGES {
         return Err(CmdError::new(
@@ -205,6 +226,23 @@ pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
     Ok(open)
 }
 
+/// Opens an archive fetched from the NAS for the reader, so page requests are served from it.
+pub fn remember_archive(state: &AppState, chapter_id: i64, path: PathBuf) -> R<()> {
+    let names = tm_archive::page_names(&path)?;
+    if names.is_empty() || names.len() > MAX_PAGES {
+        return Err(CmdError::new(
+            "archive",
+            "The NAS copy of this chapter has no readable pages.",
+        ));
+    }
+    let mut table = state.chapters()?;
+    if table.len() > 64 {
+        table.clear();
+    }
+    table.insert(chapter_id, OpenChapter { path, names });
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<ChapterPagesDto> {
     let ch = chapter_or_404(&state, chapter_id)?;
@@ -212,8 +250,13 @@ pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<Cha
         .db
         .manga(ch.manga_id)?
         .ok_or_else(|| CmdError::not_found("That manga"))?;
-    if !manga.is_local() {
-        return crate::online::chapter_pages(&state, &manga, &ch).await;
+    if !manga.is_local() && !crate::downloads::is_downloaded(&state, &manga, &ch) {
+        // Read order (plan §P6.2): download, then the NAS, then the source.
+        if let Some(cbz) = crate::nas::fetch_chapter(&state, &manga, &ch).await {
+            remember_archive(&state, chapter_id, cbz)?;
+        } else {
+            return crate::online::chapter_pages(&state, &manga, &ch).await;
+        }
     }
     let open = resolve_chapter(&state, chapter_id)?;
     let dims = tm_archive::page_dimensions(&open.path, &open.names)?;
