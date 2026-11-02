@@ -1,10 +1,11 @@
 // Manga detail (spec §3.1 detail region): info column and chapter list.
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, CheckCheck, Circle, CircleCheck, Play, Tags } from "lucide-react";
-import { useRef, useState } from "react";
+import { Check, CheckCheck, Circle, CircleCheck, Heart, Play, RefreshCw, Tags } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/commands";
-import { useCategories, useLibraryInvalidate, useMangaDetail } from "../../api/queries";
+import { keys, useCategories, useLibraryInvalidate, useMangaDetail, useSources } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
 import { Cover, ErrorState, IconButton, Loading, OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
 import type { ChapterDto } from "../../gen/ChapterDto";
@@ -85,14 +86,70 @@ function ChapterList({ chapters, onOpen, onToggleRead }: { chapters: ChapterDto[
   );
 }
 
+/** Library heart and source refresh for a manga from an online source. */
+function OnlineActions({ mangaId, favorite, onError }: { mangaId: number; favorite: boolean; onError: (m: string | null) => void }) {
+  const qc = useQueryClient();
+  const invalidate = useLibraryInvalidate();
+  const [busy, setBusy] = useState<"fav" | "refresh" | null>(null);
+  const toggle = async () => {
+    setBusy("fav");
+    onError(null);
+    try {
+      await api.librarySetFavorite(mangaId, !favorite);
+    } catch (e) {
+      onError((e as CmdError).message);
+    } finally {
+      setBusy(null);
+      invalidate();
+      void qc.invalidateQueries({ queryKey: ["browse", "list"] });
+    }
+  };
+  const refresh = async () => {
+    setBusy("refresh");
+    onError(null);
+    try {
+      const r = await api.mangaRefresh(mangaId);
+      qc.setQueryData(keys.detail(mangaId), r.detail);
+      if (r.error) onError(`The source could not be reached: ${r.error}`);
+    } catch (e) {
+      onError((e as CmdError).message);
+    } finally {
+      setBusy(null);
+      invalidate();
+    }
+  };
+  return (
+    <>
+      {favorite ? (
+        <OutlinedButton onClick={() => void toggle()} disabled={busy !== null}>
+          <Heart size={16} fill="currentColor" /> In library
+        </OutlinedButton>
+      ) : (
+        <PrimaryButton onClick={() => void toggle()} disabled={busy !== null}>
+          <Heart size={16} /> Add to library
+        </PrimaryButton>
+      )}
+      <OutlinedButton onClick={() => void refresh()} disabled={busy !== null} aria-label="Refresh from source">
+        <RefreshCw size={16} /> {busy === "refresh" ? "Refreshing…" : "Refresh"}
+      </OutlinedButton>
+    </>
+  );
+}
+
 export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass }) {
   const d = useMangaDetail(mangaId);
   const invalidate = useLibraryInvalidate();
   const openReader = useUi((u) => u.openReader);
   const [more, setMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setError(null), [mangaId]);
+  const online = d.data ? !d.data.manga.isLocal : false;
+  // Only asked for online manga, so a local-only library never starts the extension host.
+  const sources = useSources(online);
   if (d.isLoading) return <Loading />;
   if (d.isError || !d.data) return <ErrorState message={(d.error as unknown as CmdError | null)?.message ?? "This manga could not be loaded."} onRetry={() => void d.refetch()} />;
   const { manga, categoryIds } = d.data;
+  const sourceName = sources.data?.find((x) => x.id === manga.source)?.name;
   const chapters = newestFirst(d.data.chapters, manga.isLocal);
   const target = continueTarget(chapters, manga.isLocal);
   const unread = chapters.filter((c) => !c.read).length;
@@ -121,12 +178,18 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
           <div className={s.infoText}>
             <div className={s.detailTitle}>{manga.title}</div>
             {manga.author && <div className={s.author}>{manga.author}</div>}
-            <div className={s.meta}>{[STATUS[manga.status] ?? "Unknown", manga.isLocal ? "Local" : `Source ${manga.source}`].join(" · ")}</div>
+            <div className={s.meta}>{[STATUS[manga.status] ?? "Unknown", manga.isLocal ? "Local" : (sourceName ?? "Online")].join(" · ")}</div>
           </div>
         </div>
         <div className={s.actions}>
-          <CategoryMenu mangaId={manga.id} current={categoryIds} />
+          {!manga.isLocal && <OnlineActions mangaId={manga.id} favorite={manga.favorite} onError={setError} />}
+          {(manga.isLocal || manga.favorite) && <CategoryMenu mangaId={manga.id} current={categoryIds} />}
         </div>
+        {error && (
+          <div className={s.error} role="alert">
+            {error}
+          </div>
+        )}
         {manga.description && (
           <div>
             <div className={s.aboutTitle}>About this manga</div>
@@ -161,7 +224,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
         </div>
         {chapters.length === 0 ? (
           <div className={s.meta} style={{ padding: "0 var(--tm-space-2xl)" }}>
-            No chapters found. Check the manga's folder and rescan.
+            {manga.isLocal ? "No chapters found. Check the manga's folder and rescan." : "The source lists no chapters for this title yet."}
           </div>
         ) : (
           <ChapterList chapters={chapters} onOpen={open} onToggleRead={(c) => void toggleRead(c)} />

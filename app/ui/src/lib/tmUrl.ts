@@ -17,3 +17,8 @@ export function coverUrl(mangaId: number, version: number, windows?: boolean): s
 export function pageUrl(chapterId: number, index: number, windows?: boolean): string {
   return tmUrl(`page/${chapterId}/${index}`, windows);
 }
+
+/** A cover listed by an online source, fetched through that source's client. */
+export function onlineCoverUrl(sourceId: string, url: string, windows?: boolean): string {
+  return tmUrl(`ocover/${encodeURIComponent(sourceId)}/${encodeURIComponent(url)}`, windows);
+}

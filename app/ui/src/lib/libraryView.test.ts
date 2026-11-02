@@ -16,9 +16,10 @@ function entry(
   return {
     manga: {
       id,
-      source: 0,
+      source: "0",
       url: title,
       title,
+      favorite: true,
       author: extra.author ?? null,
       artist: null,
       description: null,

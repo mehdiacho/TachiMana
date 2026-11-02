@@ -8,6 +8,15 @@ import type { CmdError } from "../gen/CmdError";
 import type { ImportResultDto } from "../gen/ImportResultDto";
 import type { LibraryEntryDto } from "../gen/LibraryEntryDto";
 import type { MangaDetailDto } from "../gen/MangaDetailDto";
+import type { BrowsePageDto } from "../gen/BrowsePageDto";
+import type { BrowseStatusDto } from "../gen/BrowseStatusDto";
+import type { CatalogDto } from "../gen/CatalogDto";
+import type { InstalledExtensionDto } from "../gen/InstalledExtensionDto";
+import type { MangaDto } from "../gen/MangaDto";
+import type { PreferenceDto } from "../gen/PreferenceDto";
+import type { RefreshDto } from "../gen/RefreshDto";
+import type { RepoDto } from "../gen/RepoDto";
+import type { SourceDto } from "../gen/SourceDto";
 import type { UiSettings } from "../gen/UiSettings";
 import type { UiSettingsPatch } from "../gen/UiSettingsPatch";
 
@@ -50,4 +59,25 @@ export const api = {
   settingsSet: (patch: UiSettingsPatch) => call<UiSettings>("settings_set", { patch }),
   cacheUsage: () => call<CacheUsageDto>("cache_usage"),
   cacheClear: () => call<CacheUsageDto>("cache_clear"),
+
+  // Online sources. Source ids are strings (64-bit, beyond JS number precision).
+  browseStatus: () => call<BrowseStatusDto>("browse_status"),
+  extRepos: () => call<RepoDto[]>("ext_repos"),
+  extRepoAdd: (url: string) => call<RepoDto>("ext_repo_add", { url }),
+  extRepoRemove: (baseUrl: string) => call<void>("ext_repo_remove", { baseUrl }),
+  extInstalled: () => call<InstalledExtensionDto[]>("ext_installed"),
+  extCatalog: () => call<CatalogDto>("ext_catalog"),
+  extInstall: (repoUrl: string, pkgName: string) => call<InstalledExtensionDto>("ext_install", { repoUrl, pkgName }),
+  extUninstall: (pkgName: string) => call<void>("ext_uninstall", { pkgName }),
+  browseSources: () => call<SourceDto[]>("browse_sources"),
+  browseList: (sourceId: string, mode: BrowseMode, query: string | null, page: number) =>
+    call<BrowsePageDto>("browse_list", { sourceId, mode, query, page }),
+  onlineOpen: (sourceId: string, url: string, title: string) => call<RefreshDto>("online_open", { sourceId, url, title }),
+  mangaRefresh: (id: number) => call<RefreshDto>("manga_refresh", { id }),
+  librarySetFavorite: (id: number, favorite: boolean) => call<MangaDto>("library_set_favorite", { id, favorite }),
+  sourcePreferences: (sourceId: string) => call<PreferenceDto[]>("source_preferences", { sourceId }),
+  sourcePreferenceSet: (sourceId: string, key: string, value: unknown) =>
+    call<PreferenceDto>("source_preference_set", { sourceId, key, value }),
 };
+
+export type BrowseMode = "popular" | "latest" | "search";

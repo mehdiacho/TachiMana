@@ -16,6 +16,11 @@ export const keys = {
   pages: (chapterId: number) => ["pages", chapterId] as const,
   settings: ["settings"] as const,
   cache: ["cache"] as const,
+  browseStatus: ["browse", "status"] as const,
+  repos: ["browse", "repos"] as const,
+  sources: ["browse", "sources"] as const,
+  catalog: ["browse", "catalog"] as const,
+  prefs: (sourceId: string) => ["browse", "prefs", sourceId] as const,
 };
 
 export const useAppInfo = () => useQuery({ queryKey: keys.info, queryFn: api.appInfo });
@@ -25,6 +30,26 @@ export const useMangaDetail = (id: number | null) =>
   useQuery({ queryKey: keys.detail(id ?? -1), queryFn: () => api.mangaDetail(id ?? -1), enabled: id !== null });
 export const useSettings = () =>
   useQuery({ queryKey: keys.settings, queryFn: api.settingsGet, staleTime: Infinity });
+export const useBrowseStatus = () => useQuery({ queryKey: keys.browseStatus, queryFn: api.browseStatus, staleTime: Infinity });
+export const useRepos = () => useQuery({ queryKey: keys.repos, queryFn: api.extRepos });
+/** Starting the extension host can take a few seconds the first time; no automatic retry. */
+export const useSources = (enabled = true) =>
+  useQuery({ queryKey: keys.sources, queryFn: api.browseSources, enabled, retry: false, staleTime: 5 * 60_000 });
+export const useCatalog = (enabled = true) =>
+  useQuery({ queryKey: keys.catalog, queryFn: api.extCatalog, enabled, retry: false, staleTime: 10 * 60_000 });
+export const useSourcePrefs = (sourceId: string | null) =>
+  useQuery({ queryKey: keys.prefs(sourceId ?? ""), queryFn: () => api.sourcePreferences(sourceId ?? ""), enabled: sourceId !== null, retry: false });
+
+/** Invalidate what an install, uninstall or repo change affects. */
+export function useBrowseInvalidate() {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: keys.repos });
+    void qc.invalidateQueries({ queryKey: keys.sources });
+    void qc.invalidateQueries({ queryKey: keys.catalog });
+  };
+}
+
 export const useCacheUsage = () => useQuery({ queryKey: keys.cache, queryFn: api.cacheUsage });
 
 /** Writes a settings patch, updating the cached settings optimistically. */

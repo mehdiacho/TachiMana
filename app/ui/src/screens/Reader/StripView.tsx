@@ -11,7 +11,7 @@ import type { useChapterWindow } from "./useChapters";
 import s from "./Reader.module.css";
 
 type Item =
-  | { kind: "page"; key: string; chapter: number; page: number; chapterId: number; ratio: number }
+  | { kind: "page"; key: string; chapter: number; page: number; chapterId: number; ratio: number; known: boolean }
   | { kind: "header"; key: string; chapter: number; name: string }
   | { kind: "loading"; key: string; chapter: number }
   | { kind: "error"; key: string; chapter: number; message: string }
@@ -58,6 +58,13 @@ export function StripView({
   // Take keyboard focus so arrows and space work without a click first.
   useEffect(() => ref.current?.focus({ preventScroll: true }), []);
   const colW = stripWidth(vw, zoom, fit);
+  // Online pages arrive without sizes; each one's real ratio is learned when its image loads,
+  // and the anchor below keeps the reading position steady while the strip re-lays out.
+  const [learned, setLearned] = useState<ReadonlyMap<string, number>>(new Map());
+  const learn = (key: string, img: HTMLImageElement) => {
+    const r = ratioOf(img.naturalWidth, img.naturalHeight);
+    if (img.naturalWidth > 0 && learned.get(key) !== r) setLearned((m) => new Map(m).set(key, r));
+  };
 
   const items = useMemo(() => {
     const out: Item[] = [];
@@ -71,13 +78,21 @@ export function StripView({
       else if (l.pages.length === 0) out.push({ kind: "empty", key: `z${i}`, chapter: i });
       else
         l.pages.forEach((p, j) =>
-          out.push({ kind: "page", key: `p${ch.id}:${j}`, chapter: i, page: j, chapterId: ch.id, ratio: ratioOf(p.w, p.h) }),
+          out.push({
+            kind: "page",
+            key: `p${ch.id}:${j}`,
+            chapter: i,
+            page: j,
+            chapterId: ch.id,
+            ratio: p.w && p.h ? ratioOf(p.w, p.h) : (learned.get(`p${ch.id}:${j}`) ?? ratioOf(null, null)),
+            known: Boolean(p.w && p.h),
+          }),
         );
     }
     const last = win.loads.get(win.hi);
     if (win.hi === seq.length - 1 && last && last.state !== "loading") out.push({ kind: "end", key: "end", chapter: win.hi });
     return out;
-  }, [seq, win.lo, win.hi, win.loads]);
+  }, [seq, win.lo, win.hi, win.loads, learned]);
 
   const sizeOf = (it: Item | undefined) => (it?.kind === "page" ? Math.round(colW * it.ratio) + GAP : MARKER_H);
   const v = useVirtualizer({
@@ -187,7 +202,15 @@ export function StripView({
           const style = { transform: `translateY(${vi.start}px)`, height: vi.size - (it.kind === "page" ? GAP : 0), width: colW, left, marginLeft: 0 };
           return (
             <div key={vi.key} className={s.stripItem} style={style}>
-              {it.kind === "page" && <img src={pageUrl(it.chapterId, it.page)} alt={`Page ${it.page + 1}`} decoding="async" draggable={false} />}
+              {it.kind === "page" && (
+                <img
+                  src={pageUrl(it.chapterId, it.page)}
+                  alt={`Page ${it.page + 1}`}
+                  decoding="async"
+                  draggable={false}
+                  onLoad={it.known ? undefined : (e) => learn(it.key, e.currentTarget)}
+                />
+              )}
               {it.kind === "header" && (
                 <div className={s.marker}>
                   <span className={s.markerTitle}>{it.name}</span>
