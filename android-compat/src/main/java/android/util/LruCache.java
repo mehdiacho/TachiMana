@@ -222,7 +222,9 @@ public class LruCache<K, V> {
     }
 
     private Map.Entry<K, V> eldest() {
-        return map.firstEntry();
+        // Not map.firstEntry(): that is JDK 21+ (SequencedMap) and the project targets 17.
+        java.util.Iterator<Map.Entry<K, V>> it = map.entrySet().iterator();
+        return it.hasNext() ? it.next() : null;
     }
 
     /**

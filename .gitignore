@@ -41,4 +41,5 @@ desktop.ini
 app/target/
 app/ui/node_modules/
 app/ui/dist/
+app/ui/.vite/
 app/src-tauri/gen/

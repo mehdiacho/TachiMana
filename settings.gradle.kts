@@ -42,5 +42,8 @@ include(":sync")
 include(":android-compat")
 include(":android-compat:config")
 include(":extension")
+
+// Headless extension host for the Rust app (docs/rust-port/PLAN.md P1).
+include(":ext-host")
 // include(":reader")
 // include(":ui")

@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
-Current phase: P4 Tauri shell and UI foundation, branch feat/rust-p4-ui (stacked on feat/rust-p3-local, which is stacked on feat/rust-p2-db)
+Current phase: P1 Kotlin ext-host, branch feat/rust-p1-exthost (stacked on feat/rust-p4-ui → p3 → p2; also merges fix/release-workflow for the android-compat compile fixes)
 
 Done:
 - P2 `app/` workspace (no unsafe, no unwrap/expect/panic outside tests). `tm-core`: AppPaths, Settings
@@ -21,20 +21,31 @@ Done:
   both ends without a jump, L→R, R→L, 2-up with cover-solo, four fits, zoom keys and Ctrl+wheel, slider,
   progress saved with a 500 ms debounce and on close). Settings (theme cards, rotation, data folder,
   page cache size and clear). Recents/Browse/Downloads/Sync show "arrives later" states.
+- P1 `ext-host/` (code written, verified only in CI because Gradle cannot resolve android-jar here):
+  Ktor CIO server on 127.0.0.1, bearer token, `TM_EXTHOST_READY port=N` on stdout then stdout goes to
+  stderr, exits on stdin EOF or `/v1/shutdown`. Every endpoint of PLAN §P1 (docs/rust-port/api.md).
+  Install downloads to `*.part`, checks the signature, then replaces the old artifact, so a bad
+  download never breaks a working install. Uninstall, per-package artifact tracking, icons kept in
+  `extensions/icons.json`. `:ext-host:selfTest` covers auth, repos, catalog, install, sources,
+  popular/latest/search, cover, manga+chapters, pages, page bytes, preferences, reload, uninstall,
+  shutdown. `.github/workflows/ext-host.yml` builds it, runs the self-test and checks the start-up
+  contract with `java -jar` on Ubuntu and Windows.
 - CI: `.github/workflows/rust-port.yml` runs UI typecheck/tests/build, cargo fmt, clippy, tests, and
   checks the generated types are committed.
 
-Next step: P5 (ext-host client, Browse, online reading) needs P1 (the Kotlin ext-host). Gradle here gets
-HTTP 429 from Maven Central, so P1 may have to be built and tested through CI.
+Next step: get ext-host CI green, then P5 (tm-exthost client, Browse, online reading).
 
 Blockers / questions:
-- Gradle in the cloud container is rate limited by Maven Central (P1, the Kotlin fixture DB for P2.4).
+- Gradle in the cloud container: Maven Central works through a mirror init script, but jitpack (401)
+  and github.com/Suwayomi raw (403, android-jar) are blocked, so Kotlin builds only run in CI.
 - Open question 1 in PLAN.md (where the ext-host zip downloads from, the repo is private) still stands.
 
 Deviations from PLAN.md and why:
 - Schema version is 30, not 29 (SQLDelight's version is migrations + 1). Plan corrected.
 - SQL is embedded from the Kotlin sources rather than copied (one source of truth). Plan corrected.
 - P1 and P2 done out of order because P1 needs Gradle.
+- `:ext-host:fatJar` produces `ext-host.jar` plus `lib/` (manifest Class-Path) instead of one merged
+  jar: merging would drop duplicate `META-INF/services` files that GraalVM, Ktor and coroutines need.
 - Chapter order: online sources store `source_order` newest first (0 = newest), but the Kotlin
   LocalImporter numbers files oldest first (0 = oldest). The Rust UI orders each kind correctly. The
   Kotlin app shows `sortedByDescending(source_order)` for both, which looks right for local manga and
