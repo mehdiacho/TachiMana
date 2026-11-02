@@ -7,6 +7,7 @@ import {
   ArrowUpNarrowWide,
   BookOpen,
   Check,
+  CloudDownload,
   ChevronLeft,
   FolderOpen,
   LayoutGrid,
@@ -33,6 +34,7 @@ import {
   type LibrarySort,
   type LibraryView,
 } from "../../lib/libraryView";
+import { summary, useLibraryUpdate } from "../../store/libraryUpdate";
 import { useUi } from "../../store/ui";
 import { CategoryEditor } from "./CategoryEditor";
 import { MangaDetail } from "./MangaDetail";
@@ -172,6 +174,17 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
   const [toast, setToast] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const update = useLibraryUpdate((u) => u.progress);
+  const finished = useLibraryUpdate((u) => u.finished);
+  const startUpdate = useLibraryUpdate((u) => u.start);
+  const clearFinished = useLibraryUpdate((u) => u.clearFinished);
+  const hasOnline = (lib.data ?? []).some((e) => !e.manga.isLocal);
+
+  useEffect(() => {
+    if (!finished) return;
+    setToast(summary(finished));
+    clearFinished();
+  }, [finished, clearFinished]);
 
   const st = settings.data;
   const view: LibraryView = {
@@ -309,8 +322,26 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
                 save.mutate({ librarySort: n.sort, librarySortDescending: n.descending });
               }}
             />
+            {hasOnline && (
+              <IconButton
+                icon={CloudDownload}
+                label={update ? `Updating ${update.done} of ${update.total}` : "Update library from sources"}
+                size={18}
+                disabled={update !== null}
+                onClick={() => void startUpdate().then((m) => m && setToast(m))}
+              />
+            )}
             <IconButton icon={RefreshCw} label="Rescan local folder" size={18} onClick={() => void rescan()} disabled={scanning} />
           </div>
+          {update && (
+            <div className={s.updateBar} role="status">
+              <span>
+                Updating {Math.min(update.done + 1, update.total)} of {update.total}
+                {update.current ? ` · ${update.current}` : ""}
+              </span>
+              <progress max={Math.max(update.total, 1)} value={update.done} />
+            </div>
+          )}
           <div className={s.filters}>
             <Chip active={view.unreadOnly} onClick={() => save.mutate({ libraryUnreadOnly: !view.unreadOnly })}>
               {view.unreadOnly && <Check size={14} />} Unread

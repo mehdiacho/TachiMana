@@ -33,6 +33,12 @@ fn main() {
             if let Ok(res) = app.path().resource_dir() {
                 let _ = app.state::<AppState>().host_dir.set(res.join("ext-host"));
             }
+            // Stop the extension host when it has been idle for a while; it restarts on demand.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                online::stop_if_idle(&handle.state::<AppState>(), online::HOST_IDLE);
+            });
             Ok(())
         })
         .register_asynchronous_uri_scheme_protocol("tm", protocol::handle)
@@ -67,6 +73,7 @@ fn main() {
             online::browse_list,
             online::online_open,
             online::manga_refresh,
+            online::library_update,
             online::library_set_favorite,
             online::source_preferences,
             online::source_preference_set,

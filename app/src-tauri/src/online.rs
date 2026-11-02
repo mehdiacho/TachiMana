@@ -64,6 +64,7 @@ pub fn client(state: &AppState) -> R<Client> {
         .exthost
         .lock()
         .map_err(|_| CmdError::internal("extension host lock poisoned"))?;
+    state.touch_host();
     if let Some(host) = slot.as_mut() {
         if host.is_alive() {
             return Ok(host.client().clone());
@@ -85,6 +86,30 @@ pub fn client(state: &AppState) -> R<Client> {
         }
     });
     Ok(client)
+}
+
+/// How long the host may sit unused before it is stopped (PLAN §P5).
+pub const HOST_IDLE: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// Stops the host when nothing has used it for `idle` and no library update is running. The next
+/// call starts it again. Returns whether it stopped one.
+pub fn stop_if_idle(state: &AppState, idle: std::time::Duration) -> bool {
+    use std::sync::atomic::Ordering;
+    if state.updating.load(Ordering::Relaxed) {
+        return false;
+    }
+    let Ok(mut slot) = state.exthost.lock() else {
+        return false;
+    };
+    let last = state.host_used.load(Ordering::Relaxed);
+    let quiet = crate::state::now_secs().saturating_sub(last) >= idle.as_secs();
+    if slot.is_some() && quiet {
+        tracing::info!("ext-host idle for {} s; stopping it", idle.as_secs());
+        // Dropping closes its stdin, waits briefly, then kills it.
+        *slot = None;
+        return true;
+    }
+    false
 }
 
 /// Pushes the Cloudflare toggle to a running host (a stopped host gets it when it starts).
@@ -413,6 +438,57 @@ pub fn library_set_favorite(state: State<'_, AppState>, id: i64, favorite: bool)
     Ok(MangaDto::from(&manga_or_404(&state, id)?))
 }
 
+/// Refreshes every online manga in the library from its source, one at a time, reporting progress
+/// as `library-update` events (port of LibraryUpdater). Returns how many titles it will refresh.
+#[tauri::command]
+pub fn library_update(app: tauri::AppHandle, state: State<'_, AppState>) -> R<u32> {
+    use std::sync::atomic::Ordering;
+    let todo: Vec<Manga> = state
+        .db
+        .library()?
+        .into_iter()
+        .filter(|m| !m.is_local())
+        .collect();
+    let total = u32::try_from(todo.len()).unwrap_or(u32::MAX);
+    if todo.is_empty() {
+        return Ok(0);
+    }
+    if state.updating.swap(true, Ordering::AcqRel) {
+        return Err(CmdError::new("busy", "The library is already updating."));
+    }
+    tauri::async_runtime::spawn(async move {
+        use tauri::{Emitter, Manager};
+        let state = app.state::<AppState>();
+        let mut p = LibraryUpdateDto {
+            running: true,
+            done: 0,
+            total,
+            current: None,
+            chapters_added: 0,
+            failures: Vec::new(),
+        };
+        for m in &todo {
+            p.current = Some(m.title.clone());
+            let _ = app.emit("library-update", &p);
+            match refresh(&state, m.source, &m.url, &m.title).await {
+                Ok(r) => {
+                    p.chapters_added = p.chapters_added.saturating_add(r.chapters_added);
+                    if let Some(e) = r.error {
+                        p.failures.push(format!("{}: {e}", m.title));
+                    }
+                }
+                Err(e) => p.failures.push(format!("{}: {}", m.title, e.message)),
+            }
+            p.done = p.done.saturating_add(1);
+        }
+        p.running = false;
+        p.current = None;
+        state.updating.store(false, Ordering::Release);
+        let _ = app.emit("library-update", &p);
+    });
+    Ok(total)
+}
+
 fn manga_or_404(state: &AppState, id: i64) -> R<Manga> {
     state
         .db
@@ -546,4 +622,53 @@ pub fn cover_bytes(state: &AppState, source: i64, url: &str) -> R<Vec<u8>> {
         tracing::warn!("cover cache write failed: {e}");
     }
     Ok(img.bytes)
+}
+
+#[cfg(all(test, unix))]
+mod idle_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::atomic::Ordering;
+    use std::time::Duration;
+
+    /// A stand-in `java` that prints the ready line and waits for stdin to close.
+    fn fake_host(dir: &std::path::Path) -> ExtHost {
+        let java = dir.join("java");
+        std::fs::write(
+            &java,
+            "#!/bin/sh\necho 'TM_EXTHOST_READY port=4100'\ncat > /dev/null\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&java, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(dir.join("ext-host.jar"), b"").unwrap();
+        ExtHost::spawn(&HostConfig {
+            host_dir: dir.into(),
+            data_dir: dir.into(),
+            java: Some(java),
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn idle_host_is_stopped_but_not_during_an_update() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state =
+            AppState::open(tm_core::AppPaths::at(tmp.path().join("data")).unwrap()).unwrap();
+        assert!(!stop_if_idle(&state, Duration::ZERO), "nothing running");
+
+        *state.exthost.lock().unwrap() = Some(fake_host(tmp.path()));
+        state.touch_host();
+        assert!(
+            !stop_if_idle(&state, Duration::from_secs(600)),
+            "used just now"
+        );
+
+        state.updating.store(true, Ordering::Relaxed);
+        assert!(!stop_if_idle(&state, Duration::ZERO), "an update keeps it");
+        state.updating.store(false, Ordering::Relaxed);
+
+        assert!(stop_if_idle(&state, Duration::ZERO));
+        assert!(state.exthost.lock().unwrap().is_none());
+    }
 }

@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use tm_cache::DiskCache;
@@ -38,6 +39,10 @@ pub struct AppState {
     pub exthost: Mutex<Option<tm_exthost::ExtHost>>,
     /// Folder holding `ext-host.jar`, set once the Tauri app knows its resource dir.
     pub host_dir: OnceLock<PathBuf>,
+    /// Unix seconds of the last call to the host, for stopping it when idle.
+    pub host_used: AtomicU64,
+    /// Set while the library update runs (it keeps the host alive and runs once at a time).
+    pub updating: AtomicBool,
     _lock: AppLock,
 }
 
@@ -61,8 +66,15 @@ impl AppState {
             online: Mutex::new(HashMap::new()),
             exthost: Mutex::new(None),
             host_dir: OnceLock::new(),
+            host_used: AtomicU64::new(0),
+            updating: AtomicBool::new(false),
             _lock: lock,
         })
+    }
+
+    /// Records a use of the extension host.
+    pub fn touch_host(&self) {
+        self.host_used.store(now_secs(), Ordering::Relaxed);
     }
 
     pub fn settings(&self) -> Result<MutexGuard<'_, Settings>, CmdError> {
@@ -150,4 +162,12 @@ impl From<tm_exthost::Error> for CmdError {
         };
         Self::new(e.kind(), message)
     }
+}
+
+/// Seconds since the Unix epoch (0 if the clock is before it).
+pub fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }

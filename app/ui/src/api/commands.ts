@@ -12,6 +12,7 @@ import type { BrowsePageDto } from "../gen/BrowsePageDto";
 import type { BrowseStatusDto } from "../gen/BrowseStatusDto";
 import type { CatalogDto } from "../gen/CatalogDto";
 import type { InstalledExtensionDto } from "../gen/InstalledExtensionDto";
+import type { LibraryUpdateDto } from "../gen/LibraryUpdateDto";
 import type { MangaDto } from "../gen/MangaDto";
 import type { PreferenceDto } from "../gen/PreferenceDto";
 import type { RefreshDto } from "../gen/RefreshDto";
@@ -74,10 +75,13 @@ export const api = {
     call<BrowsePageDto>("browse_list", { sourceId, mode, query, page }),
   onlineOpen: (sourceId: string, url: string, title: string) => call<RefreshDto>("online_open", { sourceId, url, title }),
   mangaRefresh: (id: number) => call<RefreshDto>("manga_refresh", { id }),
+  /** Starts refreshing every online library title; progress arrives as `library-update` events. */
+  libraryUpdate: () => call<number>("library_update"),
   librarySetFavorite: (id: number, favorite: boolean) => call<MangaDto>("library_set_favorite", { id, favorite }),
   sourcePreferences: (sourceId: string) => call<PreferenceDto[]>("source_preferences", { sourceId }),
   sourcePreferenceSet: (sourceId: string, key: string, value: unknown) =>
     call<PreferenceDto>("source_preference_set", { sourceId, key, value }),
 };
 
+export type { LibraryUpdateDto };
 export type BrowseMode = "popular" | "latest" | "search";

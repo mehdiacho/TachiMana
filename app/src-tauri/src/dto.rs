@@ -468,6 +468,21 @@ impl From<tm_exthost::model::Preference> for PreferenceDto {
     }
 }
 
+/// Progress of the library update, sent as the `library-update` event.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LibraryUpdateDto {
+    pub running: bool,
+    pub done: u32,
+    pub total: u32,
+    /// Title being refreshed now.
+    pub current: Option<String>,
+    pub chapters_added: u32,
+    /// Titles whose source failed, with the error.
+    pub failures: Vec<String>,
+}
+
 /// Result of refreshing an online manga from its source.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
