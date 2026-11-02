@@ -1,9 +1,14 @@
-// Settings (spec §3.7): theme, rotation, online sources, storage (data folder, page cache).
-import { CheckCircle2, Circle, Database, FolderOpen, HardDrive, Info, RotateCw, ShieldCheck, Trash2 } from "lucide-react";
+// Settings (spec §3.7): theme, rotation, online sources, AniList, storage (data folder, page
+// cache, NAS), sync, updates and about.
+import { CheckCircle2, ChevronRight, Circle, Database, FolderOpen, HardDrive, Info, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
+import { useState } from "react";
 import { api } from "../../api/commands";
-import { keys, useAppInfo, useCacheUsage, useSetSettings, useSettings } from "../../api/queries";
+import { keys, queryClient, useAniList, useAppInfo, useCacheUsage, useSetSettings, useSettings, useUpdate } from "../../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { TextButton, Toggle } from "../../components/ui";
+import { OutlinedButton, PrimaryButton, TextButton, Toggle } from "../../components/ui";
+import type { CmdError } from "../../gen/CmdError";
+import { accountLine } from "../../lib/track";
+import { updateAction, updateLine } from "../../lib/update";
 import { useUi } from "../../store/ui";
 import { NasSection } from "./NasSection";
 import s from "./Settings.module.css";
@@ -23,6 +28,92 @@ function fmtBytes(n: number): string {
 
 const CACHE_SIZES = [1024, 2048, 5120, 10240, 20480, 51200];
 
+function AniListRow() {
+  const account = useAniList();
+  const [note, setNote] = useState<string | null>(null);
+  const a = account.data;
+  const waiting = a?.signingIn === true;
+  const run = async (f: () => Promise<unknown>) => {
+    setNote(null);
+    try {
+      await f();
+    } catch (e) {
+      setNote((e as CmdError).message);
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: keys.anilist });
+    }
+  };
+  return (
+    <>
+      <div className={s.row}>
+        <TrendingUp size={20} className={s.rowIcon} />
+        <div className={s.rowText}>
+          <span className={s.rowTitle}>AniList</span>
+          <span className={s.rowDesc}>
+            {a ? accountLine(a.userName, a.expiresAt) : "…"}. Link a manga from its Tracking button; finished chapters update AniList.
+          </span>
+        </div>
+        {a?.connected ? (
+          <TextButton onClick={() => void run(api.anilistDisconnect)}>Sign out</TextButton>
+        ) : (
+          <OutlinedButton disabled={waiting} onClick={() => void run(api.anilistConnect)}>
+            {waiting ? "Waiting for the browser…" : "Connect"}
+          </OutlinedButton>
+        )}
+      </div>
+      {note && (
+        <div className={s.err} role="alert">
+          {note}
+        </div>
+      )}
+    </>
+  );
+}
+
+function UpdateRow({ version, readOnly }: { version: string; readOnly: boolean }) {
+  const update = useUpdate();
+  const [note, setNote] = useState<string | null>(null);
+  const u = update.data;
+  const action = u ? updateAction(u) : null;
+  const run = async (f: () => Promise<unknown>) => {
+    setNote(null);
+    try {
+      await f();
+    } catch (e) {
+      setNote((e as CmdError).message);
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: keys.update });
+    }
+  };
+  return (
+    <>
+      <div className={s.row}>
+        <Info size={20} className={s.rowIcon} />
+        <div className={s.rowText}>
+          <span className={s.rowTitle}>TachiMana {version}</span>
+          <span className={s.rowDesc}>
+            A fork of Yōkai · Apache-2.0{readOnly ? " · This library was saved by a newer version, so editing is off." : ""}
+          </span>
+          {u && <span className={s.rowDesc}>{updateLine(u)}</span>}
+        </div>
+        {action === "check" && (
+          <TextButton onClick={() => void run(api.updateCheck)}>
+            <RefreshCw size={14} style={{ verticalAlign: "-2px" }} /> Check now
+          </TextButton>
+        )}
+        {action === "download" && <PrimaryButton onClick={() => void run(api.updateDownload)}>Download</PrimaryButton>}
+        {action === "install" && <PrimaryButton onClick={() => void run(api.updateInstall)}>Install and restart</PrimaryButton>}
+        {action === "page" && <OutlinedButton onClick={() => void run(api.updateOpenPage)}>Release page</OutlinedButton>}
+      </div>
+      {note && (
+        <div className={s.err} role="alert">
+          {note}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function SettingsScreen() {
   const settings = useSettings();
   const save = useSetSettings();
@@ -31,6 +122,7 @@ export function SettingsScreen() {
   const qc = useQueryClient();
   const rotated = useUi((u) => u.rotated);
   const setRotated = useUi((u) => u.setRotated);
+  const setScreen = useUi((u) => u.setScreen);
   const st = settings.data;
   const clear = async () => {
     const u = await api.cacheClear().catch(() => null);
@@ -99,6 +191,9 @@ export function SettingsScreen() {
           />
         </div>
 
+        <div className={s.section}>Tracking</div>
+        <AniListRow />
+
         <div className={s.section}>Storage</div>
         <div className={s.row}>
           <Database size={20} className={s.rowIcon} />
@@ -142,16 +237,18 @@ export function SettingsScreen() {
         </div>
         <NasSection />
 
-        <div className={s.section}>About</div>
-        <div className={s.row}>
-          <Info size={20} className={s.rowIcon} />
+        <div className={s.section}>Sync</div>
+        <button type="button" className={`${s.row} ${s.navRow}`} onClick={() => setScreen("sync")}>
+          <RefreshCw size={20} className={s.rowIcon} />
           <div className={s.rowText}>
-            <span className={s.rowTitle}>TachiMana {info.data?.version ?? ""}</span>
-            <span className={s.rowDesc}>
-              A fork of Yōkai · Apache-2.0{info.data?.readOnly ? " · This library was saved by a newer version, so editing is off." : ""}
-            </span>
+            <span className={s.rowTitle}>Sync and backups</span>
+            <span className={s.rowDesc}>Pull another device's library over your network, or save and restore a backup file.</span>
           </div>
-        </div>
+          <ChevronRight size={20} className={s.rowIcon} />
+        </button>
+
+        <div className={s.section}>About</div>
+        <UpdateRow version={info.data?.version ?? ""} readOnly={info.data?.readOnly ?? false} />
       </div>
     </div>
   );

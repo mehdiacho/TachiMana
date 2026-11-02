@@ -275,7 +275,13 @@ pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<Cha
 /// Save reading progress the way the Kotlin app does: page, pages left, read once finished
 /// (never un-read), and a history row.
 #[tauri::command]
-pub fn save_progress(state: State<'_, AppState>, chapter_id: i64, page: i64, total: i64) -> R<()> {
+pub fn save_progress(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    chapter_id: i64,
+    page: i64,
+    total: i64,
+) -> R<()> {
     if total <= 0 || page < 0 || page >= total {
         return Err(CmdError::new("invalid", "Page is out of range."));
     }
@@ -286,6 +292,10 @@ pub fn save_progress(state: State<'_, AppState>, chapter_id: i64, page: i64, tot
         .db
         .mark_progress(chapter_id, page, left, finished || ch.read)?;
     state.db.record_history(chapter_id)?;
+    // Like the Kotlin app: a finished chapter raises AniList's progress (no-op when untracked).
+    if finished {
+        crate::track::push_finished(&app, ch.manga_id, ch.chapter_number);
+    }
     Ok(())
 }
 

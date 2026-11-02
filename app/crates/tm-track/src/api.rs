@@ -92,7 +92,7 @@ pub mod status {
     }
 }
 
-/// Changes to a list entry; `None` leaves a field as it is.
+/// Changes to a list entry; `None` leaves a field as it is. `score` is out of 10.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EntryChange {
     pub status: Option<&'static str>,
@@ -193,7 +193,7 @@ impl AniListApi {
             .await
         {
             // AniList answers "not on your list" with a 404 GraphQL error.
-            Err(TrackError::Api(m)) if m.to_ascii_lowercase().starts_with("not found") => Ok(None),
+            Err(TrackError::Missing(_)) => Ok(None),
             Err(e) => Err(e),
             Ok(data) => match data.get("MediaList") {
                 None | Some(Value::Null) => Ok(None),
@@ -209,27 +209,36 @@ impl AniListApi {
         media_id: i64,
         change: &EntryChange,
     ) -> Result<Entry> {
+        // Only declare variables that are used: GraphQL forbids unused ones.
+        let mut decls = vec!["$mediaId: Int"];
         let mut args = vec!["mediaId: $mediaId"];
         let mut vars = Map::new();
         vars.insert("mediaId".into(), json!(media_id));
         if let Some(s) = change.status {
+            decls.push("$status: MediaListStatus");
             args.push("status: $status");
             vars.insert("status".into(), json!(s));
         }
         if let Some(p) = change.progress {
+            decls.push("$progress: Int");
             args.push("progress: $progress");
             vars.insert("progress".into(), json!(p));
         }
         if let Some(s) = change.score {
-            if !s.is_finite() {
-                return Err(TrackError::Invalid("Score must be a number.".into()));
+            if !s.is_finite() || !(0.0..=10.0).contains(&s) {
+                return Err(TrackError::Invalid(
+                    "Score must be between 0 and 10.".into(),
+                ));
             }
-            args.push("score: $score");
-            vars.insert("score".into(), json!(s));
+            // `score` would be read in the user's own scoring format (5 stars, 100 points…);
+            // `scoreRaw` is always out of 100. In range, so the cast is exact.
+            decls.push("$scoreRaw: Int");
+            args.push("scoreRaw: $scoreRaw");
+            vars.insert("scoreRaw".into(), json!((s * 10.0).round() as i64));
         }
         let q = format!(
-            "mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {{ \
-             SaveMediaListEntry({}) {{ id status progress score(format: POINT_10) }} }}",
+            "mutation ({}) {{ SaveMediaListEntry({}) {{ id status progress score(format: POINT_10) }} }}",
+            decls.join(", "),
             args.join(", ")
         );
         let data = self.graphql(&q, Value::Object(vars), Some(token)).await?;
@@ -276,6 +285,9 @@ impl AniListApi {
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("unknown error");
+            if err.get("status").and_then(Value::as_i64) == Some(404) {
+                return Err(TrackError::Missing(msg.to_owned()));
+            }
             return Err(TrackError::Api(msg.to_owned()));
         }
         match v.get("data") {

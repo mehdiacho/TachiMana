@@ -75,8 +75,12 @@ async fn graphql(
         if let Some(p) = v.get("progress").and_then(Value::as_i64) {
             e.2 = p;
         }
-        if let Some(sc) = v.get("score").and_then(Value::as_f64) {
-            e.3 = sc;
+        assert!(
+            v.get("score").is_none(),
+            "score is read in the user's own format; send scoreRaw"
+        );
+        if let Some(raw) = v.get("scoreRaw").and_then(Value::as_i64) {
+            e.3 = raw as f64 / 10.0;
         }
         let (eid, s, p, sc) = e.clone();
         return Json(
@@ -367,7 +371,7 @@ async fn capture_page_forwards_the_fragment_and_returns_the_token() {
         "{base}?access_token=abc%2Edef&token_type=Bearer&expires_in=31536000"
     ))
     .await;
-    assert!(done.contains("connected"));
+    assert!(done.contains("go back to the app"));
     assert_eq!(task.await.unwrap().unwrap(), "abc.def");
 }
 

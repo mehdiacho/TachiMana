@@ -5,6 +5,8 @@ import { api } from "../api/commands";
 import { keys, queryClient } from "../api/queries";
 import type { DownloadJobDto } from "../gen/DownloadJobDto";
 import type { SyncStatusDto } from "../gen/SyncStatusDto";
+import type { AniListAccountDto } from "../gen/AniListAccountDto";
+import type { UpdateStatusDto } from "../gen/UpdateStatusDto";
 import type { UploadJobDto } from "../gen/UploadJobDto";
 import { newlyDone } from "../lib/downloads";
 
@@ -38,6 +40,9 @@ export const useDownloads = create<DownloadsState>((set, get) => {
       void listen<UploadJobDto[]>("uploads", (e) => set({ uploads: e.payload })).catch(() => undefined);
       // Sync status (peers, progress) and libraries changed by a pull or restore.
       void listen<SyncStatusDto>("sync", (e) => queryClient.setQueryData(keys.sync, e.payload)).catch(() => undefined);
+      void listen<AniListAccountDto>("anilist", (e) => queryClient.setQueryData(keys.anilist, e.payload)).catch(() => undefined);
+      void listen<UpdateStatusDto>("update", (e) => queryClient.setQueryData(keys.update, e.payload)).catch(() => undefined);
+      void listen<number>("track-changed", (e) => void queryClient.invalidateQueries({ queryKey: keys.track(e.payload) })).catch(() => undefined);
       void listen("library-changed", () => {
         for (const k of [keys.library, keys.categories, keys.recents, ["detail"]]) void queryClient.invalidateQueries({ queryKey: k });
       }).catch(() => undefined);

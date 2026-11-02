@@ -21,6 +21,9 @@ export const keys = {
   nas: ["nas", "settings"] as const,
   nasCache: ["nas", "cache"] as const,
   sync: ["sync"] as const,
+  anilist: ["anilist"] as const,
+  update: ["update"] as const,
+  track: (mangaId: number) => ["track", mangaId] as const,
   browseStatus: ["browse", "status"] as const,
   repos: ["browse", "repos"] as const,
   sources: ["browse", "sources"] as const,
@@ -28,6 +31,9 @@ export const keys = {
   prefs: (sourceId: string) => ["browse", "prefs", sourceId] as const,
 };
 
+export const useUpdate = () => useQuery({ queryKey: keys.update, queryFn: api.updateStatus, staleTime: Infinity });
+export const useAniList = () => useQuery({ queryKey: keys.anilist, queryFn: api.anilistAccount, staleTime: Infinity });
+export const useTrack = (mangaId: number) => useQuery({ queryKey: keys.track(mangaId), queryFn: () => api.trackGet(mangaId) });
 export const useSyncStatus = () => useQuery({ queryKey: keys.sync, queryFn: api.syncStatus, staleTime: Infinity });
 export const useAppInfo = () => useQuery({ queryKey: keys.info, queryFn: api.appInfo });
 export const useLibrary = () => useQuery({ queryKey: keys.library, queryFn: api.library });

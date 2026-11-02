@@ -211,7 +211,7 @@ const CAPTURE_PAGE: &str = r#"<!doctype html><meta charset="utf-8"><title>Connec
 
 const DONE_PAGE: &str = r#"<!doctype html><meta charset="utf-8"><title>Connected</title>
 <body style="font-family:sans-serif;background:#1c1c1d;color:#eee;display:grid;place-items:center;height:100vh">
-<p>AniList is connected. You can close this tab and go back to TachiMana.</p>"#;
+<p>TachiMana has the sign-in. You can close this tab and go back to the app.</p>"#;
 
 const DECLINED_PAGE: &str = r#"<!doctype html><meta charset="utf-8"><title>Not connected</title>
 <body style="font-family:sans-serif;background:#1c1c1d;color:#eee;display:grid;place-items:center;height:100vh">

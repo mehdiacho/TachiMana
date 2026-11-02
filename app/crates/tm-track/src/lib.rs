@@ -21,6 +21,9 @@ pub enum TrackError {
     /// An error AniList itself returned, already worded by AniList.
     #[error("AniList: {0}")]
     Api(String),
+    /// AniList answered 404: nothing there (or a list it won't show us).
+    #[error("AniList: {0}")]
+    Missing(String),
     #[error("AniList sent something unexpected: {0}")]
     Protocol(String),
     #[error("not connected to AniList")]

@@ -9,6 +9,8 @@ mod online;
 mod protocol;
 mod state;
 mod sync;
+mod track;
+mod update;
 
 use state::AppState;
 
@@ -31,6 +33,7 @@ fn main() {
     };
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(state)
         .setup(|app| {
             use tauri::Manager;
@@ -42,6 +45,8 @@ fn main() {
             nas::kick(app.handle());
             // Serve this library on the LAN and look for other devices, like the Kotlin app.
             sync::init(app.handle());
+            // One quiet update check a little after start-up.
+            update::init(app.handle());
             // Stop the extension host when it has been idle for a while; it restarts on demand.
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -110,6 +115,23 @@ fn main() {
             sync::backup_restore,
             sync::backup_accept_repos,
             sync::backup_dismiss_repos,
+            track::anilist_account,
+            track::anilist_connect,
+            track::anilist_connect_token,
+            track::anilist_disconnect,
+            track::track_get,
+            track::track_search,
+            track::track_bind,
+            track::track_unbind,
+            track::track_set_status,
+            track::track_set_progress,
+            track::track_set_score,
+            track::track_open,
+            update::update_status,
+            update::update_check,
+            update::update_download,
+            update::update_install,
+            update::update_open_page,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {
