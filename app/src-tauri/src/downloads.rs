@@ -18,20 +18,35 @@ type R<T> = Result<T, CmdError>;
 /// Most chapters one request may queue.
 const MAX_ENQUEUE: usize = 2000;
 
-/// Pages through the extension host. `open` remembers the listed pages per chapter url until the
-/// next `open`, which is all one worker needs.
+/// Where an opened chapter's pages come from.
+#[derive(Clone)]
+enum Listed {
+    Host(Vec<model::Page>),
+    /// A CBZ fetched from the NAS ("re-download from NAS" setting).
+    Archive(PathBuf, Vec<String>),
+}
+
+/// Pages through the extension host, or from the NAS when it holds the chapter. `open` remembers
+/// the listing per chapter url until the next `open`, which is all one worker needs.
 struct HostPages {
     app: AppHandle,
-    listed: Mutex<HashMap<(i64, String), Vec<model::Page>>>,
+    listed: Mutex<HashMap<(i64, String), Listed>>,
 }
 
 impl HostPages {
-    fn pages_of(&self, c: &ChapterRequest) -> Option<Vec<model::Page>> {
+    fn listed_of(&self, c: &ChapterRequest) -> Option<Listed> {
         self.listed
             .lock()
             .ok()?
             .get(&(c.source_id, c.chapter_url.clone()))
             .cloned()
+    }
+
+    fn remember(&self, c: &ChapterRequest, l: Listed) {
+        if let Ok(mut t) = self.listed.lock() {
+            t.clear();
+            t.insert((c.source_id, c.chapter_url.clone()), l);
+        }
     }
 }
 
@@ -40,14 +55,26 @@ impl PageSource for HostPages {
         Box::pin(async move {
             let state = self.app.state::<AppState>();
             let (manga, ch) = rows_of(&state, c).map_err(|e| e.message)?;
+            let from_nas = state
+                .settings
+                .lock()
+                .is_ok_and(|s| s.bool(tm_core::settings::keys::REMOTE_REDOWNLOAD));
+            if from_nas {
+                if let Some(cbz) = crate::nas::fetch_chapter(&state, &manga, &ch).await {
+                    if let Ok(names) = tm_archive::page_names(&cbz) {
+                        if !names.is_empty() {
+                            let n = names.len();
+                            self.remember(c, Listed::Archive(cbz, names));
+                            return Ok(n);
+                        }
+                    }
+                }
+            }
             let open = crate::online::load_online_chapter(&state, &manga, &ch)
                 .await
                 .map_err(|e| e.message)?;
             let n = open.pages.len();
-            if let Ok(mut t) = self.listed.lock() {
-                t.clear();
-                t.insert((c.source_id, c.chapter_url.clone()), open.pages);
-            }
+            self.remember(c, Listed::Host(open.pages));
             Ok(n)
         })
     }
@@ -58,7 +85,13 @@ impl PageSource for HostPages {
         index: usize,
     ) -> BoxFuture<'a, Result<Vec<u8>, String>> {
         Box::pin(async move {
-            let pages = self.pages_of(c).ok_or("the chapter was not opened")?;
+            let pages = match self.listed_of(c).ok_or("the chapter was not opened")? {
+                Listed::Archive(path, names) => {
+                    let name = names.get(index).ok_or("no such page")?;
+                    return tm_archive::read_page(&path, name).map_err(|e| e.to_string());
+                }
+                Listed::Host(pages) => pages,
+            };
             let page = pages.get(index).ok_or("no such page")?;
             let state = self.app.state::<AppState>();
             let client = crate::online::client(&state).map_err(|e| e.message)?;
@@ -93,13 +126,37 @@ pub fn init(app: &AppHandle) {
         listed: Mutex::new(HashMap::new()),
     });
     let emitter = app.clone();
+    let root = state.paths.downloads_root();
+    // Jobs already handed to the NAS upload queue.
+    let handed: Mutex<std::collections::HashSet<u64>> = Mutex::new(Default::default());
     let dm = DownloadManager::new(
-        state.paths.downloads_root(),
+        root.clone(),
         source,
         tauri::async_runtime::handle().inner(),
         move |jobs| {
             let dto: Vec<DownloadJobDto> = jobs.iter().map(DownloadJobDto::from).collect();
             let _ = emitter.emit("downloads", dto);
+            for j in jobs
+                .iter()
+                .filter(|j| j.status == tm_download::DownloadStatus::Done)
+            {
+                if handed.lock().is_ok_and(|mut h| h.insert(j.id)) {
+                    let c = &j.chapter;
+                    let dir = tm_download::layout::chapter_dir(
+                        &root,
+                        c.source_id,
+                        &c.manga_url,
+                        &c.chapter_url,
+                    );
+                    crate::nas::upload_finished(
+                        &emitter,
+                        c.source_id,
+                        &c.manga_url,
+                        &c.chapter_url,
+                        dir,
+                    );
+                }
+            }
         },
     );
     let _ = state.downloads.set(dm);

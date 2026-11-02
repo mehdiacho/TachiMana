@@ -4,6 +4,7 @@
 mod commands;
 mod downloads;
 mod dto;
+mod nas;
 mod online;
 mod protocol;
 mod state;
@@ -35,6 +36,8 @@ fn main() {
                 let _ = app.state::<AppState>().host_dir.set(res.join("ext-host"));
             }
             downloads::init(app.handle());
+            // Uploads left over from the last run carry on.
+            nas::kick(app.handle());
             // Stop the extension host when it has been idle for a while; it restarts on demand.
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -87,6 +90,15 @@ fn main() {
             downloads::download_dismiss,
             downloads::downloads_clear_finished,
             downloads::downloads_on_disk,
+            nas::nas_settings_get,
+            nas::nas_settings_set,
+            nas::nas_test,
+            nas::nas_uploads,
+            nas::nas_uploads_retry,
+            nas::nas_upload_dismiss,
+            nas::nas_uploads_clear_finished,
+            nas::nas_cache_usage,
+            nas::nas_cache_clear,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

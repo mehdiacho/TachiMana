@@ -28,7 +28,9 @@ tm-local = { path = "../crates/tm-local" }
 tm-cache = { path = "../crates/tm-cache" }
 tm-exthost = { path = "../crates/tm-exthost" }
 tm-download = { path = "../crates/tm-download" }
+tm-remote = { path = "../crates/tm-remote" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+tm-remote = { path = "../crates/tm-remote", features = ["fake-server"] }

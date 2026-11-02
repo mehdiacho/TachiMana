@@ -45,6 +45,8 @@ pub struct AppState {
     pub updating: AtomicBool,
     /// The download queue, started in `setup` once the async runtime exists.
     pub downloads: OnceLock<tm_download::DownloadManager>,
+    /// NAS index, upload queue and source names.
+    pub nas: crate::nas::Nas,
     _lock: AppLock,
 }
 
@@ -59,6 +61,7 @@ impl AppState {
         let cap_mb = u64::try_from(settings.i64(keys::DISK_CACHE_MB).max(64)).unwrap_or(10240);
         let cache = DiskCache::open(&paths.page_cache_dir(), cap_mb.saturating_mul(MB))
             .map_err(|e| e.to_string())?;
+        let nas = crate::nas::Nas::open(&paths);
         Ok(Self {
             paths,
             db,
@@ -71,6 +74,7 @@ impl AppState {
             host_used: AtomicU64::new(0),
             updating: AtomicBool::new(false),
             downloads: OnceLock::new(),
+            nas,
             _lock: lock,
         })
     }

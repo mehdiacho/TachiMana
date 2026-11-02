@@ -8,7 +8,7 @@
     clippy::indexing_slicing
 )]
 
-mod support;
+use tm_remote::fake as support;
 
 use std::path::Path;
 

@@ -1,6 +1,7 @@
 //! Tauri commands. Each one is thin: check the input, call a crate, map the error.
 
 use std::collections::{BTreeSet, HashMap};
+use std::path::PathBuf;
 
 use tauri::State;
 use tm_core::settings::keys;
@@ -225,6 +226,23 @@ pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
     Ok(open)
 }
 
+/// Opens an archive fetched from the NAS for the reader, so page requests are served from it.
+pub fn remember_archive(state: &AppState, chapter_id: i64, path: PathBuf) -> R<()> {
+    let names = tm_archive::page_names(&path)?;
+    if names.is_empty() || names.len() > MAX_PAGES {
+        return Err(CmdError::new(
+            "archive",
+            "The NAS copy of this chapter has no readable pages.",
+        ));
+    }
+    let mut table = state.chapters()?;
+    if table.len() > 64 {
+        table.clear();
+    }
+    table.insert(chapter_id, OpenChapter { path, names });
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<ChapterPagesDto> {
     let ch = chapter_or_404(&state, chapter_id)?;
@@ -233,7 +251,12 @@ pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<Cha
         .manga(ch.manga_id)?
         .ok_or_else(|| CmdError::not_found("That manga"))?;
     if !manga.is_local() && !crate::downloads::is_downloaded(&state, &manga, &ch) {
-        return crate::online::chapter_pages(&state, &manga, &ch).await;
+        // Read order (plan §P6.2): download, then the NAS, then the source.
+        if let Some(cbz) = crate::nas::fetch_chapter(&state, &manga, &ch).await {
+            remember_archive(&state, chapter_id, cbz)?;
+        } else {
+            return crate::online::chapter_pages(&state, &manga, &ch).await;
+        }
     }
     let open = resolve_chapter(&state, chapter_id)?;
     let dims = tm_archive::page_dimensions(&open.path, &open.names)?;

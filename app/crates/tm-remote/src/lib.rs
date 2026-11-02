@@ -1,6 +1,8 @@
 //! NAS storage for TachiMana (PLAN §P6.3): Mihon-compatible names, a WebDAV client, the remote
 //! index, the read mirror and the upload queue. No Tauri here; the app wires it up.
 
+#[cfg(feature = "fake-server")]
+pub mod fake;
 pub mod index;
 pub mod mirror;
 pub mod names;

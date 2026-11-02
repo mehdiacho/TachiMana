@@ -23,8 +23,13 @@ thiserror.workspace = true
 tracing.workspace = true
 tokio = { version = "1", features = ["fs", "io-util", "sync"] }
 tm-archive = { path = "../tm-archive" }
+# Test support: an in-memory WebDAV server (feature `fake-server`).
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"], optional = true }
+
+[features]
+fake-server = ["dep:axum", "tokio/net", "tokio/rt"]
 
 [dev-dependencies]
 tempfile.workspace = true
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tm-remote = { path = ".", features = ["fake-server"] }

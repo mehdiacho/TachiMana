@@ -31,6 +31,10 @@ pub struct Client {
 impl Client {
     /// `base` is `http://127.0.0.1:<port>`.
     pub fn new(base: impl Into<String>, token: &str) -> Result<Self, Error> {
+        // When another crate in the build turns on reqwest's rustls feature, building a client
+        // without a crypto provider panics. The host is plain http on 127.0.0.1, but install one
+        // anyway; a second install (someone got there first) fails harmlessly.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let http = reqwest::Client::builder()
             .no_proxy()
             .connect_timeout(Duration::from_secs(5))
