@@ -1,8 +1,11 @@
 # Rust port status
 Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
-Current phase: P5 online sources, branch feat/rust-p5-browse (stacked on feat/rust-p1-exthost → p4 → p3 → p2)
+Current phase: P5 done (P1–P5 reached main through feat/rust-port-to-main, since the stacked PRs merged into each other's branches); next P6
 
 Done:
+- P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
+  `docs/rust-port/baseline/`. The Windows column and `browseSelfTest`/`extensionSpike` on an open
+  network are still Mehdi's.
 - P2 `app/` workspace (no unsafe, no unwrap/expect/panic outside tests). `tm-core`: AppPaths, Settings
   (Kotlin keys and defaults, unknown keys kept, atomic save, corrupt file kept aside), AppLock.
   `tm-db`: schema and named queries read straight from the Kotlin `.sq`/`.sqm` files; create, migrate
