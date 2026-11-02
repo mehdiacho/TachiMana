@@ -39,7 +39,8 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn mtime_ms(p: &Path) -> i64 {
+/// A file's modification time in epoch milliseconds, 0 when unknown.
+pub fn mtime_ms(p: &Path) -> i64 {
     std::fs::metadata(p)
         .and_then(|m| m.modified())
         .ok()
@@ -75,7 +76,8 @@ fn sorted_children(dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(v)
 }
 
-fn find_cover(manga_dir: &Path) -> Option<PathBuf> {
+/// The `cover.<image>` file of a manga folder (case-insensitive), first by natural order.
+pub fn find_cover(manga_dir: &Path) -> Option<PathBuf> {
     sorted_children(manga_dir).ok()?.into_iter().find(|p| {
         p.is_file()
             && file_name(p).is_some_and(|n| stem(&n).eq_ignore_ascii_case("cover") && is_image(&n))

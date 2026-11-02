@@ -57,6 +57,22 @@ impl Nas {
         self.source_names.lock().ok()?.get(&id).cloned()
     }
 
+    /// Known source names without the language suffix, for a backup's sources section.
+    pub fn source_names(&self) -> HashMap<i64, String> {
+        let Ok(m) = self.source_names.lock() else {
+            return HashMap::new();
+        };
+        m.iter()
+            .map(|(id, label)| {
+                let name = label
+                    .rsplit_once(" (")
+                    .filter(|(_, rest)| rest.ends_with(')'))
+                    .map_or(label.as_str(), |(n, _)| n);
+                (*id, name.to_owned())
+            })
+            .collect()
+    }
+
     /// Remembers source labels (`Name (LANG)`, as Mihon's `toString`) for NAS folder names.
     pub fn remember_sources(&self, sources: impl IntoIterator<Item = (i64, String)>) {
         let Ok(mut m) = self.source_names.lock() else {

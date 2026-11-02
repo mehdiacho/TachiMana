@@ -158,6 +158,12 @@ fn prepare_schema(conn: &Connection, version: i64) -> Result<()> {
 }
 
 /// Look up a named Kotlin query, as an error rather than a panic if it is missing.
-pub(crate) fn q(table: &str, label: &str) -> Result<&'static str> {
+pub fn q(table: &str, label: &str) -> Result<&'static str> {
     queries::sql(table, label).ok_or_else(|| DbError::UnknownQuery(format!("{table}.{label}")))
+}
+
+impl AsRef<Db> for Db {
+    fn as_ref(&self) -> &Db {
+        self
+    }
 }

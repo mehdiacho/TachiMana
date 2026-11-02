@@ -1,0 +1,386 @@
+//! Ports of the backup half of `desktop/.../sync/SyncSelfTest.kt`, plus the wire details the
+//! Kotlin decoder depends on.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+
+use std::collections::HashMap;
+use std::path::Path;
+
+use prost::Message;
+use tm_backup::*;
+use tm_db::{Db, ExtensionRepo};
+
+const PNG_1X1: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0B, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x60, 0x60, 0x60, 0x60,
+    0x00, 0x00, 0x00, 0x04, 0x00, 0x01, 0xF6, 0x17, 0x38, 0x55, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
+fn write_cbz(path: &Path) {
+    use std::io::Write;
+    let f = std::fs::File::create(path).unwrap();
+    let mut zip = zip::ZipWriter::new(f);
+    for p in ["001.png", "002.png"] {
+        zip.start_file(p, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(PNG_1X1).unwrap();
+    }
+    zip.finish().unwrap();
+}
+
+/// `local/Sample Manga/` with a cover and two chapters, scanned into a fresh database.
+fn seeded(dir: &Path) -> Db {
+    let local = dir.join("local");
+    let m = local.join("Sample Manga");
+    std::fs::create_dir_all(&m).unwrap();
+    std::fs::write(m.join("cover.png"), PNG_1X1).unwrap();
+    write_cbz(&m.join("Chapter 1.cbz"));
+    write_cbz(&m.join("Chapter 2.cbz"));
+    let db = Db::open(&dir.join("a.db")).unwrap();
+    tm_local::scan(&db, &local).unwrap();
+    db
+}
+
+fn none() -> HashMap<i64, String> {
+    HashMap::new()
+}
+
+#[test]
+fn restore_from_file_imports_library_and_relinks_covers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = seeded(&tmp.path().join("A"));
+    let file = tmp.path().join("export.tachibk");
+    std::fs::write(&file, codec::encode(&export(&a, &none()).unwrap()).unwrap()).unwrap();
+    assert!(std::fs::metadata(&file).unwrap().len() > 0);
+
+    // Instance C: copy the files over (a pull does this), then restore.
+    let c_dir = tmp.path().join("C");
+    let c_local = c_dir.join("local").join("Sample Manga");
+    std::fs::create_dir_all(&c_local).unwrap();
+    for f in ["cover.png", "Chapter 1.cbz", "Chapter 2.cbz"] {
+        std::fs::copy(
+            tmp.path().join("A/local/Sample Manga").join(f),
+            c_local.join(f),
+        )
+        .unwrap();
+    }
+    let c = Db::open(&c_dir.join("c.db")).unwrap();
+    let s = import(&c, &codec::decode(&std::fs::read(&file).unwrap()).unwrap()).unwrap();
+    assert_eq!((s.manga_added, s.chapters_added), (1, 2));
+    let lib = c.library().unwrap();
+    assert_eq!(lib.len(), 1);
+    assert_eq!(lib[0].title, "Sample Manga");
+    assert_eq!(lib[0].source, 0, "local source");
+    // The sender's absolute cover path is not carried over...
+    assert_eq!(lib[0].thumbnail_url, None);
+    // ...until relinked to this machine's own file.
+    assert_eq!(relink_local_covers(&c, &c_dir.join("local")).unwrap(), 1);
+    let thumb = c.library().unwrap()[0].thumbnail_url.clone().unwrap();
+    assert!(thumb.starts_with(c_dir.join("local").to_str().unwrap()));
+    assert!(Path::new(&thumb).exists());
+
+    // Idempotent: the same backup again adds nothing.
+    let again = import(&c, &codec::decode(&std::fs::read(&file).unwrap()).unwrap()).unwrap();
+    assert_eq!((again.manga_added, again.chapters_added), (0, 0));
+    assert_eq!(again.chapters_updated, 0);
+}
+
+#[test]
+fn extension_stores_are_pending_until_accepted() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = seeded(tmp.path());
+    a.upsert_extension_repo(&ExtensionRepo {
+        base_url: "https://example.com/testrepo".into(),
+        name: "Test Repo".into(),
+        short_name: Some("TR".into()),
+        website: "https://example.com".into(),
+        signing_key_fingerprint: "aa:bb:cc".into(),
+    })
+    .unwrap();
+    let bytes = codec::encode(&export(&a, &none()).unwrap()).unwrap();
+    let decoded = codec::decode(&bytes).unwrap();
+    assert_eq!(decoded.backup_extension_stores.len(), 1);
+    assert_eq!(
+        decoded.backup_extension_stores[0].index_url(),
+        "https://example.com/testrepo"
+    );
+
+    let c = Db::open_in_memory().unwrap();
+    let s = import(&c, &decoded).unwrap();
+    assert_eq!(s.pending_repos.len(), 1);
+    assert_eq!(s.pending_repos[0].name(), "Test Repo");
+    assert!(
+        c.extension_repos().unwrap().is_empty(),
+        "import must not add repos"
+    );
+    add_extension_repos(&c, &s.pending_repos).unwrap();
+    let repos = c.extension_repos().unwrap();
+    assert_eq!(repos.len(), 1);
+    assert_eq!(repos[0].base_url, "https://example.com/testrepo");
+    assert!(import(&c, &decoded).unwrap().pending_repos.is_empty());
+}
+
+fn mihon_backup() -> Backup {
+    let mut m = BackupManga::new(99, "/m/1");
+    m.title = "Mihon Title".into();
+    m.date_added = 1_700_000_000;
+    m.categories = vec![0];
+    m.notes = "reread after vol 3".into();
+    m.version = 7;
+    m.last_modified_at = 1_700_000_500;
+    m.favorite_modified_at = Some(1_700_000_400);
+    m.memo = Some("{\"pinned\":true}".into());
+    m.excluded_scanlators = vec!["BadGroup".into()];
+    let mut ch = BackupChapter::new("/m/1/c1", "Chapter 1");
+    ch.read = true;
+    ch.last_page_read = 12;
+    ch.last_modified_at = 1_700_000_600;
+    ch.version = 3;
+    ch.memo = Some("{\"note\":\"x\"}".into());
+    m.chapters = vec![ch];
+    m.history = vec![BackupHistory {
+        url: Some("/m/1/c1".into()),
+        last_read: Some(1_700_000_700),
+        read_duration: 90_000,
+    }];
+    m.tracking = vec![BackupTracking {
+        sync_id: Some(2),
+        library_id: Some(5),
+        media_id: 4242,
+        private: true,
+        ..Default::default()
+    }];
+    Backup {
+        backup_manga: vec![m],
+        backup_categories: vec![BackupCategory {
+            name: Some("Reading".into()),
+            order: 0,
+            id: 11,
+            flags: 0,
+        }],
+        backup_sources: vec![BackupSource {
+            name: "Some Source".into(),
+            source_id: Some(99),
+        }],
+        backup_preferences: vec![vec![10, 3, 97, 98, 99]],
+        backup_source_preferences: vec![vec![10, 2, 120, 121]],
+        backup_extension_stores: vec![BackupExtensionStore {
+            index_url: Some("https://example.com/index.pb".into()),
+            name: Some("Idx".into()),
+            badge_label: Some("I".into()),
+            contact_website: "https://example.com".into(),
+            signing_key: "ff:ee".into(),
+            contact_discord: Some("https://discord.gg/x".into()),
+            is_legacy: Some(false),
+            extension_list_url: Some("https://example.com/list.pb".into()),
+        }],
+    }
+}
+
+#[test]
+fn mihon_round_trip_keeps_every_field_we_store() {
+    let db = Db::open_in_memory().unwrap();
+    let mihon = mihon_backup();
+    import(&db, &mihon).unwrap();
+    add_extension_repos(&db, &mihon.backup_extension_stores).unwrap();
+    let round = export(&db, &none()).unwrap();
+
+    let rm = round
+        .backup_manga
+        .iter()
+        .find(|m| m.url() == "/m/1")
+        .unwrap();
+    assert_eq!(rm.notes, "reread after vol 3");
+    assert_eq!((rm.version, rm.last_modified_at), (7, 1_700_000_500));
+    assert_eq!(rm.favorite_modified_at, Some(1_700_000_400));
+    assert_eq!(rm.memo(), "{\"pinned\":true}");
+    let rc = &rm.chapters[0];
+    assert_eq!((rc.version, rc.last_modified_at), (3, 1_700_000_600));
+    assert_eq!(rc.memo(), "{\"note\":\"x\"}");
+    assert_eq!(rc.last_page_read, 12);
+    assert!(rc.read);
+    assert_eq!(rm.history.len(), 1);
+    assert_eq!(rm.history[0].last_read, Some(1_700_000_700));
+    assert_eq!(rm.history[0].read_duration, 90_000);
+    assert_eq!(rm.tracking.len(), 1);
+    assert_eq!(rm.tracking[0].media_id, 4242);
+    assert_eq!(rm.tracking[0].sync_id, Some(2));
+    assert_eq!(
+        rm.categories,
+        vec![0],
+        "member of the 'Reading' category (order 0)"
+    );
+    assert_eq!(round.backup_categories[0].name(), "Reading");
+    assert_eq!(
+        round.backup_extension_stores[0].index_url(),
+        "https://example.com/index.pb"
+    );
+    assert_eq!(round.backup_preferences, vec![vec![10u8, 3, 97, 98, 99]]);
+    assert_eq!(
+        round.backup_source_preferences,
+        vec![vec![10u8, 2, 120, 121]]
+    );
+
+    // And through the real container.
+    let re = codec::decode(&codec::encode(&round).unwrap()).unwrap();
+    assert_eq!(re, round);
+}
+
+#[test]
+fn passthrough_sections_reexport_byte_identical() {
+    // Preference entries are opaque sub-messages, including ones that are not valid protobuf.
+    let prefs = vec![
+        vec![0x0a, 0x05, b'h', b'e', b'l', b'l', b'o', 0x12, 0x00],
+        vec![0xff, 0x00, 0x7f],
+    ];
+    let src = vec![vec![0x08, 0x96, 0x01]];
+    let b = Backup {
+        backup_preferences: prefs.clone(),
+        backup_source_preferences: src.clone(),
+        ..Default::default()
+    };
+    let db = Db::open_in_memory().unwrap();
+    import(&db, &codec::decode(&codec::encode(&b).unwrap()).unwrap()).unwrap();
+    let out = export(&db, &none()).unwrap();
+    assert_eq!(out.backup_preferences, prefs);
+    assert_eq!(out.backup_source_preferences, src);
+    // The encoded sections are byte-identical to the input's encoding of them.
+    let section = |b: &Backup| {
+        Backup {
+            backup_preferences: b.backup_preferences.clone(),
+            backup_source_preferences: b.backup_source_preferences.clone(),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    };
+    assert_eq!(section(&out), section(&b));
+}
+
+#[test]
+fn required_fields_are_on_the_wire_even_when_zero() {
+    // kotlinx protobuf rejects a BackupManga without `source`; local manga have source 0.
+    let m = BackupManga::new(0, "");
+    let bytes = m.encode_to_vec();
+    assert!(bytes.starts_with(&[0x08, 0x00]), "{bytes:?}");
+    assert!(bytes.windows(2).any(|w| w == [0x12, 0x00]), "url present");
+    let t = BackupTracking {
+        sync_id: Some(0),
+        library_id: Some(0),
+        ..Default::default()
+    };
+    assert_eq!(&t.encode_to_vec()[..4], &[0x08, 0x00, 0x10, 0x00]);
+}
+
+#[test]
+fn missing_defaults_read_as_kotlin_defaults() {
+    // source=5, url="u" and nothing else: favourite must be true, memo "{}".
+    let bytes = [0x08, 0x05, 0x12, 0x01, b'u'];
+    let m = BackupManga::decode(bytes.as_slice()).unwrap();
+    assert!(m.favorite());
+    assert_eq!(m.memo(), "{}");
+    let ch = BackupChapter::decode([0x0a, 0x01, b'c', 0x12, 0x00].as_slice()).unwrap();
+    assert_eq!(ch.memo(), "{}");
+}
+
+#[test]
+fn packed_and_unpacked_categories_both_decode() {
+    // Unpacked (what kotlinx and Mihon write): tag 17 varint, twice.
+    let mut unpacked = vec![0x08, 0x01, 0x12, 0x00];
+    unpacked.extend([0x88, 0x01, 0x03, 0x88, 0x01, 0x04]);
+    assert_eq!(
+        BackupManga::decode(unpacked.as_slice()).unwrap().categories,
+        vec![3, 4]
+    );
+    // We write unpacked too.
+    let mut m = BackupManga::new(1, "");
+    m.categories = vec![3, 4];
+    let bytes = m.encode_to_vec();
+    assert!(bytes
+        .windows(6)
+        .any(|w| w == [0x88, 0x01, 0x03, 0x88, 0x01, 0x04]));
+}
+
+#[test]
+fn progress_only_moves_forward_and_categories_are_additive() {
+    let db = Db::open_in_memory().unwrap();
+    let mut b = mihon_backup();
+    import(&db, &b).unwrap();
+    let mine = db.create_category("Mine").unwrap().unwrap();
+    let id = db.library().unwrap()[0].id;
+    let mut cats: std::collections::BTreeSet<i64> =
+        db.category_assignments().unwrap().remove(&id).unwrap();
+    cats.insert(mine);
+    db.set_manga_categories(id, &cats).unwrap();
+
+    // An older copy: unread, page 3, no categories, history earlier.
+    let m = &mut b.backup_manga[0];
+    m.chapters[0].read = false;
+    m.chapters[0].last_page_read = 3;
+    m.categories.clear();
+    m.history[0].last_read = Some(1);
+    m.notes = "older".into();
+    m.last_modified_at = 1;
+    let s = import(&db, &b).unwrap();
+    assert_eq!(s.chapters_updated, 0);
+    let ch = &db.chapters(id).unwrap()[0];
+    assert!(ch.read);
+    assert_eq!(ch.last_page_read, 12);
+    assert_eq!(db.manga(id).unwrap().unwrap().notes, "reread after vol 3");
+    assert_eq!(db.category_assignments().unwrap()[&id].len(), 2);
+    assert_eq!(db.recents().unwrap()[0].last_read, 1_700_000_700);
+
+    // A newer copy moves things on.
+    b.backup_manga[0].chapters[0].bookmark = true;
+    b.backup_manga[0].chapters[0].last_page_read = 20;
+    assert_eq!(import(&db, &b).unwrap().chapters_updated, 1);
+    let ch = &db.chapters(id).unwrap()[0];
+    assert!(ch.bookmark);
+    assert_eq!(ch.last_page_read, 20);
+}
+
+#[test]
+fn categories_match_by_name_case_insensitively() {
+    let db = Db::open_in_memory().unwrap();
+    db.create_category("reading").unwrap();
+    let s = import(&db, &mihon_backup()).unwrap();
+    assert_eq!(s.categories_added, 0);
+    assert_eq!(db.categories().unwrap().len(), 1);
+    let id = db.library().unwrap()[0].id;
+    assert_eq!(db.category_assignments().unwrap()[&id].len(), 1);
+}
+
+#[test]
+fn hostile_input_is_an_error_not_a_panic() {
+    assert!(
+        codec::decode(b"").is_ok(),
+        "empty protobuf is an empty backup"
+    );
+    assert!(codec::decode(&[0x1f, 0x8b, 0x08, 0x00, 1, 2, 3]).is_err());
+    assert!(codec::decode(&[0xff, 0xff, 0xff, 0xff]).is_err());
+    // A gzip bomb is refused rather than inflated without bound.
+    let zeros = vec![0u8; 1024 * 1024];
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    for _ in 0..300 {
+        std::io::Write::write_all(&mut gz, &zeros).unwrap();
+    }
+    let bomb = gz.finish().unwrap();
+    assert!(bomb.len() < 2 * 1024 * 1024);
+    assert!(codec::decode(&bomb).is_err());
+}
+
+#[test]
+fn relink_never_leaves_the_local_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let outside = tmp.path().join("outside");
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(outside.join("cover.png"), PNG_1X1).unwrap();
+    let root = tmp.path().join("local");
+    std::fs::create_dir_all(&root).unwrap();
+    let db = Db::open_in_memory().unwrap();
+    let mut b = Backup::default();
+    b.backup_manga.push(BackupManga::new(0, "../outside"));
+    import(&db, &b).unwrap();
+    assert_eq!(relink_local_covers(&db, &root).unwrap(), 0);
+    assert_eq!(db.library().unwrap()[0].thumbnail_url, None);
+}
