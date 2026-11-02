@@ -317,6 +317,81 @@ impl Db {
         })
     }
 
+    /// Store a manga seen while browsing an online source, without favouriting it: insert it
+    /// (not favourite) or refresh the details of the existing row (favourite flag untouched),
+    /// then sync its chapters like `sync_chapters`. This gives the reader and the detail screen
+    /// real chapter ids for manga outside the library. Returns the manga id and how many
+    /// chapters were added.
+    pub fn upsert_online(
+        &self,
+        source: i64,
+        manga: &SourceManga,
+        chapters: &[SourceChapter],
+    ) -> Result<(i64, usize)> {
+        let now = now_ms();
+        let id = self.write(|c| match manga_by_url(c, &manga.url, source)? {
+            None => insert_manga(
+                c,
+                &NewManga {
+                    source,
+                    url: &manga.url,
+                    title: &manga.title,
+                    artist: manga.artist.as_deref(),
+                    author: manga.author.as_deref(),
+                    description: manga.description.as_deref(),
+                    genre: manga.genre.as_deref(),
+                    status: manga.status,
+                    thumbnail_url: manga.thumbnail_url.as_deref(),
+                    favorite: false,
+                    initialized: manga.initialized,
+                    viewer: 0,
+                },
+                now,
+            ),
+            Some(ex) => {
+                update_manga(
+                    c,
+                    ex.id,
+                    &MangaUpdate {
+                        artist: manga.artist.clone(),
+                        author: manga.author.clone(),
+                        description: manga.description.clone(),
+                        genre: manga.genre.clone(),
+                        title: Some(manga.title.clone()).filter(|t| !t.is_empty()),
+                        status: Some(manga.status),
+                        thumbnail_url: manga.thumbnail_url.clone(),
+                        last_update: Some(now),
+                        initialized: Some(manga.initialized || ex.initialized),
+                        ..Default::default()
+                    },
+                )?;
+                Ok(ex.id)
+            }
+        })?;
+        let added = if chapters.is_empty() {
+            0
+        } else {
+            self.sync_chapters(id, chapters)?
+        };
+        Ok((id, added))
+    }
+
+    /// Favourite an existing row (the heart on a manga already stored by `upsert_online`).
+    pub fn set_favorite(&self, manga_id: i64, favorite: bool) -> Result<()> {
+        self.write(|c| {
+            update_manga(
+                c,
+                manga_id,
+                &MangaUpdate {
+                    favorite: Some(favorite),
+                    // The library's "date added" sort counts from the heart, not from browsing.
+                    date_added: favorite.then(now_ms),
+                    ..Default::default()
+                },
+            )
+        })
+    }
+
     /// Unfavourite; the row stays so read state survives a re-add.
     pub fn remove_from_library(&self, source: i64, url: &str) -> Result<()> {
         self.write(|c| {

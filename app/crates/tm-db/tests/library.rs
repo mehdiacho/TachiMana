@@ -245,3 +245,61 @@ fn extension_repos_round_trip() {
     db.delete_extension_repo(&r.base_url).unwrap();
     assert!(db.extension_repos().unwrap().is_empty());
 }
+
+#[test]
+fn browsed_manga_is_stored_without_joining_the_library() {
+    let db = Db::open_in_memory().unwrap();
+    let (id, added) = db
+        .upsert_online(
+            9,
+            &manga("/b", "Browsed"),
+            &[ch("c2", "Two"), ch("c1", "One")],
+        )
+        .unwrap();
+    assert_eq!(added, 2);
+    assert!(
+        db.library().unwrap().is_empty(),
+        "browsing does not favourite"
+    );
+    let stored = db.manga(id).unwrap().unwrap();
+    assert!(!stored.favorite);
+
+    // Reading progress on a browsed manga survives a later visit and the heart.
+    let c1 = db
+        .chapters(id)
+        .unwrap()
+        .into_iter()
+        .find(|c| c.url == "c1")
+        .unwrap();
+    db.mark_progress(c1.id, 4, 2, false).unwrap();
+    let (again, added) = db
+        .upsert_online(
+            9,
+            &manga("/b", "Browsed v2"),
+            &[ch("c3", "Three"), ch("c2", "Two"), ch("c1", "One")],
+        )
+        .unwrap();
+    assert_eq!((again, added), (id, 1));
+    assert_eq!(db.manga(id).unwrap().unwrap().title, "Browsed v2");
+
+    db.set_favorite(id, true).unwrap();
+    let lib = db.library().unwrap();
+    assert_eq!(lib.len(), 1);
+    assert!(lib[0].date_added.unwrap_or(0) > 0);
+    let c1 = db
+        .chapters(id)
+        .unwrap()
+        .into_iter()
+        .find(|c| c.url == "c1")
+        .unwrap();
+    assert_eq!(c1.last_page_read, 4);
+
+    // A details-only refresh (no chapters) leaves the chapter list alone.
+    db.upsert_online(9, &manga("/b", "Browsed v2"), &[])
+        .unwrap();
+    assert_eq!(db.chapters(id).unwrap().len(), 3);
+    assert!(
+        db.manga(id).unwrap().unwrap().favorite,
+        "refresh keeps the heart"
+    );
+}

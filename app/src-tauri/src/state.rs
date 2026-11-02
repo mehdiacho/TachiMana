@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use tm_cache::DiskCache;
 use tm_core::{settings::keys, AppLock, AppPaths, Settings};
@@ -17,6 +17,14 @@ pub struct OpenChapter {
     pub names: Vec<String>,
 }
 
+/// Pages of an online chapter as its source listed them.
+#[derive(Debug, Clone)]
+pub struct OnlineChapter {
+    pub source: i64,
+    pub chapter_url: String,
+    pub pages: Vec<tm_exthost::model::Page>,
+}
+
 pub struct AppState {
     pub paths: AppPaths,
     pub db: Db,
@@ -24,6 +32,12 @@ pub struct AppState {
     pub cache: DiskCache,
     /// Chapters the reader opened, so `tm://page/<chapter>/<i>` does not re-list the archive.
     pub chapters: Mutex<HashMap<i64, OpenChapter>>,
+    /// Online chapters the reader opened, keyed by chapter id.
+    pub online: Mutex<HashMap<i64, OnlineChapter>>,
+    /// The extension host, started on first use.
+    pub exthost: Mutex<Option<tm_exthost::ExtHost>>,
+    /// Folder holding `ext-host.jar`, set once the Tauri app knows its resource dir.
+    pub host_dir: OnceLock<PathBuf>,
     _lock: AppLock,
 }
 
@@ -44,6 +58,9 @@ impl AppState {
             settings: Mutex::new(settings),
             cache,
             chapters: Mutex::new(HashMap::new()),
+            online: Mutex::new(HashMap::new()),
+            exthost: Mutex::new(None),
+            host_dir: OnceLock::new(),
             _lock: lock,
         })
     }
@@ -52,6 +69,12 @@ impl AppState {
         self.settings
             .lock()
             .map_err(|_| CmdError::internal("settings lock poisoned"))
+    }
+
+    pub fn online(&self) -> Result<MutexGuard<'_, HashMap<i64, OnlineChapter>>, CmdError> {
+        self.online
+            .lock()
+            .map_err(|_| CmdError::internal("online chapter table lock poisoned"))
     }
 
     pub fn chapters(&self) -> Result<MutexGuard<'_, HashMap<i64, OpenChapter>>, CmdError> {
@@ -113,5 +136,18 @@ impl From<tm_cache::CacheError> for CmdError {
 impl From<tm_core::CoreError> for CmdError {
     fn from(e: tm_core::CoreError) -> Self {
         Self::new("io", e.to_string())
+    }
+}
+
+impl From<tm_exthost::Error> for CmdError {
+    fn from(e: tm_exthost::Error) -> Self {
+        let message = match &e {
+            tm_exthost::Error::NotInstalled(_) => {
+                "The extension host is missing from this install, so online sources are unavailable."
+                    .to_owned()
+            }
+            other => other.to_string(),
+        };
+        Self::new(e.kind(), message)
     }
 }

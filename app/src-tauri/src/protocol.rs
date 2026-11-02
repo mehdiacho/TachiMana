@@ -1,6 +1,7 @@
 //! The `tm://` URI scheme (plan §2.1). Images reach the webview as plain URLs, never through IPC:
 //! - `tm://cover/<mangaId>`
 //! - `tm://page/<chapterId>/<index>`
+//! - `tm://ocover/<sourceId>/<percent-encoded image url>` (covers while browsing a source)
 //!
 //! Windows' webview sees these as `http://tm.localhost/<kind>/...`; both forms are accepted.
 
@@ -33,6 +34,10 @@ pub fn handle<R: Runtime>(
                 (Ok(ch), Ok(idx)) => Some(page(&state, ch, idx)),
                 _ => None,
             },
+            ["ocover", source, url] => source
+                .parse()
+                .ok()
+                .map(|source| online_cover(&state, source, url)),
             _ => None,
         };
         responder.respond(res.unwrap_or_else(|| status(StatusCode::NOT_FOUND)));
@@ -97,9 +102,9 @@ fn cover(state: &AppState, manga_id: i64) -> Response<Vec<u8>> {
     let Some(thumb) = manga.thumbnail_url.as_deref() else {
         return status(StatusCode::NOT_FOUND);
     };
-    // Local covers are files under the local folder; online covers come through the ext-host (P5).
+    // Local covers are files under the local folder; online covers come through the ext-host.
     if !manga.is_local() {
-        return status(StatusCode::NOT_FOUND);
+        return online_cover(state, manga.source, thumb);
     }
     let root = state.paths.local_library_dir();
     let path = Path::new(thumb);
@@ -119,7 +124,41 @@ fn cover(state: &AppState, manga_id: i64) -> Response<Vec<u8>> {
     }
 }
 
+fn online_cover(state: &AppState, source: i64, url: &str) -> Response<Vec<u8>> {
+    match crate::online::cover_bytes(state, source, url) {
+        Ok(bytes) => image(bytes, false),
+        Err(e) => {
+            tracing::debug!("cover {url}: {}", e.message);
+            status(StatusCode::NOT_FOUND)
+        }
+    }
+}
+
+/// Whether a chapter belongs to an online manga (its pages come through the ext-host).
+fn is_online_chapter(state: &AppState, chapter_id: i64) -> bool {
+    if state
+        .online()
+        .map(|t| t.contains_key(&chapter_id))
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    match state.db.chapter(chapter_id) {
+        Ok(Some(ch)) => matches!(state.db.manga(ch.manga_id), Ok(Some(m)) if !m.is_local()),
+        _ => false,
+    }
+}
+
 fn page(state: &AppState, chapter_id: i64, index: usize) -> Response<Vec<u8>> {
+    if is_online_chapter(state, chapter_id) {
+        return match crate::online::page_bytes(state, chapter_id, index) {
+            Ok(bytes) => image(bytes, true),
+            Err(e) => {
+                tracing::warn!("online page {chapter_id}/{index}: {}", e.message);
+                status(StatusCode::BAD_GATEWAY)
+            }
+        };
+    }
     let Ok(open) = resolve_chapter(state, chapter_id) else {
         return status(StatusCode::NOT_FOUND);
     };
@@ -148,6 +187,13 @@ mod tests {
         );
         assert_eq!(segments(Some("cover"), "/7"), ["cover", "7"]);
         assert_eq!(segments(None, "/cover/7"), ["cover", "7"]);
+        assert_eq!(
+            segments(
+                Some("ocover"),
+                "/-42/https%3A%2F%2Fx.org%2Fa%20b.jpg%3Fv%3D1"
+            ),
+            ["ocover", "-42", "https://x.org/a b.jpg?v=1"]
+        );
     }
 
     #[test]
