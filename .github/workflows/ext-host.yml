@@ -36,11 +36,11 @@ jobs:
 
       - name: Build the host
         shell: bash
-        run: ./gradlew --no-daemon :ext-host:fatJar
+        run: bash ./gradlew --no-daemon :ext-host:fatJar
 
       - name: Self-test (in-process server, real HTTP, real extension)
         shell: bash
-        run: ./gradlew --no-daemon :ext-host:selfTest
+        run: bash ./gradlew --no-daemon :ext-host:selfTest
 
       - name: Start-up contract (java -jar, ready line, bearer token, exit on stdin close)
         shell: bash
