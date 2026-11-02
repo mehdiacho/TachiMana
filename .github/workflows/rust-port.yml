@@ -1,0 +1,52 @@
+name: Rust port
+
+on:
+  pull_request:
+    paths: ["app/**", ".github/workflows/rust-port.yml"]
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/rust-port.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System libraries for Tauri (WebKitGTK)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/ui/package-lock.json
+
+      - name: UI install, typecheck, tests, build
+        working-directory: app/ui
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Rust fmt
+        run: cargo fmt --all --check
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Rust tests (also regenerates the TypeScript types)
+        run: cargo test --workspace
+      - name: Generated TypeScript types are committed and current
+        run: git diff --exit-code -- ui/src/gen

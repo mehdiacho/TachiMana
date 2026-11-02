@@ -37,5 +37,9 @@ secrets.properties
 Thumbs.db
 desktop.ini
 
-# Rust build output
+# Rust / UI (app/)
 app/target/
+app/ui/node_modules/
+app/ui/dist/
+app/ui/.vite/
+app/src-tauri/gen/

@@ -1,0 +1,208 @@
+/* Design tokens from designs/TachiMana Desktop Ratio Spec.md §1 (values ported from
+   desktop/src/main/kotlin/tachimana/ui/theme/Tokens.kt). Themes remap tokens, never layout.
+   Components use only these variables: no literal colours or sizes. */
+
+:root {
+  /* §1.4 spacing (fixed px; 1dp = 1px) */
+  --tm-space-xxs: 2px;
+  --tm-space-xs: 4px;
+  --tm-space-sm: 6px;
+  --tm-space-md: 8px;
+  --tm-space-base: 10px;
+  --tm-space-lg: 12px;
+  --tm-space-xl: 16px;
+  --tm-space-2xl: 20px;
+  --tm-space-3xl: 24px;
+
+  /* §1.5 radius, Yokai values (Midnight and Ink & Vermilion remap below) */
+  --tm-radius-sm: 4px;
+  --tm-radius-md: 8px;
+  --tm-radius-lg: 10px;
+  --tm-radius-xl: 12px;
+  --tm-radius-pill: 20px;
+  --tm-radius-chip: 16px;
+  --tm-radius-full: 50%;
+  --tm-radius-seg: 7px;
+
+  /* §1.3 type */
+  --tm-font: Roboto, "Segoe UI", "Noto Sans", system-ui, sans-serif;
+  --tm-font-mono: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  --tm-type-screen-title: 500 24px/30px var(--tm-font);
+  --tm-type-detail-title: 500 22px/28px var(--tm-font);
+  --tm-type-section-header: 500 18px/24px var(--tm-font);
+  --tm-type-title-medium: 500 17px/22px var(--tm-font);
+  --tm-type-body: 400 14.5px/20px var(--tm-font);
+  --tm-type-body-row: 500 14px/19px var(--tm-font);
+  --tm-type-body-small: 400 13.5px/18px var(--tm-font);
+  --tm-type-caption: 400 12px/16px var(--tm-font);
+  --tm-type-label: 500 13px/16px var(--tm-font);
+  --tm-type-badge: 600 11px/14px var(--tm-font);
+  --tm-type-rail-label: 500 10.5px/13px var(--tm-font);
+  --tm-type-page-num: 400 15px/20px var(--tm-font);
+  --tm-type-mono: 400 13px/16px var(--tm-font-mono);
+  --tm-label-transform: none;
+  --tm-label-tracking: normal;
+
+  /* fixed component sizes from §0.1 / §2 */
+  --tm-titlebar-h: 36px;
+  --tm-rail-w: 76px;
+  --tm-rail-w-compact: 60px;
+  --tm-master-w: 340px;
+  --tm-master-w-expanded: 360px;
+  --tm-info-w: 400px;
+  --tm-search-h: 44px;
+  --tm-chip-h: 32px;
+  --tm-btn-h: 40px;
+  --tm-btn-outlined-h: 36px;
+  --tm-reader-bar-h: 48px;
+  --tm-sheet-w: 284px;
+  --tm-content-max: 860px;
+  --tm-icon: 20px;
+  --tm-icon-rail: 21px;
+  --tm-hairline: 1px;
+  --tm-focus-ring: 2px;
+
+  /* §4 motion */
+  --tm-motion-fast: 100ms;
+  --tm-motion-nav: 150ms;
+  --tm-motion-chrome: 200ms;
+  --tm-motion-sheet: 220ms;
+  --tm-motion-rotate: 350ms;
+}
+
+/* §1.1 Yokai Dark (default) */
+:root,
+:root[data-theme="YOKAI_DARK"] {
+  --tm-color-background: #1c1c1d;
+  --tm-color-surface: #202125;
+  --tm-color-surface-raised: #2a2c31;
+  --tm-color-titlebar: #161617;
+  --tm-color-primary: #78bcff;
+  --tm-color-accent: #3399ff;
+  --tm-color-accent-ripple: rgba(51, 153, 255, 0.12);
+  --tm-color-accent-selected: rgba(51, 153, 255, 0.14);
+  --tm-color-accent-active: rgba(51, 153, 255, 0.18);
+  --tm-color-on-background: #ffffff;
+  --tm-color-on-background-med: rgba(255, 255, 255, 0.55);
+  --tm-color-on-background-dim: rgba(255, 255, 255, 0.3);
+  --tm-color-rail-inactive: rgba(255, 255, 255, 0.76);
+  --tm-color-divider: rgba(255, 255, 255, 0.07);
+  --tm-color-hover: rgba(255, 255, 255, 0.05);
+  --tm-color-hover-strong: rgba(255, 255, 255, 0.08);
+  --tm-color-outline: rgba(255, 255, 255, 0.28);
+  --tm-color-outline-faint: rgba(255, 255, 255, 0.13);
+  --tm-color-unread-bg: #3399ff;
+  --tm-color-unread-fg: #ffffff;
+  --tm-color-download-bg: #106010;
+  --tm-color-download-fg: #ffffff;
+  --tm-color-sync-ok: #99cc99;
+  --tm-color-bookmark: #e6c34c;
+  --tm-color-close-hover: #c42b1c;
+  --tm-color-on-accent: #ffffff;
+  --tm-color-backdrop: rgba(0, 0, 0, 0.6);
+  --tm-color-reader-bg: #000000;
+  --tm-shadow-cover: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --tm-shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.6);
+  --tm-cover-placeholder: linear-gradient(160deg, #2b3a55, #1d2230);
+  --tm-grid-title-scrim: linear-gradient(transparent, #000 85%);
+  color-scheme: dark;
+}
+
+/* §1.1 Yokai Light */
+:root[data-theme="YOKAI_LIGHT"] {
+  --tm-color-background: #fafafa;
+  --tm-color-surface: #e5ecf4;
+  --tm-color-surface-raised: #dde5ef;
+  --tm-color-titlebar: #ededed;
+  --tm-color-primary: #54759e;
+  --tm-color-accent: #2979ff;
+  --tm-color-accent-ripple: rgba(41, 121, 255, 0.12);
+  --tm-color-accent-selected: rgba(41, 121, 255, 0.14);
+  --tm-color-accent-active: rgba(41, 121, 255, 0.18);
+  --tm-color-on-background: rgba(0, 0, 0, 0.87);
+  --tm-color-on-background-med: rgba(0, 0, 0, 0.54);
+  --tm-color-on-background-dim: rgba(0, 0, 0, 0.38);
+  --tm-color-rail-inactive: rgba(66, 66, 66, 0.76);
+  --tm-color-divider: rgba(0, 0, 0, 0.12);
+  --tm-color-hover: rgba(0, 0, 0, 0.04);
+  --tm-color-hover-strong: rgba(0, 0, 0, 0.07);
+  --tm-color-outline: rgba(0, 0, 0, 0.28);
+  --tm-color-outline-faint: rgba(0, 0, 0, 0.13);
+  --tm-color-unread-bg: #2979ff;
+  --tm-color-unread-fg: #ffffff;
+  --tm-color-download-bg: #99cc99;
+  --tm-color-download-fg: #000000;
+  --tm-color-sync-ok: #4c8c4c;
+  --tm-color-bookmark: #c9a227;
+  --tm-color-on-accent: #ffffff;
+  --tm-shadow-cover: 0 3px 10px rgba(0, 0, 0, 0.2);
+  --tm-cover-placeholder: linear-gradient(160deg, #c9d6e8, #e5ecf4);
+  color-scheme: light;
+}
+
+/* §1.2 Midnight */
+:root[data-theme="MIDNIGHT"] {
+  --tm-color-background: #0e1418;
+  --tm-color-surface: #182028;
+  --tm-color-surface-raised: #1f2933;
+  --tm-color-titlebar: #0a0f13;
+  --tm-color-primary: #78bcff;
+  --tm-color-accent: #78bcff;
+  --tm-color-accent-ripple: rgba(120, 188, 255, 0.15);
+  --tm-color-accent-selected: rgba(120, 188, 255, 0.14);
+  --tm-color-accent-active: rgba(120, 188, 255, 0.18);
+  --tm-color-on-background: #e8eef4;
+  --tm-color-on-background-med: rgba(232, 238, 244, 0.55);
+  --tm-color-on-background-dim: rgba(232, 238, 244, 0.3);
+  --tm-color-rail-inactive: rgba(232, 238, 244, 0.7);
+  --tm-color-divider: rgba(232, 238, 244, 0.07);
+  --tm-color-unread-bg: #78bcff;
+  --tm-color-unread-fg: #071d39;
+  --tm-color-sync-ok: #7adc77;
+  --tm-color-on-accent: #071d39;
+  --tm-radius-sm: 6px;
+  --tm-radius-md: 12px;
+  --tm-radius-lg: 12px;
+  --tm-radius-xl: 12px;
+  --tm-radius-pill: 12px;
+  --tm-radius-chip: 12px;
+  --tm-cover-placeholder: linear-gradient(160deg, #1f3347, #121b23);
+}
+
+/* §1.2 Ink & Vermilion */
+:root[data-theme="INK_VERMILION"] {
+  --tm-font: "Zen Kaku Gothic New", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+  --tm-color-background: #141112;
+  --tm-color-surface: #1d191a;
+  --tm-color-surface-raised: #262122;
+  --tm-color-titlebar: #0f0d0e;
+  --tm-color-primary: #c14033;
+  --tm-color-accent: #c14033;
+  --tm-color-accent-ripple: rgba(193, 64, 51, 0.15);
+  --tm-color-accent-selected: rgba(193, 64, 51, 0.14);
+  --tm-color-accent-active: rgba(193, 64, 51, 0.18);
+  --tm-color-on-background: #f2ede7;
+  --tm-color-on-background-med: rgba(242, 237, 231, 0.55);
+  --tm-color-on-background-dim: rgba(242, 237, 231, 0.3);
+  --tm-color-rail-inactive: rgba(242, 237, 231, 0.7);
+  --tm-color-divider: rgba(242, 237, 231, 0.08);
+  --tm-color-unread-bg: #c14033;
+  --tm-color-unread-fg: #f2ede7;
+  --tm-color-download-bg: #c14033;
+  --tm-color-download-fg: #f2ede7;
+  --tm-color-sync-ok: #8fae6d;
+  --tm-color-bookmark: #d3a94c;
+  --tm-color-on-accent: #f2ede7;
+  --tm-radius-sm: 0;
+  --tm-radius-md: 0;
+  --tm-radius-lg: 0;
+  --tm-radius-xl: 0;
+  --tm-radius-pill: 0;
+  --tm-radius-chip: 0;
+  --tm-radius-full: 0;
+  --tm-radius-seg: 0;
+  --tm-label-transform: uppercase;
+  --tm-label-tracking: 0.12em;
+  --tm-shadow-cover: 6px 6px 0 rgba(193, 64, 51, 0.35);
+  --tm-cover-placeholder: linear-gradient(160deg, #3a2422, #1d191a);
+}

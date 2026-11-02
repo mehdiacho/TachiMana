@@ -1,43 +1,99 @@
 # Rust port status
-Updated: 2026-11-01 20:10 UTC by Claude (coding agent, cloud session)
-Current phase: P0 Measure the current app, branch claude/optimistic-newton-hqdd6i, PR opened (see GitHub)
-Done in this phase:
-- `docs/rust-port/baseline.md` with the Linux numbers: installer and installed sizes, 3 cold starts,
-  memory idle and while reading a 30-page CBZ, and a run of every existing self-test.
-- Found that the packaged app (jpackage) lacks `java.sql` and other modules, so the installed app
-  cannot open its database. Details and the suggested `modules(...)` line are in baseline.md. Not
-  fixed here: P0 must not change the Kotlin app. Needs Mehdi's decision (separate fix PR).
-- Measurement scripts in `docs/rust-port/baseline/` for re-use in P8.
-Next step: Mehdi fills the Windows column of baseline.md and runs `browseSelfTest` and
-`extensionSpike` on a normal network; then merge this PR and start P1 on `feat/rust-p1-ext-host`.
+Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
+Current phase: P5 done (P1–P5 reached main through feat/rust-port-to-main, since the stacked PRs merged into each other's branches); next P6
+
+Done:
+- P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
+  `docs/rust-port/baseline/`. The Windows column and `browseSelfTest`/`extensionSpike` on an open
+  network are still Mehdi's.
+- P2 `app/` workspace (no unsafe, no unwrap/expect/panic outside tests). `tm-core`: AppPaths, Settings
+  (Kotlin keys and defaults, unknown keys kept, atomic save, corrupt file kept aside), AppLock.
+  `tm-db`: schema and named queries read straight from the Kotlin `.sq`/`.sqm` files; create, migrate
+  (N.sqm upgrades N to N+1), newer schema opens read-only; library, chapters, sync, progress,
+  history/recents, categories, extension repos, tracks.
+- P3 `tm-archive` (folder/CBZ pages in natural order, capped reads, path guard, atomic CBZ packing,
+  page pixel sizes from headers), `tm-local` (LocalImporter and ChapterRecognition ports, 57 Kotlin
+  cases), `tm-cache` (size-capped LRU disk cache with pinning).
+- P4 `src-tauri`: Tauri 2 app, borderless window with our own title bar, 18 thin commands, `tm://`
+  image scheme (covers, pages; both URL forms), ts-rs types generated into `ui/src/gen`.
+  `ui`: React + TS + Vite. Tokens for Yokai Dark/Light, Midnight, Ink & Vermilion. Shell with rail,
+  whole-app rotation (Ctrl+Alt+R, remembered, one root so the screen is never reset). Library
+  (list/grid, category chips with counts, category editor, sort that flips on second click, unread and
+  downloaded filters, search, auto-scan on first open, rescan, size classes). Detail (info, categories,
+  continue/start, chapters with read toggles, mark all read). Reader (strip with chapters loading at
+  both ends without a jump, L→R, R→L, 2-up with cover-solo, four fits, zoom keys and Ctrl+wheel, slider,
+  progress saved with a 500 ms debounce and on close). Settings (theme cards, rotation, data folder,
+  page cache size and clear). Recents/Browse/Downloads/Sync show "arrives later" states.
+- P1 `ext-host/` (code written, verified only in CI because Gradle cannot resolve android-jar here):
+  Ktor CIO server on 127.0.0.1, bearer token, `TM_EXTHOST_READY port=N` on stdout then stdout goes to
+  stderr, exits on stdin EOF or `/v1/shutdown`. Every endpoint of PLAN §P1 (docs/rust-port/api.md).
+  Install downloads to `*.part`, checks the signature, then replaces the old artifact, so a bad
+  download never breaks a working install. Uninstall, per-package artifact tracking, icons kept in
+  `extensions/icons.json`. `:ext-host:selfTest` covers auth, repos, catalog, install, sources,
+  popular/latest/search, cover, manga+chapters, pages, page bytes, preferences, reload, uninstall,
+  shutdown. `.github/workflows/ext-host.yml` builds it, runs the self-test and checks the start-up
+  contract with `java -jar` on Ubuntu and Windows.
+- P5 `tm-exthost`: spawns the host (bundled `runtime/bin/java`, then `JAVA_HOME`, then PATH), fresh
+  32-byte token, waits up to 60 s for the ready line, forwards its stderr to the log, keeps stdin open
+  and closes it on drop. Typed async client for every endpoint, 64 MB body cap, host errors kept as
+  `{status, kind, message}`. 6 scripted-server tests; `tests/real_host.rs` installs MangaDex from
+  Keiyoushi and reads a page through the real host (run by ext-host CI on Linux and Windows).
+  App: host started lazily, restarted if it died, stopped after 10 idle minutes (not while the library
+  updates). Commands for repos, catalog (per-repo failures, update detection), install (only from the
+  user's own repos), uninstall, sources, popular/latest/search, open, refresh, heart, source settings,
+  Cloudflare toggle, library update with `library-update` progress events. Browsed manga are stored as
+  non-favourite rows so detail and reader use real ids; the heart only flips `favorite`. Online pages
+  and covers go through `tm://` with the page cache. Source ids travel as strings (above 2^53).
+  UI: Browse (Sources / Extensions tabs, repositories dialog with a one-tap Keiyoushi chip that is never
+  added on its own, catalog grouped Update pending / Installed / Available with NSFW and language
+  filters, source grid with infinite scroll and de-dupe, source settings dialog), detail heart and
+  refresh with the source's real error, library update button with a progress bar, Cloudflare toggle
+  in Settings, reader learns online page sizes when each image loads.
+- CI: `.github/workflows/rust-port.yml` runs UI typecheck/tests/build, cargo fmt, clippy, tests, and
+  checks the generated types are committed.
+
+Next step: P5 PR review and CI (the real-host test), then P6 (downloads, recents, NAS).
+
+P5 not done yet:
+- Downloading the host zip on first use (PLAN §P5.1) waits on open question 1 (where it is hosted).
+  Today the app looks for `TM_EXTHOST_DIR`, then `<resources>/ext-host`, then (debug builds) the
+  Gradle output folder; without it Browse says so.
+- "Restart once, then surface the error": the app restarts a dead host on every call instead.
+
 Blockers / questions:
-- The cloud container cannot reach `github.com/keiyoushi/extensions/raw/...` (proxy 403), so
-  `browseSelfTest`, `extensionSpike` and the MangaDex memory number are open. P1's gate needs the
-  same URL; P1 must run its selfTest on Mehdi's PC or a network without this restriction.
-- Should the packaged-app module fix ship now, ahead of the port? (Recommended: yes, it is one line.)
+- Gradle in the cloud container: Maven Central works through a mirror init script, but jitpack (401)
+  and github.com/Suwayomi raw (403, android-jar) are blocked, so Kotlin builds only run in CI.
+- Open question 1 in PLAN.md (where the ext-host zip downloads from, the repo is private) still stands.
+
 Deviations from PLAN.md and why:
-- Branch is `claude/optimistic-newton-hqdd6i`, not `feat/rust-p0-baseline`: the cloud session may
-  only push to its assigned branch.
-- Baseline measured on Linux in a container, not Windows; the Windows column is left for Mehdi.
-- Start-up and memory were measured on a local build with the `modules(...)` fix (not committed),
-  because the shipped build cannot open its DB.
-- Added `:extension:jsEngineSelfTest` to the self-test list; it exists and P9's parity table needs it.
-Plan vs Kotlin code disagreements (the Kotlin code wins, per §1.2; fix PLAN.md before the phase named):
-- Before P2: the schema version is **30**, not 29. SQLDelight names a migration after the version it
-  upgrades *from*, so `1.sqm`..`29.sqm` take 1→30 and `Database.Schema.version` is 30 (see
-  `MigrationSelfTest.kt`). So: create at `user_version` 30; for 1..29 run `N.sqm` from the
-  current version through 29; read-only above 30. Fixtures: `kotlin-v30.db` plus a v29 one.
-- Before P2: the Kotlin `AppSettings` writes `settings.json` from its data class and drops keys it
-  does not know. Rust-only keys (`diskCacheMb`, `extHostBaseUrl`, theme) are lost whenever the
-  Kotlin app saves a setting while both apps share the data folder. Either accept that until P9 or
-  make the Kotlin save merge into the existing JSON (an additive Kotlin change; needs Mehdi's OK).
-- Before P2: `AppPaths.kt` also honours the `tachimana.dataDir` system property and falls back to
-  `~/.tachimana-base/TachiMana` when neither `LOCALAPPDATA` nor a home-based XDG path applies.
-- Before P7: `BackupManga.categories` (tag 17) is `List<Long>`, which kotlinx.serialization writes
-  unpacked. prost packs repeated scalars by default, so the Rust structs need `packed = "false"`
-  to keep re-exports byte-identical.
-- Before P4: `Tokens.kt` has four themes (Yokai Dark, Yokai Light, Midnight, Ink & Vermilion); the
-  P4 screenshots and checklist 6.6 should cover all four.
-Test results:
-- `:desktop:packageDeb` → BUILD SUCCESSFUL (209.1 MB .deb)
-- Kotlin self-tests: 10 pass, 2 blocked by network (browseSelfTest, extensionSpike); 0 app failures
+- Schema version is 30, not 29 (SQLDelight's version is migrations + 1). Plan corrected.
+- SQL is embedded from the Kotlin sources rather than copied (one source of truth). Plan corrected.
+- P1 and P2 done out of order because P1 needs Gradle.
+- `:ext-host:fatJar` produces `ext-host.jar` plus `lib/` (manifest Class-Path) instead of one merged
+  jar: merging would drop duplicate `META-INF/services` files that GraalVM, Ktor and coroutines need.
+- Chapter order: online sources store `source_order` newest first (0 = newest), but the Kotlin
+  LocalImporter numbers files oldest first (0 = oldest). The Rust UI orders each kind correctly. The
+  Kotlin app shows `sortedByDescending(source_order)` for both, which looks right for local manga and
+  backwards for online ones; worth checking in the Kotlin app.
+- Tooltips use the native `title` attribute for now, not Radix Tooltip.
+- Rotation is a Rust-only setting (`rotated`); the Kotlin app does not remember it. Kotlin drops
+  unknown settings keys on save (found in P0), so Rust-only keys reset if the Kotlin app saves settings.
+
+Manual checklist 6.6 (P4 part), run on Linux under Xvfb with a synthetic six-manga library:
+- Library list and grid, sort menu and flip, unread filter, search, category chips, rescan: done.
+- Category editor and per-manga categories: built, exercised by code path only (not screenshotted).
+- Reader strip, 2-up, mode switch keeps the page, next chapter loads inline, previous chapter prepends
+  without moving the view, progress saved and shown as "Reading · Page 7 of 12": done.
+- Rotation (Ctrl+Alt+R) keeps the current screen: done.
+- Themes: library, grid and reader in Yokai Dark, Midnight, Ink & Vermilion (shots/p4/).
+- Not done: 60 fps measurement and 1920×1080 (needs a real GPU display), Windows `http://tm.localhost`
+  form on a real Windows webview.
+
+Manual check (P5), Linux under Xvfb with the host built by CI: Browse without a host, Sources and
+Extensions empty states, repositories dialog, Settings toggle (shots/p5/). This container's proxy
+blocks GitHub raw (403), so adding Keiyoushi shows the host's real error here. Install, listing,
+chapters and page bytes are covered by `tests/real_host.rs` in ext-host CI; the online screens
+themselves (grid, detail, reader) have not been seen with real data yet.
+
+Test results: `cargo test --workspace`: tm-core 10, tm-db 13, tm-archive 4, tm-local 4, tm-cache 4,
+tachimana 16, all pass; clippy -D warnings and fmt clean. `npm test` in app/ui: 26 pass.

@@ -1,0 +1,18 @@
+[package]
+name = "tm-db"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rusqlite = { version = "0.41", features = ["bundled"] }
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

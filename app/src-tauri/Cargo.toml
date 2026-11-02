@@ -1,0 +1,33 @@
+[package]
+name = "tachimana"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "TachiMana desktop manga reader"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+ts-rs = "11"
+percent-encoding = "2"
+tm-core = { path = "../crates/tm-core" }
+tm-db = { path = "../crates/tm-db" }
+tm-archive = { path = "../crates/tm-archive" }
+tm-local = { path = "../crates/tm-local" }
+tm-cache = { path = "../crates/tm-cache" }
+tm-exthost = { path = "../crates/tm-exthost" }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[dev-dependencies]
+tempfile.workspace = true

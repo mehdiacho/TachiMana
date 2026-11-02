@@ -1,0 +1,5 @@
+[env]
+# ts-rs writes the TypeScript types shared with the UI here (run `cargo test -p tachimana`).
+TS_RS_EXPORT_DIR = { value = "ui/src/gen", relative = true }
+# Row ids and timestamps fit a JS number (< 2^53); emit `number`, not `bigint`.
+TS_RS_LARGE_INT = "number"
