@@ -93,21 +93,25 @@ export function Cover({
   width,
   height,
   className,
+  src,
 }: {
-  mangaId: number;
-  version: number;
+  mangaId?: number;
+  version?: number;
+  /** An image URL to show instead of the library cover. */
+  src?: string | null;
   title: string;
   width?: number;
   height?: number;
   className?: string;
 }) {
-  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ok" | "error">(src === null ? "error" : "loading");
+  const url = src ?? (mangaId !== undefined ? coverUrl(mangaId, version ?? 0) : null);
   return (
     <div className={`${s.cover} ${className ?? ""}`} style={width ? { width, height } : undefined}>
       {state !== "ok" && <span className={s.coverInitial}>{title.trim().charAt(0).toUpperCase()}</span>}
-      {state !== "error" && (
+      {state !== "error" && url && (
         <img
-          src={coverUrl(mangaId, version)}
+          src={url}
           alt=""
           loading="lazy"
           decoding="async"

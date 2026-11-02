@@ -26,6 +26,8 @@ tm-db = { path = "../crates/tm-db" }
 tm-archive = { path = "../crates/tm-archive" }
 tm-local = { path = "../crates/tm-local" }
 tm-cache = { path = "../crates/tm-cache" }
+tm-exthost = { path = "../crates/tm-exthost" }
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 tempfile.workspace = true

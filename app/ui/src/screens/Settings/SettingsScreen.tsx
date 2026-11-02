@@ -1,5 +1,5 @@
-// Settings (spec §3.7), P4 subset: theme, rotation, storage (data folder, page cache).
-import { CheckCircle2, Circle, Database, FolderOpen, HardDrive, Info, RotateCw, Trash2 } from "lucide-react";
+// Settings (spec §3.7): theme, rotation, online sources, storage (data folder, page cache).
+import { CheckCircle2, Circle, Database, FolderOpen, HardDrive, Info, RotateCw, ShieldCheck, Trash2 } from "lucide-react";
 import { api } from "../../api/commands";
 import { keys, useAppInfo, useCacheUsage, useSetSettings, useSettings } from "../../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -79,6 +79,22 @@ export function SettingsScreen() {
               setRotated(v);
               save.mutate({ rotated: v });
             }}
+          />
+        </div>
+
+        <div className={s.section}>Online sources</div>
+        <div className={s.row}>
+          <ShieldCheck size={20} className={s.rowIcon} />
+          <div className={s.rowText}>
+            <span className={s.rowTitle}>Cloudflare bypass</span>
+            <span className={s.rowDesc}>
+              When a source is behind a Cloudflare check, solve it in a hidden browser window. Off by default.
+            </span>
+          </div>
+          <Toggle
+            label="Cloudflare bypass"
+            checked={st?.cloudflareBypassEnabled ?? false}
+            onChange={(v) => save.mutate({ cloudflareBypassEnabled: v })}
           />
         </div>
 

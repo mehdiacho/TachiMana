@@ -95,6 +95,8 @@ export function PagedView({
     e.preventDefault();
   };
 
+  const [natural, setNatural] = useState<ReadonlyMap<string, { w: number; h: number }>>(new Map());
+
   // Preload the next 3 pages and keep the previous 2 warm in the browser cache.
   const preload = useMemo(() => {
     if (!pages || !chapter) return [];
@@ -121,9 +123,29 @@ export function PagedView({
       <div className={s.spread} style={{ flexDirection: "row" }}>
         {ordered.map((i) => {
           const p = load.pages[i];
-          const nat = p?.w && p?.h ? { w: p.w, h: p.h } : UNKNOWN;
+          const key = `${chapter.id}:${i}`;
+          const nat = p?.w && p?.h ? { w: p.w, h: p.h } : (natural.get(key) ?? UNKNOWN);
           const size = fitSize(fit, zoom, nat, vp, unit.length);
-          return <img key={`${chapter.id}:${i}`} src={pageUrl(chapter.id, i)} alt={`Page ${i + 1}`} width={size.w} height={size.h} draggable={false} decoding="async" />;
+          return (
+            <img
+              key={key}
+              src={pageUrl(chapter.id, i)}
+              alt={`Page ${i + 1}`}
+              width={size.w}
+              height={size.h}
+              draggable={false}
+              decoding="async"
+              onLoad={
+                p?.w && p?.h
+                  ? undefined
+                  : (e) => {
+                      const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                      // Online pages carry no size; fit them once the image says what it is.
+                      if (w > 0 && h > 0 && natural.get(key)?.w !== w) setNatural((m) => new Map(m).set(key, { w, h }));
+                    }
+              }
+            />
+          );
         })}
       </div>
     );

@@ -510,3 +510,35 @@
   box-shadow: var(--tm-shadow-modal);
   z-index: 20;
 }
+
+.updateBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-xs);
+  padding: 0 var(--tm-space-xl) var(--tm-space-sm);
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-med);
+  flex: none;
+}
+.updateBar span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.updateBar progress {
+  width: 100%;
+  height: 3px;
+  appearance: none;
+  border: 0;
+  background: var(--tm-color-surface);
+  accent-color: var(--tm-color-accent);
+}
+.updateBar progress::-webkit-progress-bar {
+  background: var(--tm-color-surface);
+}
+.updateBar progress::-webkit-progress-value {
+  background: var(--tm-color-accent);
+}
+.field::placeholder {
+  color: var(--tm-color-on-background-dim);
+}

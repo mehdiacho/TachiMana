@@ -120,6 +120,10 @@ pub fn manga_set_categories(state: State<'_, AppState>, manga_id: i64, ids: Vec<
 
 #[tauri::command]
 pub fn manga_detail(state: State<'_, AppState>, id: i64) -> R<MangaDetailDto> {
+    detail_of(&state, id)
+}
+
+pub fn detail_of(state: &AppState, id: i64) -> R<MangaDetailDto> {
     let manga = state
         .db
         .manga(id)?
@@ -153,7 +157,7 @@ pub fn set_viewer(state: State<'_, AppState>, manga_id: i64, viewer: i64) -> R<(
     Ok(state.db.set_viewer(manga_id, viewer)?)
 }
 
-fn chapter_or_404(state: &AppState, id: i64) -> R<Chapter> {
+pub fn chapter_or_404(state: &AppState, id: i64) -> R<Chapter> {
     state
         .db
         .chapter(id)?
@@ -203,6 +207,14 @@ pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
 
 #[tauri::command]
 pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<ChapterPagesDto> {
+    let ch = chapter_or_404(&state, chapter_id)?;
+    let manga = state
+        .db
+        .manga(ch.manga_id)?
+        .ok_or_else(|| CmdError::not_found("That manga"))?;
+    if !manga.is_local() {
+        return crate::online::chapter_pages(&state, &manga, &ch).await;
+    }
     let open = resolve_chapter(&state, chapter_id)?;
     let dims = tm_archive::page_dimensions(&open.path, &open.names)?;
     Ok(ChapterPagesDto {
@@ -252,6 +264,7 @@ fn ui_settings(s: &tm_core::Settings) -> UiSettings {
         library_downloaded_only: s.bool(keys::LIBRARY_DOWNLOADED_ONLY),
         disk_cache_mb: s.i64(keys::DISK_CACHE_MB),
         rotated: s.bool(keys::ROTATED),
+        cloudflare_bypass_enabled: s.bool(keys::CLOUDFLARE_BYPASS_ENABLED),
     }
 }
 
@@ -301,6 +314,10 @@ pub fn settings_set(state: State<'_, AppState>, patch: UiSettingsPatch) -> R<UiS
         (patch.library_unread_only, keys::LIBRARY_UNREAD_ONLY),
         (patch.library_downloaded_only, keys::LIBRARY_DOWNLOADED_ONLY),
         (patch.rotated, keys::ROTATED),
+        (
+            patch.cloudflare_bypass_enabled,
+            keys::CLOUDFLARE_BYPASS_ENABLED,
+        ),
     ];
     for (v, key) in bools {
         if let Some(v) = v {
@@ -316,6 +333,9 @@ pub fn settings_set(state: State<'_, AppState>, patch: UiSettingsPatch) -> R<UiS
         state.cache.set_cap(bytes)?;
     }
     s.save()?;
+    if let Some(enabled) = patch.cloudflare_bypass_enabled {
+        crate::online::push_cloudflare(&state, enabled);
+    }
     Ok(ui_settings(&s))
 }
 

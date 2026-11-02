@@ -3,6 +3,7 @@
 
 mod commands;
 mod dto;
+mod online;
 mod protocol;
 mod state;
 
@@ -27,6 +28,19 @@ fn main() {
     };
     let result = tauri::Builder::default()
         .manage(state)
+        .setup(|app| {
+            use tauri::Manager;
+            if let Ok(res) = app.path().resource_dir() {
+                let _ = app.state::<AppState>().host_dir.set(res.join("ext-host"));
+            }
+            // Stop the extension host when it has been idle for a while; it restarts on demand.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                online::stop_if_idle(&handle.state::<AppState>(), online::HOST_IDLE);
+            });
+            Ok(())
+        })
         .register_asynchronous_uri_scheme_protocol("tm", protocol::handle)
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
@@ -47,6 +61,22 @@ fn main() {
             commands::settings_set,
             commands::cache_usage,
             commands::cache_clear,
+            online::browse_status,
+            online::ext_repos,
+            online::ext_repo_add,
+            online::ext_repo_remove,
+            online::ext_installed,
+            online::ext_catalog,
+            online::ext_install,
+            online::ext_uninstall,
+            online::browse_sources,
+            online::browse_list,
+            online::online_open,
+            online::manga_refresh,
+            online::library_update,
+            online::library_set_favorite,
+            online::source_preferences,
+            online::source_preference_set,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

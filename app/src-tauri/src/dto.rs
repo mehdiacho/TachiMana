@@ -11,10 +11,13 @@ use ts_rs::TS;
 pub struct MangaDto {
     #[ts(type = "number")]
     pub id: i64,
-    #[ts(type = "number")]
+    /// Source ids are 64-bit and exceed 2^53, so they travel as strings.
+    #[serde(serialize_with = "id_str::serialize")]
+    #[ts(type = "string")]
     pub source: i64,
     pub url: String,
     pub title: String,
+    pub favorite: bool,
     pub author: Option<String>,
     pub artist: Option<String>,
     pub description: Option<String>,
@@ -40,6 +43,7 @@ impl From<&tm_db::Manga> for MangaDto {
             source: m.source,
             url: m.url.clone(),
             title: m.title.clone(),
+            favorite: m.favorite,
             author: m.author.clone().filter(|s| !s.trim().is_empty()),
             artist: m.artist.clone().filter(|s| !s.trim().is_empty()),
             description: m.description.clone().filter(|s| !s.trim().is_empty()),
@@ -207,6 +211,7 @@ pub struct UiSettings {
     #[ts(type = "number")]
     pub disk_cache_mb: i64,
     pub rotated: bool,
+    pub cloudflare_bypass_enabled: bool,
 }
 
 /// A partial update: only the fields present are written.
@@ -236,6 +241,8 @@ pub struct UiSettingsPatch {
     pub disk_cache_mb: Option<i64>,
     #[ts(optional)]
     pub rotated: Option<bool>,
+    #[ts(optional)]
+    pub cloudflare_bypass_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -265,4 +272,224 @@ pub struct CacheUsageDto {
 pub struct CmdError {
     pub kind: String,
     pub message: String,
+}
+
+/// Serialises an i64 id as a JSON string (commands take ids back as strings and parse them).
+pub mod id_str {
+    use serde::Serializer;
+
+    pub fn serialize<S: Serializer>(v: &i64, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&v.to_string())
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Online sources (P5). Source ids are strings on this side of the IPC boundary (see `id_str`).
+
+/// Whether the extension host can be used, and why not.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BrowseStatusDto {
+    pub available: bool,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RepoDto {
+    pub base_url: String,
+    pub name: String,
+    pub short_name: Option<String>,
+    pub website: String,
+    pub signing_key_fingerprint: String,
+}
+
+impl From<&tm_db::ExtensionRepo> for RepoDto {
+    fn from(r: &tm_db::ExtensionRepo) -> Self {
+        Self {
+            base_url: r.base_url.clone(),
+            name: r.name.clone(),
+            short_name: r.short_name.clone(),
+            website: r.website.clone(),
+            signing_key_fingerprint: r.signing_key_fingerprint.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceRefDto {
+    #[serde(serialize_with = "id_str::serialize")]
+    #[ts(type = "string")]
+    pub id: i64,
+    pub name: String,
+    pub lang: String,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct InstalledExtensionDto {
+    pub pkg_name: String,
+    pub name: String,
+    pub version_name: String,
+    pub lang: String,
+    pub nsfw: bool,
+    pub icon_url: Option<String>,
+    pub sources: Vec<SourceRefDto>,
+}
+
+impl From<&tm_exthost::model::Extension> for InstalledExtensionDto {
+    fn from(e: &tm_exthost::model::Extension) -> Self {
+        Self {
+            pkg_name: e.pkg_name.clone(),
+            name: e.name.clone(),
+            version_name: e.version_name.clone(),
+            lang: e.lang.clone(),
+            nsfw: e.nsfw,
+            icon_url: e.icon_url.clone(),
+            sources: e
+                .sources
+                .iter()
+                .map(|s| SourceRefDto {
+                    id: s.id,
+                    name: s.name.clone(),
+                    lang: s.lang.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// One extension a repo offers, with its install state.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CatalogEntryDto {
+    pub repo_url: String,
+    pub repo_name: String,
+    pub pkg_name: String,
+    pub name: String,
+    pub version_name: String,
+    pub lang: String,
+    pub nsfw: bool,
+    pub icon_url: String,
+    /// Installed version, if any.
+    pub installed_version: Option<String>,
+    pub update_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RepoFailureDto {
+    pub repo_name: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CatalogDto {
+    pub entries: Vec<CatalogEntryDto>,
+    pub failures: Vec<RepoFailureDto>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SourceDto {
+    #[serde(serialize_with = "id_str::serialize")]
+    #[ts(type = "string")]
+    pub id: i64,
+    pub name: String,
+    pub lang: String,
+    pub extension_pkg: String,
+    pub extension_name: String,
+    pub icon_url: Option<String>,
+    pub supports_latest: bool,
+    pub is_configurable: bool,
+}
+
+/// A manga as a source lists it while browsing.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct OnlineMangaDto {
+    pub url: String,
+    pub title: String,
+    pub thumbnail_url: Option<String>,
+    /// The library row, when this manga is a favourite.
+    #[ts(type = "number | null")]
+    pub library_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BrowsePageDto {
+    pub mangas: Vec<OnlineMangaDto>,
+    pub has_next_page: bool,
+}
+
+/// A source preference (api.md "Preference").
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PreferenceDto {
+    pub key: String,
+    pub kind: String,
+    pub title: String,
+    pub summary: Option<String>,
+    pub enabled: bool,
+    #[ts(type = "boolean | string | Array<string> | null")]
+    pub value: serde_json::Value,
+    pub entries: Vec<String>,
+    pub entry_values: Vec<String>,
+    pub accepted: Option<bool>,
+}
+
+impl From<tm_exthost::model::Preference> for PreferenceDto {
+    fn from(p: tm_exthost::model::Preference) -> Self {
+        Self {
+            key: p.key,
+            kind: p.kind,
+            title: p.title,
+            summary: p.summary,
+            enabled: p.enabled,
+            value: p.value.unwrap_or(serde_json::Value::Null),
+            entries: p.entries.unwrap_or_default(),
+            entry_values: p.entry_values.unwrap_or_default(),
+            accepted: p.accepted,
+        }
+    }
+}
+
+/// Progress of the library update, sent as the `library-update` event.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LibraryUpdateDto {
+    pub running: bool,
+    pub done: u32,
+    pub total: u32,
+    /// Title being refreshed now.
+    pub current: Option<String>,
+    pub chapters_added: u32,
+    /// Titles whose source failed, with the error.
+    pub failures: Vec<String>,
+}
+
+/// Result of refreshing an online manga from its source.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RefreshDto {
+    pub detail: MangaDetailDto,
+    pub chapters_added: u32,
+    /// Set when the source failed; the detail is then what was stored before.
+    pub error: Option<String>,
 }

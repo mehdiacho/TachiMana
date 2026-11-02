@@ -1,7 +1,8 @@
-import { ArrowDownToLine, Compass, History, RefreshCw } from "lucide-react";
+import { ArrowDownToLine, History, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import { useSettings } from "./api/queries";
 import { Shell } from "./components/Shell";
+import { BrowseScreen } from "./screens/Browse/BrowseScreen";
 import { LibraryScreen } from "./screens/Library/LibraryScreen";
 import { Placeholder } from "./screens/Placeholder/Placeholder";
 import { ReaderScreen } from "./screens/Reader/ReaderScreen";
@@ -24,7 +25,7 @@ export function App() {
         <>
           {screen === "library" && <LibraryScreen cls={cls} />}
           {screen === "recents" && <Placeholder icon={History} title="Recents" detail="Reading history arrives in a later update." />}
-          {screen === "browse" && <Placeholder icon={Compass} title="Browse" detail="Online sources arrive with the extension host." />}
+          {screen === "browse" && <BrowseScreen cls={cls} />}
           {screen === "downloads" && <Placeholder icon={ArrowDownToLine} title="Downloads" detail="The download queue arrives in a later update." />}
           {screen === "sync" && <Placeholder icon={RefreshCw} title="Sync" detail="Backup and LAN sync arrive in a later update." />}
           {screen === "settings" && <SettingsScreen />}

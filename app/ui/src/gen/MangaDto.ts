@@ -3,7 +3,11 @@
 /**
  * Library manga as the UI needs it (a subset of the `mangas` row).
  */
-export type MangaDto = { id: number, source: number, url: string, title: string, author: string | null, artist: string | null, description: string | null, genres: Array<string>, status: number, viewer: number, dateAdded: number, lastUpdate: number, isLocal: boolean, 
+export type MangaDto = { id: number, 
+/**
+ * Source ids are 64-bit and exceed 2^53, so they travel as strings.
+ */
+source: string, url: string, title: string, favorite: boolean, author: string | null, artist: string | null, description: string | null, genres: Array<string>, status: number, viewer: number, dateAdded: number, lastUpdate: number, isLocal: boolean, 
 /**
  * Bumped when the cover changes, so `tm://cover/<id>?v=<coverVersion>` busts the cache.
  */
