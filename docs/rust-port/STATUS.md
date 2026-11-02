@@ -88,8 +88,9 @@ Manual checklist 6.6 (P4 part), run on Linux under Xvfb with a synthetic six-man
 
 Manual check (P5), Linux under Xvfb with the host built by CI: Browse without a host, Sources and
 Extensions empty states, repositories dialog, Settings toggle (shots/p5/). This container's proxy
-blocks GitHub raw (403), so adding Keiyoushi shows the host's real error here; the online lists,
-install, detail and reader were checked through `tests/real_host.rs` in CI, not on screen.
+blocks GitHub raw (403), so adding Keiyoushi shows the host's real error here. Install, listing,
+chapters and page bytes are covered by `tests/real_host.rs` in ext-host CI; the online screens
+themselves (grid, detail, reader) have not been seen with real data yet.
 
 Test results: `cargo test --workspace`: tm-core 10, tm-db 13, tm-archive 4, tm-local 4, tm-cache 4,
 tachimana 16, all pass; clippy -D warnings and fmt clean. `npm test` in app/ui: 26 pass.
