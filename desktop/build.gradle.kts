@@ -143,6 +143,13 @@ compose.desktop {
             packageVersion = appVersion
             description = "A desktop-first manga reader"
             vendor = "mehdiacho"
+            // jlink only bundles the modules listed here. Without java.sql the installed app
+            // cannot open its database (NoClassDefFoundError: java/sql/DriverManager).
+            // List from `./gradlew :desktop:suggestRuntimeModules`.
+            modules(
+                "java.instrument", "java.management", "java.naming", "java.prefs", "java.scripting",
+                "java.sql", "jdk.httpserver", "jdk.javadoc", "jdk.unsupported",
+            )
 
             windows {
                 // A STABLE uuid is what makes an install an *upgrade* rather than a second copy
