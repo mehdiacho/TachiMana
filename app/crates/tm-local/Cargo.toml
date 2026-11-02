@@ -1,0 +1,19 @@
+[package]
+name = "tm-local"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tm-db = { path = "../tm-db" }
+tm-archive = { path = "../tm-archive" }
+regex = "1"
+thiserror.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
