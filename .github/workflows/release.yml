@@ -18,11 +18,11 @@ jobs:
         uses: actions/checkout@v4
 
       # ── JDK ──────────────────────────────────────────────────────────
-      - name: Set up JDK 17
+      - name: Set up JDK 24
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 24   # the toolchain the app is developed and tested on
           cache: gradle
 
       # ── extract version from the tag ─────────────────────────────────
