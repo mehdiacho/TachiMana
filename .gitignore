@@ -36,3 +36,8 @@ secrets.properties
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Rust / UI (app/)
+app/target/
+app/ui/node_modules/
+app/ui/dist/

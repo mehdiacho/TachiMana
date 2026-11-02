@@ -64,7 +64,7 @@ manga never need Java.
 
 ### 1.3 Interop invariants (breaking any of these is a bug, never a style choice)
 1. **Same database.** The Rust app opens the same `tachimana.db` (SQLite) the Kotlin app writes, at
-   schema version **29**, tracked in `PRAGMA user_version`. Same tables, same columns, same meanings
+   schema version **30** (`Database.Schema.version`: 29 migration files + 1), tracked in `PRAGMA user_version`. Same tables, same columns, same meanings
    (source id `0` = local; `manga.url` = folder name for local; `chapter.url` = `<manga>/<file>` for
    local; `viewer` flag values 5/1/2/6 for strip/L→R/R→L/double; `manga_sync.sync_id` 2 = AniList).
 2. **Same data folder.** Windows `%LOCALAPPDATA%\TachiMana`, Linux `$XDG_DATA_HOME/TachiMana` or
@@ -278,13 +278,12 @@ Gate: selfTest green on Windows; `docs/rust-port/api.md` describes every endpoin
      atomically (write to `settings.json.tmp`, then rename).
    - `AppLock`: exclusive lock on `<data>/app.lock` (use the `fs4` crate or an OS-level file lock).
 3. `tm-db`:
-   - Copy every `CREATE` statement from `engine/data/src/commonMain/sqldelight/tachiyomi/data/*.sq`
-     and `view/*.sq`, and every migration `migrations/1.sqm`..`29.sqm`, into
-     `app/crates/tm-db/sql/` **verbatim**, and embed them with `include_str!`. Add a comment at the
-     top of each copied file naming its Kotlin source.
-   - Opening: if `user_version` = 0 and no tables, create the schema and set `user_version` = 29
+   - Embed the Kotlin `.sq` and `.sqm` files directly with `include_str!` from
+     `engine/data/src/commonMain/sqldelight/tachiyomi/` (no copies, so there is one source of
+     truth), strip SQLDelight-only syntax at load time, and run the named queries by label.
+   - Opening: if `user_version` = 0 and no tables, create the schema and set `user_version` = 30
      (match what `engine/data/src/jvmMain/kotlin/yokai/data/DatabaseFactory.kt` does, read it). If
-     between 1 and 28, run the migrations in order inside a transaction. If above 29, open
+     between 1 and 29, run `N.sqm` (N to N+1) in order inside a transaction. If above 30, open
      **read-only** and show "this library was written by a newer TachiMana".
    - WAL mode, `foreign_keys = ON`, a busy timeout of 5 s.
    - Typed query functions for everything the Kotlin repos use: port the queries named in the
