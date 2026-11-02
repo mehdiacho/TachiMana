@@ -3571,6 +3571,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tm-download"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tm-exthost"
 version = "0.1.0"
 dependencies = [
