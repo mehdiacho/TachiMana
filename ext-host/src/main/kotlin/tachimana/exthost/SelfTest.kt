@@ -201,8 +201,13 @@ private class SelfTest {
 
             check("config accepts the Cloudflare toggle", call("PUT", "/v1/config", json.encodeToString(ConfigRequest(false))).status == 200)
 
-            // --- Persistence: a fresh host on the same data dir reloads the install ---
-            val second = HostService(HostPaths(root))
+            // --- Persistence: a fresh host reloads what extensions/apks holds ---
+            // A copy of the data dir, because this JVM still has the first host's dex2jar output
+            // open, and Windows does not let the second host rewrite a file that is open.
+            val copy = Files.createTempDirectory("tachimana-exthost-reload").toFile()
+            File(root, "extensions/apks").copyRecursively(File(copy, "extensions/apks"))
+            File(root, "extensions/icons.json").takeIf { it.isFile }?.copyTo(File(copy, "extensions/icons.json"))
+            val second = HostService(HostPaths(copy))
             second.boot()
             check("installed extension reloads on the next start (${second.extensions.size})", second.extensions.any { it.packageName == mangadex.pkgName })
 
