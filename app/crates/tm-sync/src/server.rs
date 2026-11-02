@@ -155,28 +155,32 @@ async fn ping(State(s): State<Arc<ServerState>>) -> Json<PingInfo> {
     })
 }
 
-async fn build_backup(s: &Arc<ServerState>) -> std::result::Result<Vec<u8>, Response> {
+/// The backup bytes, or `None` after logging why it failed (answer with [`backup_failed`]).
+async fn build_backup(s: &Arc<ServerState>) -> Option<Vec<u8>> {
     let f = Arc::clone(&s.backup);
     match tokio::task::spawn_blocking(move || f()).await {
-        Ok(Ok(bytes)) => Ok(bytes),
+        Ok(Ok(bytes)) => Some(bytes),
         Ok(Err(e)) => {
             tracing::warn!("sync backup failed: {e}");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, "backup failed").into_response())
+            None
         }
         Err(e) => {
             tracing::warn!("sync backup task failed: {e}");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, "backup failed").into_response())
+            None
         }
     }
+}
+
+fn backup_failed() -> Response {
+    (StatusCode::INTERNAL_SERVER_ERROR, "backup failed").into_response()
 }
 
 async fn manifest(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Response {
     if let Some(r) = check(&s, &headers) {
         return r;
     }
-    let bytes = match build_backup(&s).await {
-        Ok(b) => b,
-        Err(r) => return r,
+    let Some(bytes) = build_backup(&s).await else {
+        return backup_failed();
     };
     let root = s.local_root.clone();
     let files = tokio::task::spawn_blocking(move || list_local_files(&root))
@@ -196,8 +200,10 @@ async fn backup_route(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> 
         return r;
     }
     match build_backup(&s).await {
-        Ok(bytes) => ([(header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response(),
-        Err(r) => r,
+        Some(bytes) => {
+            ([(header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response()
+        }
+        None => backup_failed(),
     }
 }
 
