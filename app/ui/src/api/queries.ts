@@ -20,6 +20,7 @@ export const keys = {
   onDisk: ["downloads", "disk"] as const,
   nas: ["nas", "settings"] as const,
   nasCache: ["nas", "cache"] as const,
+  sync: ["sync"] as const,
   browseStatus: ["browse", "status"] as const,
   repos: ["browse", "repos"] as const,
   sources: ["browse", "sources"] as const,
@@ -27,6 +28,7 @@ export const keys = {
   prefs: (sourceId: string) => ["browse", "prefs", sourceId] as const,
 };
 
+export const useSyncStatus = () => useQuery({ queryKey: keys.sync, queryFn: api.syncStatus, staleTime: Infinity });
 export const useAppInfo = () => useQuery({ queryKey: keys.info, queryFn: api.appInfo });
 export const useLibrary = () => useQuery({ queryKey: keys.library, queryFn: api.library });
 export const useCategories = () => useQuery({ queryKey: keys.categories, queryFn: api.categories });

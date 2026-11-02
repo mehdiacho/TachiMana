@@ -360,7 +360,7 @@ fn hostile_input_is_an_error_not_a_panic() {
     assert!(codec::decode(&[0xff, 0xff, 0xff, 0xff]).is_err());
     // A gzip bomb is refused rather than inflated without bound.
     let zeros = vec![0u8; 1024 * 1024];
-    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     for _ in 0..300 {
         std::io::Write::write_all(&mut gz, &zeros).unwrap();
     }
@@ -383,4 +383,46 @@ fn relink_never_leaves_the_local_root() {
     import(&db, &b).unwrap();
     assert_eq!(relink_local_covers(&db, &root).unwrap(), 0);
     assert_eq!(db.library().unwrap()[0].thumbnail_url, None);
+}
+
+/// A `.tachibk` written by the Kotlin app (`SyncInterop.kt seed` + `export`): a local manga, a
+/// "Mihon" manga with progress, a category, tracking, an extension store and preference blobs.
+const KOTLIN_FIXTURE: &[u8] = include_bytes!("fixtures/kotlin-app.tachibk");
+
+#[test]
+fn restores_a_backup_made_by_the_kotlin_app() {
+    let b = codec::decode(KOTLIN_FIXTURE).unwrap();
+    assert_eq!(b.backup_manga.len(), 2);
+    let db = Db::open_in_memory().unwrap();
+    let s = import(&db, &b).unwrap();
+    assert_eq!(
+        (s.manga_added, s.chapters_added, s.categories_added),
+        (2, 4, 1)
+    );
+    assert_eq!(s.pending_repos.len(), 1);
+    assert_eq!(
+        s.pending_repos[0].index_url(),
+        "https://example.com/index.pb"
+    );
+
+    let lib = db.library().unwrap();
+    let mihon = lib.iter().find(|m| m.url == "/m/1").unwrap();
+    assert_eq!(mihon.source, 99);
+    assert_eq!(mihon.notes, "reread after vol 3");
+    assert_eq!(mihon.memo, "{\"pinned\":true}");
+    let chs = db.chapters(mihon.id).unwrap();
+    let c1 = chs.iter().find(|c| c.url == "/m/1/c1").unwrap();
+    let c2 = chs.iter().find(|c| c.url == "/m/1/c2").unwrap();
+    assert!(c1.read && c1.last_page_read == 12);
+    assert!(c2.bookmark && c2.last_page_read == 4);
+    assert_eq!(db.tracks(mihon.id).unwrap()[0].remote_id, 4242);
+    let local = lib.iter().find(|m| m.url == "Sample Manga").unwrap();
+    assert_eq!(local.source, 0);
+    assert_eq!(db.chapters(local.id).unwrap().len(), 2);
+
+    // The preference sections come back out byte for byte.
+    let out = export(&db, &none()).unwrap();
+    assert_eq!(out.backup_preferences, b.backup_preferences);
+    assert_eq!(out.backup_source_preferences, b.backup_source_preferences);
+    assert_eq!(out.backup_preferences, vec![vec![10u8, 3, 97, 98, 99]]);
 }

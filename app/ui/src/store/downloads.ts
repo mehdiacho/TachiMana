@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { api } from "../api/commands";
 import { keys, queryClient } from "../api/queries";
 import type { DownloadJobDto } from "../gen/DownloadJobDto";
+import type { SyncStatusDto } from "../gen/SyncStatusDto";
 import type { UploadJobDto } from "../gen/UploadJobDto";
 import { newlyDone } from "../lib/downloads";
 
@@ -35,6 +36,11 @@ export const useDownloads = create<DownloadsState>((set, get) => {
       if (started) return;
       started = true;
       void listen<UploadJobDto[]>("uploads", (e) => set({ uploads: e.payload })).catch(() => undefined);
+      // Sync status (peers, progress) and libraries changed by a pull or restore.
+      void listen<SyncStatusDto>("sync", (e) => queryClient.setQueryData(keys.sync, e.payload)).catch(() => undefined);
+      void listen("library-changed", () => {
+        for (const k of [keys.library, keys.categories, keys.recents, ["detail"]]) void queryClient.invalidateQueries({ queryKey: k });
+      }).catch(() => undefined);
       // An archived chapter left this computer after its upload.
       void listen("downloads-changed", () => {
         void queryClient.invalidateQueries({ queryKey: ["detail"] });
