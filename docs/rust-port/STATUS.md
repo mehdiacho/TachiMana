@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
-Current phase: P1 Kotlin ext-host, branch feat/rust-p1-exthost (stacked on feat/rust-p4-ui → p3 → p2; also merges fix/release-workflow for the android-compat compile fixes)
+Current phase: P5 online sources, branch feat/rust-p5-browse (stacked on feat/rust-p1-exthost → p4 → p3 → p2)
 
 Done:
 - P2 `app/` workspace (no unsafe, no unwrap/expect/panic outside tests). `tm-core`: AppPaths, Settings
@@ -30,10 +30,32 @@ Done:
   popular/latest/search, cover, manga+chapters, pages, page bytes, preferences, reload, uninstall,
   shutdown. `.github/workflows/ext-host.yml` builds it, runs the self-test and checks the start-up
   contract with `java -jar` on Ubuntu and Windows.
+- P5 `tm-exthost`: spawns the host (bundled `runtime/bin/java`, then `JAVA_HOME`, then PATH), fresh
+  32-byte token, waits up to 60 s for the ready line, forwards its stderr to the log, keeps stdin open
+  and closes it on drop. Typed async client for every endpoint, 64 MB body cap, host errors kept as
+  `{status, kind, message}`. 6 scripted-server tests; `tests/real_host.rs` installs MangaDex from
+  Keiyoushi and reads a page through the real host (run by ext-host CI on Linux and Windows).
+  App: host started lazily, restarted if it died, stopped after 10 idle minutes (not while the library
+  updates). Commands for repos, catalog (per-repo failures, update detection), install (only from the
+  user's own repos), uninstall, sources, popular/latest/search, open, refresh, heart, source settings,
+  Cloudflare toggle, library update with `library-update` progress events. Browsed manga are stored as
+  non-favourite rows so detail and reader use real ids; the heart only flips `favorite`. Online pages
+  and covers go through `tm://` with the page cache. Source ids travel as strings (above 2^53).
+  UI: Browse (Sources / Extensions tabs, repositories dialog with a one-tap Keiyoushi chip that is never
+  added on its own, catalog grouped Update pending / Installed / Available with NSFW and language
+  filters, source grid with infinite scroll and de-dupe, source settings dialog), detail heart and
+  refresh with the source's real error, library update button with a progress bar, Cloudflare toggle
+  in Settings, reader learns online page sizes when each image loads.
 - CI: `.github/workflows/rust-port.yml` runs UI typecheck/tests/build, cargo fmt, clippy, tests, and
   checks the generated types are committed.
 
-Next step: get ext-host CI green, then P5 (tm-exthost client, Browse, online reading).
+Next step: P5 PR review and CI (the real-host test), then P6 (downloads, recents, NAS).
+
+P5 not done yet:
+- Downloading the host zip on first use (PLAN §P5.1) waits on open question 1 (where it is hosted).
+  Today the app looks for `TM_EXTHOST_DIR`, then `<resources>/ext-host`, then (debug builds) the
+  Gradle output folder; without it Browse says so.
+- "Restart once, then surface the error": the app restarts a dead host on every call instead.
 
 Blockers / questions:
 - Gradle in the cloud container: Maven Central works through a mirror init script, but jitpack (401)
@@ -63,6 +85,11 @@ Manual checklist 6.6 (P4 part), run on Linux under Xvfb with a synthetic six-man
 - Themes: library, grid and reader in Yokai Dark, Midnight, Ink & Vermilion (shots/p4/).
 - Not done: 60 fps measurement and 1920×1080 (needs a real GPU display), Windows `http://tm.localhost`
   form on a real Windows webview.
+
+Manual check (P5), Linux under Xvfb with the host built by CI: Browse without a host, Sources and
+Extensions empty states, repositories dialog, Settings toggle (shots/p5/). This container's proxy
+blocks GitHub raw (403), so adding Keiyoushi shows the host's real error here; the online lists,
+install, detail and reader were checked through `tests/real_host.rs` in CI, not on screen.
 
 Test results: `cargo test --workspace`: tm-core 10, tm-db 13, tm-archive 4, tm-local 4, tm-cache 4,
 tachimana 16, all pass; clippy -D warnings and fmt clean. `npm test` in app/ui: 26 pass.

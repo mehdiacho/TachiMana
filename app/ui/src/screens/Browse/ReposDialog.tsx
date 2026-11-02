@@ -70,7 +70,7 @@ export function ReposDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             <input
               className={l.field}
               value={url}
-              placeholder="https://…/index.min.json"
+              placeholder="Repository address (https://…)"
               aria-label="Repository URL"
               onChange={(e) => setUrl(e.target.value)}
               maxLength={2000}

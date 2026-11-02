@@ -539,3 +539,6 @@
 .updateBar progress::-webkit-progress-value {
   background: var(--tm-color-accent);
 }
+.field::placeholder {
+  color: var(--tm-color-on-background-dim);
+}
