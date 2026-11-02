@@ -43,6 +43,8 @@ pub struct AppState {
     pub host_used: AtomicU64,
     /// Set while the library update runs (it keeps the host alive and runs once at a time).
     pub updating: AtomicBool,
+    /// The download queue, started in `setup` once the async runtime exists.
+    pub downloads: OnceLock<tm_download::DownloadManager>,
     _lock: AppLock,
 }
 
@@ -68,6 +70,7 @@ impl AppState {
             host_dir: OnceLock::new(),
             host_used: AtomicU64::new(0),
             updating: AtomicBool::new(false),
+            downloads: OnceLock::new(),
             _lock: lock,
         })
     }

@@ -27,6 +27,7 @@ tm-archive = { path = "../crates/tm-archive" }
 tm-local = { path = "../crates/tm-local" }
 tm-cache = { path = "../crates/tm-cache" }
 tm-exthost = { path = "../crates/tm-exthost" }
+tm-download = { path = "../crates/tm-download" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]

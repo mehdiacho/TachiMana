@@ -63,7 +63,7 @@ pub fn library(state: State<'_, AppState>) -> R<Vec<LibraryEntryDto>> {
                 .get(&m.id)
                 .map(|s| s.iter().copied().collect())
                 .unwrap_or_default(),
-            downloaded: false,
+            downloaded: crate::downloads::has_any(&state, m),
             latest_chapter: latest.get(&m.id).cloned(),
         })
         .collect())
@@ -132,7 +132,13 @@ pub fn detail_of(state: &AppState, id: i64) -> R<MangaDetailDto> {
     let cats = state.db.category_assignments()?;
     Ok(MangaDetailDto {
         manga: MangaDto::from(&manga),
-        chapters: chapters.iter().map(ChapterDto::from).collect(),
+        chapters: chapters
+            .iter()
+            .map(|c| ChapterDto {
+                downloaded: crate::downloads::is_downloaded(state, &manga, c),
+                ..ChapterDto::from(c)
+            })
+            .collect(),
         category_ids: cats
             .get(&id)
             .map(|s| s.iter().copied().collect())
@@ -164,8 +170,9 @@ pub fn chapter_or_404(state: &AppState, id: i64) -> R<Chapter> {
         .ok_or_else(|| CmdError::not_found("That chapter"))
 }
 
-/// Resolve where a chapter's pages live. Local manga only for now; downloads, NAS and online
-/// sources join in P5/P6 (plan §5.4 order).
+/// Resolve where a chapter's pages live on disk: the local folder, or a finished download of an
+/// online chapter (plan §5.4 order; the NAS joins later). Online chapters that are not downloaded
+/// come through the extension host instead (`online::page_bytes`).
 pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
     if let Some(open) = state.chapters()?.get(&chapter_id) {
         return Ok(open.clone());
@@ -175,19 +182,17 @@ pub fn resolve_chapter(state: &AppState, chapter_id: i64) -> R<OpenChapter> {
         .db
         .manga(ch.manga_id)?
         .ok_or_else(|| CmdError::not_found("That manga"))?;
-    if !manga.is_local() {
-        return Err(CmdError::new(
-            "unsupported",
-            "Online chapters arrive with the extension host. Only local manga can be read in this build.",
-        ));
-    }
-    let path =
+    let path = if manga.is_local() {
         tm_local::chapter_path(&state.paths.local_library_dir(), &ch.url).ok_or_else(|| {
             CmdError::new(
                 "invalid",
                 "This chapter's path is not inside the local folder.",
             )
-        })?;
+        })?
+    } else {
+        crate::downloads::downloaded_dir(state, &manga, &ch)
+            .ok_or_else(|| CmdError::not_found("A download of that chapter"))?
+    };
     let names = tm_archive::page_names(&path)?;
     if names.len() > MAX_PAGES {
         return Err(CmdError::new(
@@ -212,7 +217,7 @@ pub async fn chapter_pages(state: State<'_, AppState>, chapter_id: i64) -> R<Cha
         .db
         .manga(ch.manga_id)?
         .ok_or_else(|| CmdError::not_found("That manga"))?;
-    if !manga.is_local() {
+    if !manga.is_local() && !crate::downloads::is_downloaded(&state, &manga, &ch) {
         return crate::online::chapter_pages(&state, &manga, &ch).await;
     }
     let open = resolve_chapter(&state, chapter_id)?;

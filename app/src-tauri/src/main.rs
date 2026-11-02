@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod downloads;
 mod dto;
 mod online;
 mod protocol;
@@ -33,6 +34,7 @@ fn main() {
             if let Ok(res) = app.path().resource_dir() {
                 let _ = app.state::<AppState>().host_dir.set(res.join("ext-host"));
             }
+            downloads::init(app.handle());
             // Stop the extension host when it has been idle for a while; it restarts on demand.
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -77,6 +79,13 @@ fn main() {
             online::library_set_favorite,
             online::source_preferences,
             online::source_preference_set,
+            downloads::downloads_list,
+            downloads::download_chapters,
+            downloads::download_unread,
+            downloads::download_delete,
+            downloads::download_dismiss,
+            downloads::downloads_clear_finished,
+            downloads::downloads_on_disk,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {
