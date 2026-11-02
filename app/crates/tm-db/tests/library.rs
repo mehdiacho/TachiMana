@@ -303,3 +303,44 @@ fn browsed_manga_is_stored_without_joining_the_library() {
         "refresh keeps the heart"
     );
 }
+
+#[test]
+fn track_rows_put_update_delete() {
+    let db = Db::open_in_memory().unwrap();
+    let id = db.add_to_library(5, &manga("/t", "T"), &[]).unwrap();
+    assert!(db.track(id, tm_db::ANILIST_SYNC_ID).unwrap().is_none());
+    let t = tm_db::Track {
+        id: 0,
+        manga_id: id,
+        sync_id: tm_db::ANILIST_SYNC_ID,
+        remote_id: 30013,
+        library_id: Some(9),
+        title: "One Piece".into(),
+        last_chapter_read: 3.0,
+        total_chapters: 0,
+        status: 1,
+        score: 0.0,
+        remote_url: "https://anilist.co/manga/30013".into(),
+        start_date: 0,
+        finish_date: 0,
+    };
+    let stored = db.put_track(&t).unwrap();
+    assert_eq!(stored.remote_id, 30013);
+    // Binding again replaces rather than adding a second row.
+    db.put_track(&tm_db::Track {
+        remote_id: 1,
+        ..t.clone()
+    })
+    .unwrap();
+    assert_eq!(db.tracks(id).unwrap().len(), 1);
+    let row = db.track(id, tm_db::ANILIST_SYNC_ID).unwrap().unwrap();
+    assert_eq!(row.remote_id, 1);
+    db.update_track(row.id, Some(7.0), None, Some(8.5)).unwrap();
+    let row = db.track(id, tm_db::ANILIST_SYNC_ID).unwrap().unwrap();
+    assert_eq!(
+        (row.last_chapter_read, row.status, row.score),
+        (7.0, 1, 8.5)
+    );
+    db.delete_track(id, tm_db::ANILIST_SYNC_ID).unwrap();
+    assert!(db.tracks(id).unwrap().is_empty());
+}

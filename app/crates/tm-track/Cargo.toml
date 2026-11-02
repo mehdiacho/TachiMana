@@ -1,0 +1,29 @@
+[package]
+name = "tm-track"
+description = "AniList tracking: OAuth implicit-grant login, the GraphQL client and manga_sync rows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tm-db = { path = "../tm-db" }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "query"] }
+tokio = { version = "1", features = ["net", "sync", "time", "rt"] }
+percent-encoding = "2"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+tm-backup = { path = "../tm-backup" }
+reqwest = { version = "0.13", default-features = false }
