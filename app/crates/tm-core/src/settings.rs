@@ -38,6 +38,8 @@ pub mod keys {
     pub const EXT_HOST_BASE_URL: &str = "extHostBaseUrl";
     /// Rust-only: NAS role, "mirror" (keep local copy) or "archive" (evict after verified upload).
     pub const REMOTE_ROLE: &str = "remoteStorageRole";
+    /// Rust-only: whole-app 90° rotation for a rotated monitor (spec §2.18), remembered.
+    pub const ROTATED: &str = "rotated";
 }
 
 /// The settings document plus where it lives.

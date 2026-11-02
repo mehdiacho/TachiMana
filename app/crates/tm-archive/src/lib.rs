@@ -150,6 +150,53 @@ pub fn read_page(chapter: &Path, name: &str) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
+/// How many leading bytes of a page are read to find its pixel size. JPEG headers can sit after
+/// a large EXIF block, so this is generous; pages whose size is not found report `None`.
+const HEADER_PREFIX: u64 = 512 * 1024;
+
+/// Pixel size (width, height) of each named page, read from the image header only. One pass over
+/// the archive; a page that cannot be read or parsed gives `None` rather than failing the list.
+pub fn page_dimensions(chapter: &Path, names: &[String]) -> Result<Vec<Option<(u32, u32)>>> {
+    let size_of = |bytes: &[u8]| {
+        imagesize::blob_size(bytes).ok().and_then(|d| {
+            let w = u32::try_from(d.width).ok()?;
+            let h = u32::try_from(d.height).ok()?;
+            (w > 0 && h > 0).then_some((w, h))
+        })
+    };
+    if chapter.is_dir() {
+        return Ok(names
+            .iter()
+            .map(|n| {
+                if n.contains(['/', '\\']) || n == ".." || n == "." {
+                    return None;
+                }
+                let f = File::open(chapter.join(n)).ok()?;
+                let mut buf = Vec::new();
+                f.take(HEADER_PREFIX).read_to_end(&mut buf).ok()?;
+                size_of(&buf)
+            })
+            .collect());
+    }
+    let file = File::open(chapter).map_err(io(chapter))?;
+    let mut zip = zip::ZipArchive::new(file).map_err(zip_err(chapter))?;
+    let mut out = Vec::with_capacity(names.len().min(10_000));
+    for n in names {
+        let dims = match zip.by_name(n) {
+            Ok(entry) => {
+                let mut buf = Vec::new();
+                match entry.take(HEADER_PREFIX).read_to_end(&mut buf) {
+                    Ok(_) => size_of(&buf),
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        };
+        out.push(dims);
+    }
+    Ok(out)
+}
+
 /// Write pages as an uncompressed (stored) CBZ at `out`, atomically (temp file, then rename).
 /// Images are already compressed, so storing them is faster and the same size.
 pub fn pack_cbz(pages: &[(String, Vec<u8>)], out: &Path) -> Result<()> {
@@ -219,6 +266,40 @@ fn lower(c: char) -> char {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn png_header(w: u32, h: u32) -> Vec<u8> {
+        let mut v = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13];
+        v.extend_from_slice(b"IHDR");
+        v.extend_from_slice(&w.to_be_bytes());
+        v.extend_from_slice(&h.to_be_bytes());
+        v.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
+        v
+    }
+
+    #[test]
+    fn page_dimensions_from_headers() {
+        let dir = tempfile::tempdir().unwrap();
+        let cbz = dir.path().join("c.cbz");
+        pack_cbz(
+            &[
+                ("1.png".into(), png_header(800, 1200)),
+                ("2.png".into(), b"not an image".to_vec()),
+            ],
+            &cbz,
+        )
+        .unwrap();
+        let names = page_names(&cbz).unwrap();
+        let dims = page_dimensions(&cbz, &names).unwrap();
+        assert_eq!(dims, [Some((800, 1200)), None]);
+        let missing = page_dimensions(&cbz, &["nope.png".into()]).unwrap();
+        assert_eq!(missing, [None]);
+
+        let folder = dir.path().join("f");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("a.png"), png_header(10, 20)).unwrap();
+        let dims = page_dimensions(&folder, &["a.png".into(), "../c.cbz".into()]).unwrap();
+        assert_eq!(dims, [Some((10, 20)), None]);
+    }
 
     #[test]
     fn natural_order() {

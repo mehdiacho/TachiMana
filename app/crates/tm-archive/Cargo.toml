@@ -11,6 +11,7 @@ workspace = true
 [dependencies]
 zip = { version = "9", default-features = false, features = ["deflate"] }
 thiserror.workspace = true
+imagesize = "0.13"
 
 [dev-dependencies]
 tempfile.workspace = true

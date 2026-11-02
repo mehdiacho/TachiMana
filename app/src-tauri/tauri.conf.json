@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TachiMana",
+  "version": "0.1.0",
+  "identifier": "tech.mehdiacho.tachimana",
+  "build": {
+    "beforeDevCommand": "npm --prefix ui run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm --prefix ui run build",
+    "frontendDist": "../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "TachiMana",
+        "width": 1360,
+        "height": 840,
+        "minWidth": 720,
+        "minHeight": 520,
+        "decorations": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' tm: http://tm.localhost data: blob:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "deb", "appimage"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "category": "Entertainment",
+    "shortDescription": "A desktop-first manga reader"
+  }
+}
