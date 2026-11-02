@@ -1,0 +1,119 @@
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--tm-space-3xl) var(--tm-space-3xl) var(--tm-space-3xl);
+}
+.col {
+  max-width: var(--tm-content-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-md);
+}
+.title {
+  font: var(--tm-type-screen-title);
+  margin-bottom: var(--tm-space-lg);
+}
+.section {
+  font: var(--tm-type-label);
+  color: var(--tm-color-accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: var(--tm-space-xl);
+}
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-lg);
+}
+.card {
+  width: 190px;
+  border-radius: var(--tm-radius-xl);
+  border: 2px solid var(--tm-color-outline-faint);
+  overflow: hidden;
+  text-align: left;
+}
+.card:hover {
+  border-color: var(--tm-color-outline);
+}
+.card[data-active="true"] {
+  border-color: var(--tm-color-accent);
+}
+.mock {
+  height: 100px;
+  padding: var(--tm-space-base);
+  display: flex;
+  gap: var(--tm-space-md);
+}
+.mockCover {
+  width: 40px;
+  height: 58px;
+  border-radius: 4px;
+}
+.mockLines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mockLine {
+  height: 7px;
+  border-radius: 4px;
+}
+.mockBtn {
+  height: 12px;
+  width: 60%;
+  border-radius: 6px;
+  margin-top: auto;
+}
+.cardLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-sm);
+  padding: var(--tm-space-md) var(--tm-space-base);
+  background: var(--tm-color-surface);
+  font: var(--tm-type-label);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-lg);
+  padding: var(--tm-space-lg) var(--tm-space-xl);
+  border-radius: var(--tm-radius-lg);
+}
+.row:hover {
+  background: var(--tm-color-hover);
+}
+.rowIcon {
+  color: var(--tm-color-on-background-med);
+  flex: none;
+}
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-xxs);
+}
+.rowTitle {
+  font: var(--tm-type-body);
+}
+.rowDesc {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-med);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.kbd {
+  font: var(--tm-type-mono);
+  padding: var(--tm-space-xs) var(--tm-space-md);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-color-surface);
+}
+.select {
+  height: 32px;
+  border-radius: var(--tm-radius-md);
+  border: var(--tm-hairline) solid var(--tm-color-outline-faint);
+  background: var(--tm-color-surface);
+  color: var(--tm-color-on-background);
+  padding: 0 var(--tm-space-md);
+}

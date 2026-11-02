@@ -1,0 +1,131 @@
+.viewport {
+  position: fixed;
+  inset: 0;
+  background: var(--tm-color-reader-bg);
+  overflow: hidden;
+}
+.root {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tm-color-background);
+  transition: transform var(--tm-motion-rotate) ease-in-out;
+  overflow: hidden;
+}
+
+.titlebar {
+  height: var(--tm-titlebar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  background: var(--tm-color-titlebar);
+  padding-left: var(--tm-space-xl);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  flex: 1;
+  height: 100%;
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background);
+  opacity: 0.85;
+}
+.brandDot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--tm-radius-full);
+  background: var(--tm-color-accent);
+}
+.winBtn {
+  width: 45px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tm-color-on-background);
+  opacity: 0.6;
+}
+.winBtn:hover {
+  background: var(--tm-color-hover-strong);
+  opacity: 1;
+}
+.winClose:hover {
+  background: var(--tm-color-close-hover);
+  color: var(--tm-color-on-accent);
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+
+.rail {
+  width: var(--tm-rail-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tm-space-md);
+  padding: var(--tm-space-lg) 0;
+  border-right: var(--tm-hairline) solid var(--tm-color-divider);
+}
+.rail[data-compact="true"] {
+  width: var(--tm-rail-w-compact);
+}
+.railSpacer {
+  flex: 1;
+}
+.railItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tm-space-xs);
+  color: var(--tm-color-rail-inactive);
+  font: var(--tm-type-rail-label);
+  font-weight: 400;
+  width: 100%;
+  position: relative;
+}
+.railCapsule {
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--tm-motion-nav) ease;
+}
+.railItem:hover .railCapsule {
+  background: var(--tm-color-hover);
+}
+.railItem[data-active="true"] {
+  color: var(--tm-color-accent);
+  font-weight: 500;
+}
+.railItem[data-active="true"] .railCapsule {
+  background: var(--tm-color-accent-active);
+}
+:root[data-theme="INK_VERMILION"] .railCapsule {
+  background: transparent !important;
+}
+:root[data-theme="INK_VERMILION"] .railItem[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--tm-color-accent);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  position: relative;
+}
