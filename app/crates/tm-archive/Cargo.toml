@@ -1,0 +1,16 @@
+[package]
+name = "tm-archive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zip = { version = "9", default-features = false, features = ["deflate"] }
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

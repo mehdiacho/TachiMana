@@ -683,3 +683,60 @@ fn chapter_at(r: &rusqlite::Row<'_>, o: usize) -> rusqlite::Result<Chapter> {
         memo: r.get(o + 15)?,
     })
 }
+
+// ---------------------------------------------------------------------------------------------
+// Transaction-level building blocks for other crates (importer, backup restore).
+// ---------------------------------------------------------------------------------------------
+
+pub fn manga_by_url_tx(c: &Connection, url: &str, source: i64) -> Result<Option<Manga>> {
+    manga_by_url(c, url, source)
+}
+
+pub fn chapters_tx(c: &Connection, manga_id: i64) -> Result<Vec<Chapter>> {
+    chapters_of(c, manga_id)
+}
+
+pub fn insert_chapter_tx(
+    c: &Connection,
+    manga_id: i64,
+    ch: &SourceChapter,
+    source_order: i64,
+    now: i64,
+) -> Result<i64> {
+    insert_chapter(c, manga_id, ch, source_order, now)
+}
+
+pub fn insert_manga_tx(c: &Connection, m: &NewManga<'_>, now: i64) -> Result<i64> {
+    insert_manga(c, m, now)
+}
+
+pub fn update_manga_tx(c: &Connection, id: i64, u: &MangaUpdate) -> Result<()> {
+    update_manga(c, id, u)
+}
+
+pub fn update_chapter_tx(c: &Connection, id: i64, u: &ChapterUpdate) -> Result<()> {
+    update_chapter(c, id, u)
+}
+
+/// Insert a local-source manga the way `LocalImporter` does: title = folder name, favourite,
+/// initialized, cover path and its modification time.
+pub fn insert_local_manga(
+    c: &Connection,
+    url: &str,
+    cover: Option<&str>,
+    cover_last_modified: i64,
+    now: i64,
+) -> Result<i64> {
+    c.execute(
+        q("mangas", "insert")?,
+        named_params! {
+            ":source": LOCAL_SOURCE, ":url": url, ":artist": None::<String>,
+            ":author": None::<String>, ":description": None::<String>, ":genre": None::<String>,
+            ":title": url, ":status": 0i64, ":thumbnailUrl": cover, ":favorite": true,
+            ":lastUpdate": now, ":initialized": true, ":viewer": 0i64, ":hideTitle": false,
+            ":chapterFlags": 0i64, ":dateAdded": now, ":filteredScanlators": None::<String>,
+            ":updateStrategy": 0i64, ":coverLastModified": cover_last_modified,
+        },
+    )?;
+    Ok(c.last_insert_rowid())
+}
