@@ -48,6 +48,21 @@ jobs:
           ./gradlew.bat :desktop:packageExe `
             "-Ptachimana.version=${{ steps.ver.outputs.version }}"
 
+      # ── check the bundled JRE has the modules the app needs ──────────
+      - name: Check bundled runtime modules
+        shell: pwsh
+        run: |
+          # The installer's JRE comes from jlink; a missing module only shows up at run time
+          # (java.sql missing meant the installed app had no database). Fail the build instead.
+          $rel = Get-ChildItem -Path "desktop/build/compose" -Filter "release" -Recurse -File |
+                   Where-Object { $_.Directory.Name -eq "runtime" } | Select-Object -First 1
+          if (-not $rel) { Write-Error "No bundled runtime found under desktop/build/compose"; exit 1 }
+          $mods = (Select-String -Path $rel.FullName -Pattern '^MODULES=').Line
+          Write-Host "Bundled: $mods"
+          foreach ($m in "java.sql", "java.naming", "jdk.unsupported") {
+            if ($mods -notmatch "\b$([regex]::Escape($m))\b") { Write-Error "Bundled JRE lacks $m"; exit 1 }
+          }
+
       # ── locate the EXE and compute SHA-256 ───────────────────────────
       - name: Locate EXE & compute SHA-256
         id: sha

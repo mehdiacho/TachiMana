@@ -1,0 +1,18 @@
+/home/user/tachimana/app/target/debug/deps/zopfli-831fa2a198a887c6.d: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/blocksplitter.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/cache.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/deflate.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/gzip.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/hash.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/iter.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/katajainen.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/lz77.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/squeeze.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/symbols.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/tree.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/util.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/zlib.rs
+
+/home/user/tachimana/app/target/debug/deps/libzopfli-831fa2a198a887c6.rmeta: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/blocksplitter.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/cache.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/deflate.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/gzip.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/hash.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/iter.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/katajainen.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/lz77.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/squeeze.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/symbols.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/tree.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/util.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/zlib.rs
+
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/lib.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/blocksplitter.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/cache.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/deflate.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/gzip.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/hash.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/iter.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/katajainen.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/lz77.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/squeeze.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/symbols.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/tree.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/util.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zopfli-0.8.4/src/zlib.rs:
