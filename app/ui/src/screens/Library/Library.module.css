@@ -542,3 +542,10 @@
 .field::placeholder {
   color: var(--tm-color-on-background-dim);
 }
+.dlBusy {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}

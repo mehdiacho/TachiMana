@@ -47,6 +47,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
             commands::library,
+            commands::recents,
             commands::categories,
             commands::category_create,
             commands::category_rename,

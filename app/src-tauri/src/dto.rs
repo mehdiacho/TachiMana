@@ -111,6 +111,8 @@ pub struct ChapterDto {
     pub id: i64,
     #[ts(type = "number")]
     pub manga_id: i64,
+    /// The source's chapter url (a relative path for local chapters).
+    pub url: String,
     pub name: String,
     pub scanlator: Option<String>,
     pub read: bool,
@@ -133,6 +135,7 @@ impl From<&tm_db::Chapter> for ChapterDto {
         Self {
             id: c.id,
             manga_id: c.manga_id,
+            url: c.url.clone(),
             name: c.name.clone(),
             scanlator: c.scanlator.clone(),
             read: c.read,
@@ -156,7 +159,9 @@ pub struct DownloadJobDto {
     pub id: u64,
     /// Source ids are 64-bit and exceed 2^53, so they travel as strings.
     pub source_id: String,
+    pub manga_url: String,
     pub manga_title: String,
+    pub chapter_url: String,
     pub chapter_name: String,
     /// `QUEUED`, `DOWNLOADING`, `DONE` or `FAILED`.
     pub status: String,
@@ -176,7 +181,9 @@ impl From<&tm_download::DownloadJob> for DownloadJobDto {
         Self {
             id: j.id,
             source_id: j.chapter.source_id.to_string(),
+            manga_url: j.chapter.manga_url.clone(),
             manga_title: j.chapter.manga_title.clone(),
+            chapter_url: j.chapter.chapter_url.clone(),
             chapter_name: j.chapter.chapter_name.clone(),
             status: status.into(),
             downloaded: j.downloaded,
@@ -549,4 +556,16 @@ pub struct RefreshDto {
     pub chapters_added: u32,
     /// Set when the source failed; the detail is then what was stored before.
     pub error: Option<String>,
+}
+
+/// One row of reading history (`recentsFlow`): the manga, the chapter last read and when.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RecentDto {
+    pub manga: MangaDto,
+    pub chapter: ChapterDto,
+    /// Epoch milliseconds.
+    #[ts(type = "number")]
+    pub last_read: i64,
 }

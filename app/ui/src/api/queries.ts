@@ -16,6 +16,8 @@ export const keys = {
   pages: (chapterId: number) => ["pages", chapterId] as const,
   settings: ["settings"] as const,
   cache: ["cache"] as const,
+  recents: ["recents"] as const,
+  onDisk: ["downloads", "disk"] as const,
   browseStatus: ["browse", "status"] as const,
   repos: ["browse", "repos"] as const,
   sources: ["browse", "sources"] as const,
@@ -49,6 +51,9 @@ export function useBrowseInvalidate() {
     void qc.invalidateQueries({ queryKey: keys.catalog });
   };
 }
+
+export const useRecents = () => useQuery({ queryKey: keys.recents, queryFn: api.recents, staleTime: 0 });
+export const useOnDisk = () => useQuery({ queryKey: keys.onDisk, queryFn: api.downloadsOnDisk, staleTime: 0 });
 
 export const useCacheUsage = () => useQuery({ queryKey: keys.cache, queryFn: api.cacheUsage });
 

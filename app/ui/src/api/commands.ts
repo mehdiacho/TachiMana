@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AppInfo } from "../gen/AppInfo";
 import type { CacheUsageDto } from "../gen/CacheUsageDto";
 import type { CategoryDto } from "../gen/CategoryDto";
+import type { DownloadJobDto } from "../gen/DownloadJobDto";
+import type { DownloadedChapterDto } from "../gen/DownloadedChapterDto";
+import type { RecentDto } from "../gen/RecentDto";
 import type { ChapterPagesDto } from "../gen/ChapterPagesDto";
 import type { CmdError } from "../gen/CmdError";
 import type { ImportResultDto } from "../gen/ImportResultDto";
@@ -41,6 +44,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 export const api = {
   appInfo: () => call<AppInfo>("app_info"),
   library: () => call<LibraryEntryDto[]>("library"),
+  recents: () => call<RecentDto[]>("recents"),
   categories: () => call<CategoryDto[]>("categories"),
   categoryCreate: (name: string) => call<number | null>("category_create", { name }),
   categoryRename: (id: number, name: string) => call<void>("category_rename", { id, name }),
@@ -81,6 +85,15 @@ export const api = {
   sourcePreferences: (sourceId: string) => call<PreferenceDto[]>("source_preferences", { sourceId }),
   sourcePreferenceSet: (sourceId: string, key: string, value: unknown) =>
     call<PreferenceDto>("source_preference_set", { sourceId, key, value }),
+
+  // Downloads. Queue changes arrive as `downloads` events.
+  downloadsList: () => call<DownloadJobDto[]>("downloads_list"),
+  downloadChapters: (mangaId: number, chapterIds: number[]) => call<number>("download_chapters", { mangaId, chapterIds }),
+  downloadUnread: (mangaId: number) => call<number>("download_unread", { mangaId }),
+  downloadDelete: (mangaId: number, chapterIds: number[]) => call<number>("download_delete", { mangaId, chapterIds }),
+  downloadDismiss: (id: number) => call<void>("download_dismiss", { id }),
+  downloadsClearFinished: () => call<void>("downloads_clear_finished"),
+  downloadsOnDisk: () => call<DownloadedChapterDto[]>("downloads_on_disk"),
 };
 
 export type { LibraryUpdateDto };

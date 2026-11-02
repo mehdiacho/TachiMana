@@ -5,6 +5,7 @@ import { ascending, chapterStatus, continueTarget, newestFirst } from "./chapter
 const ch = (id: number, sourceOrder: number, read = false, lastPageRead = 0, pagesLeft = 0): ChapterDto => ({
   id,
   mangaId: 1,
+  url: `/c/${id}`,
   name: `Ch ${id}`,
   scanlator: null,
   read,
@@ -14,6 +15,7 @@ const ch = (id: number, sourceOrder: number, read = false, lastPageRead = 0, pag
   chapterNumber: id,
   sourceOrder,
   dateUpload: 0,
+  downloaded: false,
 });
 
 describe("chapter ordering", () => {

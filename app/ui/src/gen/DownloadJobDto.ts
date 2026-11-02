@@ -7,7 +7,7 @@ export type DownloadJobDto = { id: number,
 /**
  * Source ids are 64-bit and exceed 2^53, so they travel as strings.
  */
-sourceId: string, mangaTitle: string, chapterName: string, 
+sourceId: string, mangaUrl: string, mangaTitle: string, chapterUrl: string, chapterName: string, 
 /**
  * `QUEUED`, `DOWNLOADING`, `DONE` or `FAILED`.
  */

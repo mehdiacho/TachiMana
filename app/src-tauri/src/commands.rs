@@ -69,6 +69,21 @@ pub fn library(state: State<'_, AppState>) -> R<Vec<LibraryEntryDto>> {
         .collect())
 }
 
+/// Recently read chapters, newest first (at most 50, one per chapter).
+#[tauri::command]
+pub fn recents(state: State<'_, AppState>) -> R<Vec<crate::dto::RecentDto>> {
+    Ok(state
+        .db
+        .recents()?
+        .iter()
+        .map(|r| crate::dto::RecentDto {
+            manga: MangaDto::from(&r.manga),
+            chapter: ChapterDto::from(&r.chapter),
+            last_read: r.last_read,
+        })
+        .collect())
+}
+
 #[tauri::command]
 pub fn categories(state: State<'_, AppState>) -> R<Vec<CategoryDto>> {
     Ok(state
