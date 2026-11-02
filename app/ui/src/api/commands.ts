@@ -6,6 +6,9 @@ import type { CategoryDto } from "../gen/CategoryDto";
 import type { DownloadJobDto } from "../gen/DownloadJobDto";
 import type { DownloadedChapterDto } from "../gen/DownloadedChapterDto";
 import type { RecentDto } from "../gen/RecentDto";
+import type { NasSettingsDto } from "../gen/NasSettingsDto";
+import type { NasSettingsPatch } from "../gen/NasSettingsPatch";
+import type { UploadJobDto } from "../gen/UploadJobDto";
 import type { ChapterPagesDto } from "../gen/ChapterPagesDto";
 import type { CmdError } from "../gen/CmdError";
 import type { ImportResultDto } from "../gen/ImportResultDto";
@@ -94,6 +97,18 @@ export const api = {
   downloadDismiss: (id: number) => call<void>("download_dismiss", { id }),
   downloadsClearFinished: () => call<void>("downloads_clear_finished"),
   downloadsOnDisk: () => call<DownloadedChapterDto[]>("downloads_on_disk"),
+
+  // NAS storage. Upload changes arrive as `uploads` events.
+  nasSettingsGet: () => call<NasSettingsDto>("nas_settings_get"),
+  nasSettingsSet: (patch: NasSettingsPatch) => call<NasSettingsDto>("nas_settings_set", { patch }),
+  /** Tries `patch` over the saved settings without saving; resolves with a short success line. */
+  nasTest: (patch: NasSettingsPatch) => call<string>("nas_test", { patch }),
+  nasUploads: () => call<UploadJobDto[]>("nas_uploads"),
+  nasUploadsRetry: () => call<void>("nas_uploads_retry"),
+  nasUploadDismiss: (id: number) => call<void>("nas_upload_dismiss", { id }),
+  nasUploadsClearFinished: () => call<void>("nas_uploads_clear_finished"),
+  nasCacheUsage: () => call<number>("nas_cache_usage"),
+  nasCacheClear: () => call<number>("nas_cache_clear"),
 };
 
 export type { LibraryUpdateDto };

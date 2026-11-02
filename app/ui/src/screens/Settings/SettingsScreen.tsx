@@ -5,6 +5,7 @@ import { keys, useAppInfo, useCacheUsage, useSetSettings, useSettings } from "..
 import { useQueryClient } from "@tanstack/react-query";
 import { TextButton, Toggle } from "../../components/ui";
 import { useUi } from "../../store/ui";
+import { NasSection } from "./NasSection";
 import s from "./Settings.module.css";
 
 export const THEMES = [
@@ -139,6 +140,7 @@ export function SettingsScreen() {
             <Trash2 size={14} style={{ verticalAlign: "-2px" }} /> Clear
           </TextButton>
         </div>
+        <NasSection />
 
         <div className={s.section}>About</div>
         <div className={s.row}>

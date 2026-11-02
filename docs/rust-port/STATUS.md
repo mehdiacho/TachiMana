@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
-Current phase: P5 done (P1–P5 reached main through feat/rust-port-to-main, since the stacked PRs merged into each other's branches); next P6
+Current phase: P6 done on feat/rust-p6-downloads (PR to main); next P7 (backup/restore, LAN sync)
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -49,10 +49,38 @@ Done:
   filters, source grid with infinite scroll and de-dupe, source settings dialog), detail heart and
   refresh with the source's real error, library update button with a progress bar, Cloudflare toggle
   in Settings, reader learns online page sizes when each image loads.
+- P6 `tm-download`: port of DownloadManager (one worker, QUEUED/DOWNLOADING/DONE/FAILED, the Kotlin
+  layout and hash so existing downloads keep working, folder wiped before a retry, `.done` written
+  last, de-dupe, dismiss a queued job). New: completed list rebuilt from disk on start, "download
+  unread", delete. Port of DownloadSelfTest's 16 checks plus restart/dismiss/incomplete tests.
+  App: reader order is local file → finished download → NAS → source; `downloads` events; detail shows
+  per-chapter download/progress/delete and "download unread"; Downloads screen (queue, retry state,
+  "on this computer" with read and delete); Recents screen (history, resume); library "Downloaded"
+  filter now real.
+  `tm-remote`: Mihon names (DiskFilenames port, incl. hashed and legacy names), WebDAV client
+  (PROPFIND 0/1, HEAD, GET with progress and size cap, PUT, MKCOL, DELETE, MOVE; 404 = absent;
+  redirects not followed; password never in Debug), remote index saved to `remote_index.json`, read
+  mirror (`cache/remote_mirror/<sha256>.cbz`, size checked, trimmed to the cache budget), and the new
+  upload queue (`uploads.json`): pack CBZ, PUT, compare remote and local size, then mark done; the
+  "Move to NAS" role deletes the local copy only after that check; interrupted uploads resume; a saved
+  job pointing outside the downloads folder is refused. Port of RemoteSelfTest's 9 checks against an
+  in-memory WebDAV server (axum, feature `fake-server`) plus upload, size-mismatch, restart, escaping
+  and auth tests. App: Storage settings (address, port, HTTPS, folder, user, password never sent to
+  the UI, test connection without saving, keep both / move to NAS, download from the NAS first, read
+  cache size and clear), uploads after each finished download, upload list on the Downloads screen.
 - CI: `.github/workflows/rust-port.yml` runs UI typecheck/tests/build, cargo fmt, clippy, tests, and
   checks the generated types are committed.
 
-Next step: P5 PR review and CI (the real-host test), then P6 (downloads, recents, NAS).
+Next step: P6 PR review and CI, then P7 (backup/restore, LAN sync).
+
+P6 not done yet:
+- Pinned manga (never evicted by "Move to NAS") do not exist in the app yet, so nothing is pinned.
+- A downloaded chapter that was moved to the NAS shows as not downloaded; it reads from the NAS. A
+  "on the NAS" mark in the chapter list is not built.
+- Library download badge shows a filter only (the badge wants a per-manga count).
+- NAS folder names need the source's name, which the app learns when Browse lists sources
+  (`source_names.json`); until then uploads for that source are skipped (logged).
+- The fake WebDAV server is the only server tested; no real NAS here.
 
 P5 not done yet:
 - Downloading the host zip on first use (PLAN §P5.1) waits on open question 1 (where it is hosted).
@@ -95,5 +123,11 @@ blocks GitHub raw (403), so adding Keiyoushi shows the host's real error here. I
 chapters and page bytes are covered by `tests/real_host.rs` in ext-host CI; the online screens
 themselves (grid, detail, reader) have not been seen with real data yet.
 
-Test results: `cargo test --workspace`: tm-core 10, tm-db 13, tm-archive 4, tm-local 4, tm-cache 4,
+Manual check (P6), Linux under Xvfb, a seeded online manga and the fake WebDAV server
+(`cargo run -p tm-remote --features fake-server --example fake_dav`): detail download marks, reading a
+downloaded chapter with no host, Downloads queue with a failed job and retry, delete, Recents, NAS
+settings and test connection, reading a chapter that only the NAS has, downloading it from the NAS with
+the source not installed, and an interrupted upload finishing after a restart (shots/p6/).
+
+Older test results (P5): `cargo test --workspace`: tm-core 10, tm-db 13, tm-archive 4, tm-local 4, tm-cache 4,
 tachimana 16, all pass; clippy -D warnings and fmt clean. `npm test` in app/ui: 26 pass.

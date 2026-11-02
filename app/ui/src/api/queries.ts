@@ -18,6 +18,8 @@ export const keys = {
   cache: ["cache"] as const,
   recents: ["recents"] as const,
   onDisk: ["downloads", "disk"] as const,
+  nas: ["nas", "settings"] as const,
+  nasCache: ["nas", "cache"] as const,
   browseStatus: ["browse", "status"] as const,
   repos: ["browse", "repos"] as const,
   sources: ["browse", "sources"] as const,
@@ -54,6 +56,9 @@ export function useBrowseInvalidate() {
 
 export const useRecents = () => useQuery({ queryKey: keys.recents, queryFn: api.recents, staleTime: 0 });
 export const useOnDisk = () => useQuery({ queryKey: keys.onDisk, queryFn: api.downloadsOnDisk, staleTime: 0 });
+
+export const useNasSettings = () => useQuery({ queryKey: keys.nas, queryFn: api.nasSettingsGet, staleTime: Infinity });
+export const useNasCache = () => useQuery({ queryKey: keys.nasCache, queryFn: api.nasCacheUsage });
 
 export const useCacheUsage = () => useQuery({ queryKey: keys.cache, queryFn: api.cacheUsage });
 

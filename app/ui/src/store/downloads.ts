@@ -4,10 +4,13 @@ import { create } from "zustand";
 import { api } from "../api/commands";
 import { keys, queryClient } from "../api/queries";
 import type { DownloadJobDto } from "../gen/DownloadJobDto";
+import type { UploadJobDto } from "../gen/UploadJobDto";
 import { newlyDone } from "../lib/downloads";
 
 interface DownloadsState {
   jobs: DownloadJobDto[];
+  /** NAS uploads (`uploads` event). */
+  uploads: UploadJobDto[];
   /** Subscribes once and loads the current queue. Safe to call from every screen. */
   init: () => void;
 }
@@ -27,9 +30,21 @@ export const useDownloads = create<DownloadsState>((set, get) => {
   };
   return {
     jobs: [],
+    uploads: [],
     init: () => {
       if (started) return;
       started = true;
+      void listen<UploadJobDto[]>("uploads", (e) => set({ uploads: e.payload })).catch(() => undefined);
+      // An archived chapter left this computer after its upload.
+      void listen("downloads-changed", () => {
+        void queryClient.invalidateQueries({ queryKey: ["detail"] });
+        void queryClient.invalidateQueries({ queryKey: keys.library });
+        void queryClient.invalidateQueries({ queryKey: keys.onDisk });
+      }).catch(() => undefined);
+      void api
+        .nasUploads()
+        .then((uploads) => set({ uploads }))
+        .catch(() => undefined);
       void listen<DownloadJobDto[]>("downloads", (e) => apply(e.payload)).catch(() => {
         started = false;
       });

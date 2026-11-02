@@ -1,7 +1,7 @@
 // Downloads (behaviour from ui/download/DownloadsScreen.kt): the queue, then every chapter that is
 // complete on this computer, which can be read or deleted.
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDownToLine, BookOpen, Check, CircleAlert, Download, Trash2, X } from "lucide-react";
+import { ArrowDownToLine, BookOpen, Check, CircleAlert, CloudUpload, Download, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, useOnDisk } from "../../api/queries";
@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, IconButton, Loading, TextButton } from "../../c
 import type { CmdError } from "../../gen/CmdError";
 import type { DownloadedChapterDto } from "../../gen/DownloadedChapterDto";
 import type { DownloadJobDto } from "../../gen/DownloadJobDto";
+import type { UploadJobDto } from "../../gen/UploadJobDto";
 import { activeCount, jobDetail } from "../../lib/downloads";
 import { useDownloads } from "../../store/downloads";
 import { useUi } from "../../store/ui";
@@ -56,6 +57,36 @@ function JobRow({ job, onDismiss }: { job: DownloadJobDto; onDismiss: () => void
       </span>
       {finished && <TextButton onClick={onDismiss}>Dismiss</TextButton>}
       {job.status === "QUEUED" && <IconButton icon={X} label={`Cancel ${job.chapterName}`} size={18} onClick={onDismiss} />}
+    </div>
+  );
+}
+
+function UploadRow({ job, onDismiss }: { job: UploadJobDto; onDismiss: () => void }) {
+  const detail =
+    job.status === "FAILED"
+      ? `failed: ${job.error ?? "unknown error"}`
+      : job.status === "DONE"
+        ? job.archive
+          ? "on the NAS · removed from this computer"
+          : "on the NAS"
+        : job.status === "UPLOADING"
+          ? "uploading…"
+          : "waiting";
+  return (
+    <div className={b.item} role="listitem">
+      <span className={s.status} data-status={job.status} aria-hidden>
+        {job.status === "DONE" && <Check size={20} />}
+        {job.status === "FAILED" && <CircleAlert size={20} />}
+        {job.status === "UPLOADING" && <ProgressRing done={0} total={0} />}
+        {job.status === "QUEUED" && <CloudUpload size={18} />}
+      </span>
+      <span className={b.itemText}>
+        <span className={b.itemTitle}>{job.label}</span>
+        <span className={b.itemSub} title={job.path}>
+          {detail}
+        </span>
+      </span>
+      {job.status !== "UPLOADING" && <TextButton onClick={onDismiss}>Dismiss</TextButton>}
     </div>
   );
 }
@@ -140,6 +171,7 @@ function OnDisk({ onError }: { onError: (m: string | null) => void }) {
 
 export function DownloadsScreen() {
   const jobs = useDownloads((d) => d.jobs);
+  const uploads = useDownloads((d) => d.uploads);
   const init = useDownloads((d) => d.init);
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +208,23 @@ export function DownloadsScreen() {
               <JobRow key={j.id} job={j} onDismiss={() => run(api.downloadDismiss(j.id))} />
             ))}
           </div>
+        )}
+        {uploads.length > 0 && (
+          <>
+            <div className={s.head} style={{ marginTop: "var(--tm-space-xl)", marginBottom: 0 }}>
+              <span className={s.section} style={{ margin: 0 }}>
+                Uploads to the NAS
+              </span>
+              <span className={s.grow} />
+              {uploads.some((u) => u.status === "FAILED") && <TextButton onClick={() => run(api.nasUploadsRetry())}>Retry failed</TextButton>}
+              {uploads.some((u) => u.status === "DONE") && <TextButton onClick={() => run(api.nasUploadsClearFinished())}>Clear finished</TextButton>}
+            </div>
+            <div role="list" aria-label="Uploads to the NAS">
+              {uploads.map((u) => (
+                <UploadRow key={u.id} job={u} onDismiss={() => run(api.nasUploadDismiss(u.id))} />
+              ))}
+            </div>
+          </>
         )}
         <div className={s.section}>On this computer</div>
         <OnDisk onError={setError} />

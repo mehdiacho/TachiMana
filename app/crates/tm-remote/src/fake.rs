@@ -201,15 +201,22 @@ async fn handle(
     }
 }
 
-/// Starts the server with `/webdav` as an existing folder.
+/// Starts the server on a free port with `/webdav` as an existing folder.
 pub async fn start() -> Server {
+    start_on(0).await
+}
+
+/// Starts the server on `port` (0 = any free port).
+pub async fn start_on(port: u16) -> Server {
     let dav = Arc::new(Dav::default());
     dav.dirs
         .lock()
         .unwrap()
         .extend(["/".to_string(), "/webdav".to_string()]);
     let app = axum::Router::new().fallback(handle).with_state(dav.clone());
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
+        .await
+        .unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;

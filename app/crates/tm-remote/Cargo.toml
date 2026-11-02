@@ -31,5 +31,9 @@ fake-server = ["dep:axum", "tokio/net", "tokio/rt"]
 
 [dev-dependencies]
 tempfile.workspace = true
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }
 tm-remote = { path = ".", features = ["fake-server"] }
+
+[[example]]
+name = "fake_dav"
+required-features = ["fake-server"]
