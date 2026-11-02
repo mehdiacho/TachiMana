@@ -36,3 +36,6 @@ secrets.properties
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Rust build output
+app/target/
