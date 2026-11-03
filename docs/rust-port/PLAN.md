@@ -513,6 +513,7 @@ fps. Memory under 250 MB while reading a local chapter (ext-host not running).
    need a token. Default for now: setting `extHostBaseUrl` (a URL prefix), plus an "Install helper from
    file" button in Settings. Mehdi to choose: make releases public in a separate public repo, host the
    zips on his NAS / mehdiacho.tech, or ship a "full" installer with the helper inside.
+   **Answered 2026-11-03: a public releases repository, `mehdiacho/tachimana-releases`.**
 2. **Linux priority.** Default: Windows first, Linux must build and run, but polishing WebKitGTK
    differences can wait until P9.
 3. **Passwords.** Default: keep the WebDAV password in `settings.json` like today. Optional

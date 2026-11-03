@@ -1,9 +1,9 @@
 name: App release (Rust)
 
 # Builds the Rust app's installers and the extension helper zips (PLAN.md §P8.4–5).
-# A tag `app-v<version>` (e.g. app-v0.2.0) publishes a GitHub release with all of them; the app's
-# updater only looks at `app-v` releases. Running it by hand builds everything as workflow
-# artifacts without releasing. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
+# A tag `app-v<version>` (e.g. app-v0.2.0) publishes a release with all of them in the public
+# repository mehdiacho/tachimana-releases; the app's updater and helper download read from there.
+# Running it by hand builds everything as workflow artifacts without releasing. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
 
 on:
   push:
@@ -142,9 +142,18 @@ jobs:
           path: dist
           merge-multiple: true
       - run: ls -l dist
+      # Published to the public releases repository, which the app's updater and helper download
+      # read without signing in (this repository is private). RELEASES_TOKEN is a fine-grained
+      # token with Contents read/write on that repository only.
+      - name: Check the release token
+        env:
+          TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: test -n "$TOKEN" || { echo "::error::Add the RELEASES_TOKEN secret (see the comment above)"; exit 1; }
       - uses: softprops/action-gh-release@v2
         with:
+          repository: mehdiacho/tachimana-releases
+          token: ${{ secrets.RELEASES_TOKEN }}
           tag_name: ${{ github.ref_name }}
-          name: TachiMana ${{ needs.version.outputs.version }} (Rust)
-          generate_release_notes: true
+          name: TachiMana ${{ needs.version.outputs.version }}
+          body: Installers for Windows (setup.exe, msi) and Linux (deb, AppImage), and the extension helper zips the app downloads on first use.
           files: dist/*

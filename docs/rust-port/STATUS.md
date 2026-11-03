@@ -111,14 +111,16 @@ Done:
   Checked by hand in the running app: screenshots in `docs/rust-port/shots/p8/`. Linux installers
   built here; sizes, start-up and memory in `baseline.md` ("Rust app").
 
-Next step: P7, P8 and P9 PR review and CI; then Mehdi's answers on open question 1 (where the helper
-and updates download from) and on retiring `desktop/` (P9.3). Windows measurements on his PC.
+Next step: merge #13 (P8) and #14 (P9); Mehdi creates the releases repository and secret, tries
+the Windows installer, then a follow-up PR removes `desktop/` and `release.yml` (ext-host and the
+Kotlin modules it needs stay).
 
 P8 not done yet:
-- Where the helper zip and app updates download from (open question 1): the repo is private, so
-  anonymous GitHub release downloads fail. The app uses the `extHostBaseUrl` setting when set
-  (no Settings field for it yet; edit `settings.json`), else this version's GitHub release, and
-  "From file…" always works. The updater only checks GitHub. Needs Mehdi's choice.
+- Open question 1 answered 2026-11-03 (Mehdi: public releases repo). Releases go to the public
+  repository `mehdiacho/tachimana-releases`; the updater and the helper download read from it
+  (`extHostBaseUrl` still overrides the helper's, and "From file…" always works). Before the
+  first `app-v*` tag, Mehdi creates that repository (with a README so it has a branch) and adds
+  the `RELEASES_TOKEN` secret here (fine-grained token, Contents read/write on it only).
 - The Windows installers are built by CI only; nobody has installed one yet.
 - The Tauri updater plugin was not used: it needs signed update manifests and public URLs, and the
   repo is private. The updater ports `UpdateChecker.kt` instead, as PLAN.md allows.
@@ -191,17 +193,17 @@ Every Kotlin self-test and every Kotlin desktop feature, and what covers it in t
 | Packaged installer (`release.yml`, jpackage) | `app-release.yml`: NSIS, MSI, deb, AppImage, helper zips |
 
 ### Still missing or different (P9)
-- Where the helper zip and updates download from (open question 1). Until then "From file…".
+- Releases repository and `RELEASES_TOKEN` secret to be created by Mehdi (see P8 not done yet).
 - Windows: installers built by CI only; Windows measurements not taken (both apps).
 - Pinned manga do not exist in either app (the Kotlin app only round-trips the backup memo).
 - `browseSelfTest`-style online checks need an open network; not run here.
-- Removing `desktop/` (P9.3) waits for Mehdi.
+- Removing `desktop/` (P9.3): Mehdi chose 2026-11-03 to remove it after he has tried the Rust app's Windows installer.
 
 Blockers / questions:
 - Gradle in the cloud container works with an init script that points Maven Central at Google's
   mirror (Central rate-limits with 429) and `github.com/<repo>/raw/` at raw.githubusercontent.com
   (the proxy answers 403). The Kotlin desktop app builds and its self-tests run here now.
-- Open question 1 in PLAN.md (where the ext-host zip downloads from, the repo is private) still stands.
+- Open question 1 answered (public releases repository); waits on the repository and secret above.
 
 Deviations from PLAN.md and why:
 - P8 release tags are `app-v<version>`, not `v*`: the Kotlin app's `release.yml` still owns `v*`

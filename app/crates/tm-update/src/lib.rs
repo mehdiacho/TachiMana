@@ -14,7 +14,10 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
-pub const DEFAULT_REPO: &str = "mehdiacho/TachiMana";
+/// Where releases are published: a public repository, so the app can download installers and the
+/// extension helper without signing in (the source repository is private). CI publishes there on
+/// `app-v*` tags (`.github/workflows/app-release.yml`).
+pub const DEFAULT_REPO: &str = "mehdiacho/tachimana-releases";
 pub const API_BASE: &str = "https://api.github.com";
 /// Tag prefix of the Rust app's releases.
 pub const TAG_PREFIX: &str = "app-v";
