@@ -1,6 +1,6 @@
 # Rust port status
-Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
-Current phase: P7 done on feat/rust-p7-sync (stacked on P6, PR to main); next P8 (AniList, settings, updater, packaging)
+Updated: 2026-11-03 by Claude (implementing; the planned agent was unavailable)
+Current phase: P8 done on feat/rust-p8 (stacked on P7, PR to main); next P9 (parity sweep)
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -92,7 +92,36 @@ Done:
 - CI: `.github/workflows/rust-port.yml` runs UI typecheck/tests/build, cargo fmt, clippy, tests, and
   checks the generated types are committed.
 
-Next step: P6 and P7 PR review and CI, then P8 (AniList, settings, updater, packaging).
+- P8 `tm-track`: AniList GraphQL client (search, viewer, list entry read/save; scores sent as
+  `scoreRaw`), implicit-grant sign-in (client 46514, browser capture on 127.0.0.1:43815
+  `/auth/anilist`, pasted-token fallback), `anilist.json` in the Kotlin shape written 0600,
+  tracker on `manga_sync` sync_id 2 that never lowers remote progress. 9 tests against a fake
+  GraphQL server plus an ignored live search (passed against real AniList).
+  `tm-update`: GitHub releases tagged `app-v<version>`, version compare, Windows installer download
+  checked against its `.sha256`, other platforms open the release page. 5 tests.
+  `tm-exthost::install`: helper zip unpacked into `<data>/ext-host` (staged, swapped, old helper
+  restored on failure; path, symlink, size and count guards). 2 tests.
+  App: Tracking dialog on manga detail (connect, find, linked card with status/chapters/score),
+  finished chapters pushed to AniList, Settings gains AniList, extension helper (download or from
+  file), Sync and update rows; quiet update check 10 s after start.
+  Packaging: `tauri.conf.json` bundles NSIS (per-user) and MSI on Windows, `.deb` and AppImage on
+  Linux. `app/scripts/package-ext-host.sh` builds the helper zip (jdeps + jlink runtime) with its
+  `.sha256`. `.github/workflows/app-release.yml` builds all of them on `app-v*` tags (and on PRs that
+  touch packaging) and publishes a release on tags.
+  Checked by hand in the running app: screenshots in `docs/rust-port/shots/p8/`. Linux installers
+  built here; sizes, start-up and memory in `baseline.md` ("Rust app").
+
+Next step: P7 and P8 PR review and CI, then P9 (parity sweep).
+
+P8 not done yet:
+- Where the helper zip and app updates download from (open question 1): the repo is private, so
+  anonymous GitHub release downloads fail. The app uses the `extHostBaseUrl` setting when set
+  (no Settings field for it yet; edit `settings.json`), else this version's GitHub release, and
+  "From file…" always works. The updater only checks GitHub. Needs Mehdi's choice.
+- The Windows installers are built by CI only; nobody has installed one yet.
+- The Tauri updater plugin was not used: it needs signed update manifests and public URLs, and the
+  repo is private. The updater ports `UpdateChecker.kt` instead, as PLAN.md allows.
+- The Track dialog has AniList only, like the Kotlin app.
 
 P7 not done yet:
 - The Kotlin export has no history and no `excludedScanlators`; the Rust export writes history but
@@ -110,9 +139,9 @@ P6 not done yet:
 - The fake WebDAV server is the only server tested; no real NAS here.
 
 P5 not done yet:
-- Downloading the host zip on first use (PLAN §P5.1) waits on open question 1 (where it is hosted).
-  Today the app looks for `TM_EXTHOST_DIR`, then `<resources>/ext-host`, then (debug builds) the
-  Gradle output folder; without it Browse says so.
+- Downloading the host zip (PLAN §P5.1) is in Settings since P8, but where it is hosted is still
+  open question 1. The app looks for `TM_EXTHOST_DIR`, then `<data>/ext-host` (installed from
+  Settings), then `<resources>/ext-host`, then (debug builds) the Gradle output folder.
 - "Restart once, then surface the error": the app restarts a dead host on every call instead.
 
 Blockers / questions:
@@ -122,6 +151,10 @@ Blockers / questions:
 - Open question 1 in PLAN.md (where the ext-host zip downloads from, the repo is private) still stands.
 
 Deviations from PLAN.md and why:
+- P8 release tags are `app-v<version>`, not `v*`: the Kotlin app's `release.yml` still owns `v*`
+  until P9, and the updater must not offer a Kotlin release to the Rust app.
+- P8 CI: the Rust checks already run in `rust-port.yml` (P4); the installer builds are a separate
+  `app-release.yml` so a PR only pays for them when it touches packaging.
 - Schema version is 30, not 29 (SQLDelight's version is migrations + 1). Plan corrected.
 - SQL is embedded from the Kotlin sources rather than copied (one source of truth). Plan corrected.
 - P1 and P2 done out of order because P1 needs Gradle.

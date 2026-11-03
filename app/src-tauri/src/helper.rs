@@ -104,7 +104,35 @@ pub async fn helper_install_file(app: AppHandle) -> R<Option<HelperStatusDto>> {
     install(&app, path).await.map(Some)
 }
 
-/// Downloads this version's helper from its GitHub release (checking its SHA-256), then installs it.
+/// Where the helper zips are: the `extHostBaseUrl` setting when set (a folder holding
+/// `tachimana-ext-host-<platform>.zip` and its `.sha256`, for example on a NAS), else this
+/// version's GitHub release. The GitHub repository is private for now, so that only works once its
+/// releases are public (PLAN.md open question 1).
+fn download_base(state: &AppState) -> R<String> {
+    let custom = state
+        .settings
+        .lock()
+        .map(|s| s.string(tm_core::settings::keys::EXT_HOST_BASE_URL))
+        .unwrap_or_default();
+    let custom = custom.trim().trim_end_matches('/');
+    if custom.is_empty() {
+        return Ok(format!(
+            "https://github.com/{}/releases/download/{}{CURRENT}",
+            tm_update::DEFAULT_REPO,
+            tm_update::TAG_PREFIX
+        ));
+    }
+    if custom.starts_with("https://") || custom.starts_with("http://") {
+        Ok(custom.to_owned())
+    } else {
+        Err(CmdError::new(
+            "invalid",
+            "The helper download address in settings must start with https:// or http://.",
+        ))
+    }
+}
+
+/// Downloads this version's helper from [`download_base`] (checking its SHA-256), then installs it.
 #[tauri::command]
 pub async fn helper_download(app: AppHandle) -> R<HelperStatusDto> {
     let plat = platform().ok_or_else(|| {
@@ -114,11 +142,7 @@ pub async fn helper_download(app: AppHandle) -> R<HelperStatusDto> {
         )
     })?;
     let name = format!("tachimana-ext-host-{plat}.zip");
-    let base = format!(
-        "https://github.com/{}/releases/download/{}{CURRENT}",
-        tm_update::DEFAULT_REPO,
-        tm_update::TAG_PREFIX
-    );
+    let base = download_base(&app.state::<AppState>())?;
     let asset = Asset {
         url: format!("{base}/{name}"),
         sha256_url: Some(format!("{base}/{name}.sha256")),
@@ -133,7 +157,9 @@ pub async fn helper_download(app: AppHandle) -> R<HelperStatusDto> {
         .map_err(|e| match e {
             UpdateError::Status(404) => CmdError::new(
                 "helper",
-                format!("No helper is published for version {CURRENT}. Install one from a file."),
+                format!(
+                    "No helper for version {CURRENT} was found there. Install one from a file."
+                ),
             ),
             UpdateError::Http(_) => CmdError::new(
                 "network",

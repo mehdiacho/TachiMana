@@ -13,4 +13,8 @@ Read this first if you are picking up TachiMana work in a fresh session.
 - **Building the Kotlin app in a cloud container:** use a Gradle init script that maps Maven Central
   to `https://maven-central.storage-download.googleapis.com/maven2/` and `github.com/<x>/raw/` to
   `raw.githubusercontent.com/<x>/` (see STATUS.md, Blockers).
+- **Releases of the Rust app:** tag `app-v<version>` runs `.github/workflows/app-release.yml`
+  (installers plus the extension helper zips). `v*` tags are still the Kotlin app's.
+- **Running the app in a cloud container:** Xvfb on :99, `WEBKIT_DISABLE_COMPOSITING_MODE=1`,
+  `TACHIMANA_DATA_DIR` for a throwaway data folder; `TM_EXTHOST_DIR` points at an unpacked helper.
 - **Next step:** see "Next step" in STATUS.md.

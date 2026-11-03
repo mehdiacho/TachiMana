@@ -110,3 +110,29 @@ form of the android-jar repo got the build through. Nothing in the repo needed t
 
 `docs/rust-port/baseline/measure-start.sh` (start-up timing) and `docs/rust-port/baseline/mem.sh`
 (PSS/RSS of a process tree), so P8 measures the Rust app the same way.
+
+## Rust app (P8)
+
+Measured 2026-11-03 on branch `feat/rust-p8`, app version 0.1.0, same container type and the same
+scripts (`baseline/measure-start.sh`, `baseline/mem.sh`) as the Kotlin column. Release build from
+`tauri build --bundles deb,appimage`, run with `WEBKIT_DISABLE_COMPOSITING_MODE=1` under Xvfb
+(software rendering, as for the Kotlin app). Library: one local manga with one 30-page CBZ of
+1100×1600 JPEG pages (17 MB; generated pages, not the P0 file), DB created by a warm-up run.
+
+| Measurement | Kotlin app (Linux, above) | Rust app (Linux) |
+| --- | --- | --- |
+| Installer size (`.deb`) | 209.1 MB as shipped | **9.7 MB** (10 132 930 B) |
+| Installer size (AppImage) | n/a | 84 MB (bundles WebKitGTK and GTK) |
+| Installed size | 335 MB as shipped (360 MB with fix) | **30.5 MB** (`Installed-Size` 31 202 KiB) |
+| Extension helper (downloaded once, only for online sources) | inside the app | 171 MB zip: host jars plus an 83 MB jlink Java runtime |
+| Cold start → window mapped, 3 runs | 2.51 · 2.01 · 2.51 s | 0.51 · 0.51 · 0.51 s (±0.5 s polling) |
+| Cold start → Library painted and still, 3 runs | 2.75 · 2.38 · 2.77 s (mean 2.63 s) | **1.45 · 1.56 · 1.59 s (mean 1.53 s)** |
+| Memory idle on Library (PSS, 15 s after start), 3 runs | 277 · 270 · 266 MB | **252 · 251 · 252 MB** (RSS 414; app plus WebKit processes) |
+| Memory reading a local 30-page CBZ (strip, at page 30) | 613 MB PSS | **392 MB PSS** (557 MB RSS) |
+| Memory browsing MangaDex | not measured | not measured (same network block) |
+
+Notes:
+- The `.deb` depends on the system `libwebkit2gtk-4.1-0` and `libgtk-3-0`, which the Kotlin `.deb`
+  did not need; the AppImage carries them.
+- Windows sizes and times are not measured yet (CI builds the NSIS and MSI installers; numbers on
+  Mehdi's PC are still to fill in, both columns).
