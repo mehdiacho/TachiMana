@@ -659,9 +659,8 @@ mod tests {
             );
             // The folder was listed (empty) a moment ago; a new listing finds the file.
             state.nas.index.invalidate();
-            let on_nas = |s: &AppState| {
-                crate::commands::detail_of(s, manga_id).unwrap().chapters[0].on_nas
-            };
+            let on_nas =
+                |s: &AppState| crate::commands::detail_of(s, manga_id).unwrap().chapters[0].on_nas;
             assert!(!on_nas(&state), "not marked before the folder is listed");
             assert!(list_manga(&state, manga_id).await.unwrap(), "listed");
             assert!(on_nas(&state), "marked once listed");
