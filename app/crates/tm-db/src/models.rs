@@ -48,7 +48,7 @@ pub struct Manga {
 }
 
 impl Manga {
-    pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
+    pub fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: r.get("_id")?,
             source: r.get("source")?,
@@ -104,7 +104,7 @@ pub struct Chapter {
 }
 
 impl Chapter {
-    pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
+    pub fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: r.get("_id")?,
             manga_id: r.get("manga_id")?,
@@ -136,7 +136,7 @@ pub struct Category {
 }
 
 impl Category {
-    pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
+    pub fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: r.get("_id")?,
             name: r.get("name")?,
@@ -173,7 +173,7 @@ pub struct Track {
 }
 
 impl Track {
-    pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
+    pub fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: r.get("_id")?,
             manga_id: r.get("manga_id")?,
@@ -202,7 +202,7 @@ pub struct ExtensionRepo {
 }
 
 impl ExtensionRepo {
-    pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
+    pub fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             base_url: r.get("base_url")?,
             name: r.get("name")?,

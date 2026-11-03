@@ -29,6 +29,9 @@ tm-cache = { path = "../crates/tm-cache" }
 tm-exthost = { path = "../crates/tm-exthost" }
 tm-download = { path = "../crates/tm-download" }
 tm-remote = { path = "../crates/tm-remote" }
+tm-backup = { path = "../crates/tm-backup" }
+tm-sync = { path = "../crates/tm-sync" }
+tauri-plugin-dialog = "2"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]

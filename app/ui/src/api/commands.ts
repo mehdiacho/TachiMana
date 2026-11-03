@@ -9,6 +9,10 @@ import type { RecentDto } from "../gen/RecentDto";
 import type { NasSettingsDto } from "../gen/NasSettingsDto";
 import type { NasSettingsPatch } from "../gen/NasSettingsPatch";
 import type { UploadJobDto } from "../gen/UploadJobDto";
+import type { PeerDto } from "../gen/PeerDto";
+import type { PullReportDto } from "../gen/PullReportDto";
+import type { RestoreDto } from "../gen/RestoreDto";
+import type { SyncStatusDto } from "../gen/SyncStatusDto";
 import type { ChapterPagesDto } from "../gen/ChapterPagesDto";
 import type { CmdError } from "../gen/CmdError";
 import type { ImportResultDto } from "../gen/ImportResultDto";
@@ -109,6 +113,18 @@ export const api = {
   nasUploadsClearFinished: () => call<void>("nas_uploads_clear_finished"),
   nasCacheUsage: () => call<number>("nas_cache_usage"),
   nasCacheClear: () => call<number>("nas_cache_clear"),
+
+  // LAN sync and backup files. Status changes arrive as `sync` events.
+  syncStatus: () => call<SyncStatusDto>("sync_status"),
+  syncAddPeer: (host: string, port: number) => call<PeerDto>("sync_add_peer", { host, port }),
+  syncPull: (peerId: string, code: string) => call<PullReportDto>("sync_pull", { peerId, code }),
+  /** Opens a save dialog; resolves with the saved path, or null when cancelled. */
+  backupExport: () => call<string | null>("backup_export"),
+  /** Opens a file dialog; resolves with what was restored, or null when cancelled. */
+  backupRestore: () => call<RestoreDto | null>("backup_restore"),
+  /** Adds the pending extension stores with these index URLs (all when omitted). */
+  backupAcceptRepos: (indexUrls?: string[]) => call<void>("backup_accept_repos", { indexUrls: indexUrls ?? null }),
+  backupDismissRepos: () => call<void>("backup_dismiss_repos"),
 };
 
 export type { LibraryUpdateDto };

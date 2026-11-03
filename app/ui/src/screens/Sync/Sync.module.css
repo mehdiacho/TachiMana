@@ -1,0 +1,79 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-sm);
+  padding: var(--tm-space-lg) var(--tm-space-xl);
+  border-radius: var(--tm-radius-lg);
+  background: var(--tm-color-surface);
+}
+.deviceName {
+  font: var(--tm-type-body);
+  font-weight: 600;
+  margin-bottom: var(--tm-space-sm);
+}
+.code {
+  font: var(--tm-type-screen-title);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+  color: var(--tm-color-accent);
+  user-select: text;
+}
+.addresses {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  margin-top: var(--tm-space-sm);
+}
+.codeInput {
+  flex: none;
+  width: 160px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+.addRow {
+  display: flex;
+  gap: var(--tm-space-md);
+  align-items: center;
+}
+.addRow > input {
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+}
+.addRow > input.port {
+  flex: none;
+  width: 90px;
+}
+.searching,
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  font: var(--tm-type-body);
+  color: var(--tm-color-on-background-med);
+  padding: var(--tm-space-md) 0;
+}
+.progress {
+  color: var(--tm-color-accent);
+  padding: 0;
+}
+.spin {
+  animation: spin 1.2s linear infinite;
+  flex: none;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+.repo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-xxs);
+  padding: var(--tm-space-sm) 0;
+}

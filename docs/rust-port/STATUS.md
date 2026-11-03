@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-02 by Claude (implementing; the planned agent was unavailable)
-Current phase: P6 done on feat/rust-p6-downloads (PR to main); next P7 (backup/restore, LAN sync)
+Current phase: P7 done on feat/rust-p7-sync (stacked on P6, PR to main); next P8 (AniList, settings, updater, packaging)
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -68,10 +68,37 @@ Done:
   and auth tests. App: Storage settings (address, port, HTTPS, folder, user, password never sent to
   the UI, test connection without saving, keep both / move to NAS, download from the NAS first, read
   cache size and clear), uploads after each finished download, upload list on the Downloads screen.
+- P7 `tm-backup`: the `.tachibk` protobuf tag for tag with `BackupModels.kt` (prost). Fields kotlinx
+  treats as required (`source`, `url`, `name`, `syncId`, ...) are always written, even when zero:
+  without that a local manga (source 0) made the Kotlin app throw `MissingFieldException` (seen, then
+  fixed). `favorite` and `memo` read as Kotlin's defaults when absent; `categories` is written
+  unpacked like kotlinx. Export and import ported from `BackupRepo.kt` in one transaction: upsert by
+  (source, url) and (url, manga), furthest progress wins, Mihon fields kept by `lastModifiedAt`,
+  categories by name and additive, tracking only moves forward, extension stores only reported as
+  pending, preference sections parked and handed back byte for byte. New: history goes both ways (the
+  Kotlin export leaves it out); a gzip bomb or broken file is an error. Settings (and so the NAS
+  password) are never in a backup. 12 tests, including restoring `tests/fixtures/kotlin-app.tachibk`,
+  a backup written by the Kotlin app.
+  `tm-sync`: the Kotlin LAN protocol (same routes, `X-Pair-Code`, JSON keys, port 27193 and up, mDNS
+  `_tachimana._tcp` with `id`/`name` TXT), `device.json` shared with the Kotlin app. New hardening:
+  manifest paths must be `<folder>/<file>` on both the serving and the pulling side (a hostile peer
+  cannot write outside the library; tested), symlinks out of the library are not served, 10 wrong
+  codes a minute and the server answers 429, files stream to `.part` and are length-checked. Port of
+  SyncSelfTest's LAN checks plus those. 11 tests.
+  App: serves and advertises at start-up (errors shown, not fatal), Sync screen (this device's code,
+  port and addresses; devices found on the network; add by address; pull with progress; last result
+  or error; restore and export through the system file dialog; pending extension repos with Add or
+  Not now). New `tauri-plugin-dialog`.
 - CI: `.github/workflows/rust-port.yml` runs UI typecheck/tests/build, cargo fmt, clippy, tests, and
   checks the generated types are committed.
 
-Next step: P6 PR review and CI, then P7 (backup/restore, LAN sync).
+Next step: P6 and P7 PR review and CI, then P8 (AniList, settings, updater, packaging).
+
+P7 not done yet:
+- The Kotlin export has no history and no `excludedScanlators`; the Rust export writes history but
+  not excluded scanlators either (the app has no per-manga scanlator filter yet).
+- Pulls are one-way per press, as in the Kotlin app: to sync both ways, pull on each device.
+- Unknown protobuf fields from future Mihon versions are dropped on restore, as in the Kotlin app.
 
 P6 not done yet:
 - Pinned manga (never evicted by "Move to NAS") do not exist in the app yet, so nothing is pinned.
@@ -89,8 +116,9 @@ P5 not done yet:
 - "Restart once, then surface the error": the app restarts a dead host on every call instead.
 
 Blockers / questions:
-- Gradle in the cloud container: Maven Central works through a mirror init script, but jitpack (401)
-  and github.com/Suwayomi raw (403, android-jar) are blocked, so Kotlin builds only run in CI.
+- Gradle in the cloud container works with an init script that points Maven Central at Google's
+  mirror (Central rate-limits with 429) and `github.com/<repo>/raw/` at raw.githubusercontent.com
+  (the proxy answers 403). The Kotlin desktop app builds and its self-tests run here now.
 - Open question 1 in PLAN.md (where the ext-host zip downloads from, the repo is private) still stands.
 
 Deviations from PLAN.md and why:
@@ -128,6 +156,16 @@ Manual check (P6), Linux under Xvfb, a seeded online manga and the fake WebDAV s
 downloaded chapter with no host, Downloads queue with a failed job and retry, delete, Recents, NAS
 settings and test connection, reading a chapter that only the NAS has, downloading it from the NAS with
 the source not installed, and an interrupted upload finishing after a restart (shots/p6/).
+
+Interop check (P7), `docs/rust-port/interop/sync-interop.sh`, Kotlin app vs Rust on two data dirs:
+Rust pulls Kotlin (local manga, a Mihon-style online manga with progress, bookmark, category,
+tracking; the extension store pending, not added), Kotlin pulls Rust, all five transferred files
+byte-identical (`cmp`), Kotlin's `.tachibk` restored by Rust and Rust's by Kotlin with the preference
+bytes intact, and both libraries print the same apart from the opt-in store. Kotlin `syncSelfTest`:
+32/32 pass in this container. Manual check in the app under Xvfb (shots/p7/): the Rust app found the
+Kotlin app over mDNS (JmDNS and mdns-sd talk), pulled it, showed the pending repo and added it, saved
+and restored backups through the file dialog, and showed the wrong-code error; the Kotlin app then
+pulled the running Rust app (10 manga, 30 files, 12 MB).
 
 Older test results (P5): `cargo test --workspace`: tm-core 10, tm-db 13, tm-archive 4, tm-local 4, tm-cache 4,
 tachimana 16, all pass; clippy -D warnings and fmt clean. `npm test` in app/ui: 26 pass.

@@ -47,6 +47,8 @@ pub struct AppState {
     pub downloads: OnceLock<tm_download::DownloadManager>,
     /// NAS index, upload queue and source names.
     pub nas: crate::nas::Nas,
+    /// LAN sync: identity, server, peers, the running pull.
+    pub sync: crate::sync::Sync,
     _lock: AppLock,
 }
 
@@ -62,6 +64,7 @@ impl AppState {
         let cache = DiskCache::open(&paths.page_cache_dir(), cap_mb.saturating_mul(MB))
             .map_err(|e| e.to_string())?;
         let nas = crate::nas::Nas::open(&paths);
+        let sync = crate::sync::Sync::open(&paths.identity_file());
         Ok(Self {
             paths,
             db,
@@ -75,6 +78,7 @@ impl AppState {
             updating: AtomicBool::new(false),
             downloads: OnceLock::new(),
             nas,
+            sync,
             _lock: lock,
         })
     }

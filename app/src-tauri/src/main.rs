@@ -8,6 +8,7 @@ mod nas;
 mod online;
 mod protocol;
 mod state;
+mod sync;
 
 use state::AppState;
 
@@ -29,6 +30,7 @@ fn main() {
         }
     };
     let result = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .setup(|app| {
             use tauri::Manager;
@@ -38,6 +40,8 @@ fn main() {
             downloads::init(app.handle());
             // Uploads left over from the last run carry on.
             nas::kick(app.handle());
+            // Serve this library on the LAN and look for other devices, like the Kotlin app.
+            sync::init(app.handle());
             // Stop the extension host when it has been idle for a while; it restarts on demand.
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -99,6 +103,13 @@ fn main() {
             nas::nas_uploads_clear_finished,
             nas::nas_cache_usage,
             nas::nas_cache_clear,
+            sync::sync_status,
+            sync::sync_add_peer,
+            sync::sync_pull,
+            sync::backup_export,
+            sync::backup_restore,
+            sync::backup_accept_repos,
+            sync::backup_dismiss_repos,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

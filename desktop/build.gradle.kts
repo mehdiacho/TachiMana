@@ -56,6 +56,24 @@ tasks.register<JavaExec>("syncSelfTest") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
+// The Kotlin half of the Kotlin <-> Rust LAN sync check (docs/rust-port/STATUS.md, P7).
+tasks.register<JavaExec>("syncInterop") {
+    group = "verification"
+    description = "Serves, pulls, exports or imports one library dir for the Rust interop check."
+    mainClass.set("tachimana.sync.SyncInteropKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    standardInput = System.`in`
+}
+
+// Writes the runtime classpath, so the interop script can run `java -cp` directly.
+tasks.register("syncInteropClasspath") {
+    val out = layout.buildDirectory.file("interop-classpath.txt")
+    val cp = sourceSets["main"].runtimeClasspath
+    dependsOn(tasks.named("classes"))
+    outputs.file(out)
+    doLast { out.get().asFile.writeText(cp.asPath) }
+}
+
 tasks.register<JavaExec>("libraryUpdateSelfTest") {
     group = "verification"
     description = "Proves online library refresh (new chapters folded in, read state preserved)."
