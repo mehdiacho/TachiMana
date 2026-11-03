@@ -97,3 +97,14 @@ export function nextSort(view: LibraryView, sort: LibrarySort): Pick<LibraryView
   const def = SORTS.find((s) => s.id === sort)?.defaultDescending ?? false;
   return { sort, descending: def };
 }
+
+/** Why a non-empty library shows nothing with this view (`NoMatchesHint` in the Kotlin app). */
+export function noMatchesLine(view: LibraryView): string {
+  const q = view.query.trim();
+  if (q) return `Nothing matches "${q}".`;
+  if (view.unreadOnly && view.downloadedOnly) return "Nothing here is both unread and downloaded.";
+  if (view.unreadOnly) return "Everything here is read.";
+  if (view.downloadedOnly) return "Nothing here is downloaded yet.";
+  if (view.categoryId === UNCATEGORIZED) return "Every manga is in a category.";
+  return "This category is empty.";
+}
