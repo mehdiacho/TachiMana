@@ -10,4 +10,8 @@ elapsedMs: number,
 /**
  * Manga that could not be restored, and why.
  */
-errors: Array<RestoreErrorDto>, };
+errors: Array<RestoreErrorDto>, 
+/**
+ * What became of the AniList sign-in in the backup, when it had one.
+ */
+tracking: string | null, };

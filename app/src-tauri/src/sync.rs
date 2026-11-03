@@ -241,6 +241,8 @@ pub struct RestoreDto {
     pub elapsed_ms: u64,
     /// Manga that could not be restored, and why.
     pub errors: Vec<RestoreErrorDto>,
+    /// What became of the AniList sign-in in the backup, when it had one.
+    pub tracking: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -576,15 +578,16 @@ pub fn export_to(state: &AppState, path: &Path) -> R<()> {
 /// downloading chapters again are offered (see [`RestoreOfferDto`]).
 #[cfg(test)]
 pub fn restore_from(state: &AppState, path: &Path) -> R<RestoreDto> {
-    restore_with(state, path, &mut |_| {})
+    restore_with(state, path, &mut |_| {}).map(|(dto, _)| dto)
 }
 
-/// [`restore_from`], reporting each step to `progress`.
+/// [`restore_from`], reporting each step to `progress`. Also hands back the AniList sign-in the
+/// backup carries (Mihon's "Include sensitive settings"), which needs the network to check.
 pub fn restore_with(
     state: &AppState,
     path: &Path,
     progress: &mut dyn FnMut(RestoreProgressDto),
-) -> R<RestoreDto> {
+) -> R<(RestoreDto, Option<tm_backup::prefs::TrackerLogin>)> {
     let started = std::time::Instant::now();
     let step = |stage: &str, done: usize, total: usize, title: &str| RestoreProgressDto {
         stage: stage.to_owned(),
@@ -605,6 +608,7 @@ pub fn restore_with(
         .map_err(|e| CmdError::new("io", format!("Could not read the file: {e}")))?;
     let backup = tm_backup::codec::decode(&bytes)?;
     drop(bytes);
+    let login = tm_backup::prefs::anilist_login(&backup);
     let summary = tm_backup::import_with(&state.db, &backup, &mut |done, total, title| {
         progress(step("library", done, total, title));
     })?;
@@ -622,7 +626,7 @@ pub fn restore_with(
         "backup restored"
     );
     progress(step("done", 0, 0, ""));
-    Ok(RestoreDto {
+    let dto = RestoreDto {
         file: path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -637,7 +641,9 @@ pub fn restore_with(
                 message: e.message.clone(),
             })
             .collect(),
-    })
+        tracking: None,
+    };
+    Ok((dto, login))
 }
 
 /// Ask where to save, then save a backup there. `None` when the user cancels.
@@ -721,7 +727,11 @@ async fn restore_in_background(app: AppHandle, path: PathBuf) -> R<RestoreDto> {
     })
     .await;
     RESTORING.store(false, Ordering::Release);
-    let out = joined.map_err(|e| CmdError::internal(format!("The restore stopped: {e}")))??;
+    let (mut out, login) =
+        joined.map_err(|e| CmdError::internal(format!("The restore stopped: {e}")))??;
+    if let Some(login) = login {
+        out.tracking = Some(crate::track::adopt_from_backup(&app, login).await);
+    }
     let _ = app.emit("library-changed", ());
     emit(&app);
     Ok(out)
@@ -952,5 +962,63 @@ mod tests {
         assert_eq!(r.summary.manga_added, 0);
         assert_eq!(b.db.extension_repos().unwrap().len(), 1, "repos are added");
         assert_eq!(offer_of(&b).repos_added.len(), 1);
+    }
+
+    /// A Mihon `BackupPreference` holding a string, encoded by hand.
+    fn mihon_string_pref(key: &str, value: &str) -> Vec<u8> {
+        fn field(tag: u8, bytes: &[u8]) -> Vec<u8> {
+            let mut v = vec![tag << 3 | 2, u8::try_from(bytes.len()).unwrap()];
+            v.extend_from_slice(bytes);
+            v
+        }
+        let body = field(1, value.as_bytes());
+        let mut poly = field(
+            1,
+            b"eu.kanade.tachiyomi.data.backup.models.StringPreferenceValue",
+        );
+        poly.extend(field(2, &body));
+        let mut pref = field(1, key.as_bytes());
+        pref.extend(field(2, &poly));
+        pref
+    }
+
+    #[test]
+    fn a_backup_with_sensitive_settings_hands_over_the_anilist_sign_in_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("mihon.tachibk");
+        let backup = tm_backup::model::Backup {
+            backup_preferences: vec![
+                mihon_string_pref("anilist_score_type", "POINT_10"),
+                mihon_string_pref(
+                    "__PRIVATE_track_token_2",
+                    r#"{"access_token":"synthetic-token","expires":4000000000000}"#,
+                ),
+            ],
+            ..Default::default()
+        };
+        std::fs::write(&file, tm_backup::codec::encode(&backup).unwrap()).unwrap();
+
+        let st = AppState::open(tm_core::AppPaths::at(dir.path()).unwrap()).unwrap();
+        let (_, login) = restore_with(&st, &file, &mut |_| {}).unwrap();
+        let login = login.expect("the sign-in is read");
+        assert_eq!(
+            (login.token.as_str(), login.expires_at),
+            ("synthetic-token", Some(4_000_000_000_000))
+        );
+
+        // A backup made here afterwards does not carry the token on.
+        let again = dir.path().join("again.tachibk");
+        export_to(&st, &again).unwrap();
+        let inner = {
+            use tm_backup::prost::Message;
+            tm_backup::codec::decode(&std::fs::read(&again).unwrap())
+                .unwrap()
+                .encode_to_vec()
+        };
+        assert!(!inner.windows(15).any(|w| w == b"synthetic-token"));
+        assert!(
+            inner.windows(18).any(|w| w == b"anilist_score_type"),
+            "the other settings still travel"
+        );
     }
 }

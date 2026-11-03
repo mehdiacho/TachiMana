@@ -15,6 +15,7 @@ prost = { version = "0.14", default-features = false, features = ["derive", "std
 flate2 = "1"
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 

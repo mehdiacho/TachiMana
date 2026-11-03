@@ -10,6 +10,7 @@
 
 pub mod codec;
 pub mod model;
+pub mod prefs;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Component, Path};
@@ -503,8 +504,16 @@ fn import_tail(c: &Connection, backup: &Backup, s: &mut ImportSummary) -> Result
         .take(MAX_EXTENSIONS)
         .collect();
 
-    // Park what we don't interpret so a re-export hands it back unchanged.
-    park(c, KIND_PREFERENCES, &backup.backup_preferences)?;
+    // Park what we don't interpret so a re-export hands it back unchanged. Private preferences
+    // (tracker tokens, passwords) are not parked: a later backup from here must not carry them
+    // without being asked. The AniList sign-in among them is read by `prefs::anilist_login`.
+    let public: Vec<Vec<u8>> = backup
+        .backup_preferences
+        .iter()
+        .filter(|raw| !prefs::is_private(raw))
+        .cloned()
+        .collect();
+    park(c, KIND_PREFERENCES, &public)?;
     park(
         c,
         KIND_SOURCE_PREFERENCES,

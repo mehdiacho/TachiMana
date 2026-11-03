@@ -52,6 +52,7 @@ export function restoreSummary(r: RestoreDto): string {
   const errors = r.errors.length === 1 ? "1 error" : `${count(r.errors.length)} errors`;
   let line = `Restored ${parts.join(", ")} from ${r.file} in ${duration(r.elapsedMs)}. ${errors}.`;
   if (s.mangaUpdated > 0) line += ` ${count(s.mangaUpdated)} manga were already in your library and were updated.`;
+  if (r.tracking) line += ` ${r.tracking}`;
   return line;
 }
 
