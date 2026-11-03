@@ -33,6 +33,11 @@ pub struct Backup {
     pub backup_source_preferences: Vec<Vec<u8>>,
     #[prost(message, repeated, tag = "106")]
     pub backup_extension_stores: Vec<BackupExtensionStore>,
+    /// TachiMana / Mehdi's Mihon fork extension (not in stock Mihon, which skips it): the
+    /// extensions installed on the device that wrote the backup, so a restore can reinstall them.
+    /// Schema: `docs/rust-port/backup-schema.md`.
+    #[prost(message, repeated, tag = "900")]
+    pub backup_extensions: Vec<BackupExtension>,
 }
 
 #[derive(Clone, PartialEq, Message)]
@@ -136,6 +141,10 @@ pub struct BackupChapter {
     /// Yōkai/J2K extension, not in Mihon. Kept so Yōkai backups round-trip.
     #[prost(int32, tag = "800")]
     pub pages_left: i32,
+    /// TachiMana / Mihon-fork extension: the chapter was downloaded on the device that wrote the
+    /// backup. Never means "the files are in this backup".
+    #[prost(bool, optional, tag = "900")]
+    pub downloaded: Option<bool>,
 }
 
 impl BackupChapter {
@@ -230,4 +239,27 @@ pub struct BackupExtensionStore {
     pub is_legacy: Option<bool>,
     #[prost(string, optional, tag = "8")]
     pub extension_list_url: Option<String>,
+}
+
+/// An installed extension (tag 900 on [`Backup`]). Field 6 has the same form as
+/// [`BackupExtensionStore::index_url`]; it is empty for a sideloaded extension.
+#[derive(Clone, PartialEq, Eq, Hash, Message, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupExtension {
+    #[prost(string, tag = "1")]
+    pub pkg_name: String,
+    #[prost(string, optional, tag = "2")]
+    pub name: Option<String>,
+    #[prost(int64, optional, tag = "3")]
+    pub version_code: Option<i64>,
+    #[prost(string, optional, tag = "4")]
+    pub version_name: Option<String>,
+    #[prost(string, optional, tag = "5")]
+    pub lang: Option<String>,
+    #[prost(string, optional, tag = "6")]
+    pub repo_index_url: Option<String>,
+    #[prost(int64, repeated, packed = "false", tag = "7")]
+    pub source_ids: Vec<i64>,
+    #[prost(string, optional, tag = "8")]
+    pub signature_hash: Option<String>,
 }

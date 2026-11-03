@@ -1,0 +1,173 @@
+// What a restore can still do once the library is back: the extension repos it added, the
+// extensions to install from them, chapters to download again, and an AniList sign-in.
+import { useState } from "react";
+import { api } from "../../api/commands";
+import { keys, queryClient, useAniList } from "../../api/queries";
+import { OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
+import type { CmdError } from "../../gen/CmdError";
+import type { RestoreExtensionsDto } from "../../gen/RestoreExtensionsDto";
+import type { RestoreOfferDto } from "../../gen/RestoreOfferDto";
+import { extensionsLine, redownloadLine } from "../../lib/sync";
+import l from "../Library/Library.module.css";
+import st from "../Settings/Settings.module.css";
+import s from "./Sync.module.css";
+
+export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
+  const anilist = useAniList();
+  const [plan, setPlan] = useState<RestoreExtensionsDto | null>(null);
+  const [busy, setBusy] = useState<"look" | "install" | "download" | null>(null);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const signIn = offer.anilistSignIn && anilist.data?.connected !== true;
+  const nothing = offer.reposAdded.length === 0 && !offer.hasExtensions && offer.downloaded === 0 && !signIn;
+  if (nothing) return null;
+
+  const look = async () => {
+    setBusy("look");
+    setNote(null);
+    try {
+      setPlan(await api.restoreExtensions());
+    } catch (e) {
+      setNote({ ok: false, text: `Couldn't look up the extensions: ${(e as CmdError).message}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exts = plan?.extensions ?? [];
+  const toInstall = exts.filter((e) => !e.installed && e.repoUrl !== null);
+  const missing = exts.filter((e) => !e.installed && e.repoUrl === null);
+
+  const installAll = async () => {
+    setBusy("install");
+    setNote(null);
+    const failed: string[] = [];
+    let done = 0;
+    for (const e of toInstall) {
+      try {
+        await api.extInstall(e.repoUrl ?? "", e.pkgName);
+        done += 1;
+      } catch {
+        failed.push(e.name);
+      }
+    }
+    await queryClient.invalidateQueries({ queryKey: ["browse"] });
+    setPlan(await api.restoreExtensions().catch(() => plan));
+    setNote(
+      failed.length === 0
+        ? { ok: true, text: `Installed ${done === 1 ? "1 extension" : `${done} extensions`}.` }
+        : { ok: false, text: `Installed ${done}. These didn't install: ${failed.join(", ")}.` },
+    );
+    setBusy(null);
+  };
+
+  const redownload = async (unreadOnly: boolean) => {
+    setBusy("download");
+    setNote(null);
+    try {
+      const n = await api.restoreRedownload(unreadOnly);
+      setNote({ ok: true, text: `Queued ${n === 1 ? "1 chapter" : `${n} chapters`} for download.` });
+      await queryClient.invalidateQueries({ queryKey: keys.sync });
+    } catch (e) {
+      setNote({ ok: false, text: (e as CmdError).message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const signInAniList = async () => {
+    setNote(null);
+    try {
+      await api.anilistConnect();
+    } catch (e) {
+      setNote({ ok: false, text: (e as CmdError).message });
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: keys.anilist });
+    }
+  };
+
+  return (
+    <div className={s.card} aria-label="After the restore">
+      <div className={st.rowTitle}>Finish setting up</div>
+
+      {offer.reposAdded.length > 0 && (
+        <>
+          <div className={st.rowDesc}>
+            {offer.reposAdded.length === 1
+              ? "Added this extension repo from the backup. You can remove it under Browse, Extensions."
+              : `Added these ${offer.reposAdded.length} extension repos from the backup. You can remove any of them under Browse, Extensions.`}
+          </div>
+          <div role="list">
+            {offer.reposAdded.map((p) => (
+              <div key={p.indexUrl} className={s.repo} role="listitem">
+                <span className={st.rowTitle}>{p.name || p.indexUrl}</span>
+                <span className={st.rowDesc}>{p.indexUrl}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {offer.hasExtensions && plan === null && (
+        <div className={st.buttons}>
+          <PrimaryButton onClick={() => void look()} disabled={busy !== null}>
+            {busy === "look" ? "Looking…" : "Find the extensions it used"}
+          </PrimaryButton>
+        </div>
+      )}
+      {plan !== null && (
+        <>
+          <div className={st.rowDesc}>{extensionsLine(toInstall, missing)}</div>
+          {plan.failures.length > 0 && (
+            <div className={l.error} role="alert">
+              Couldn't read {plan.failures.length === 1 ? "this repo" : "these repos"}, so some extensions may be missing above: {plan.failures.join("; ")}
+            </div>
+          )}
+          {toInstall.length > 0 && (
+            <div className={st.buttons}>
+              <PrimaryButton onClick={() => void installAll()} disabled={busy !== null}>
+                {busy === "install" ? "Installing…" : "Install all"}
+              </PrimaryButton>
+            </div>
+          )}
+        </>
+      )}
+
+      {offer.downloaded > 0 && (
+        <>
+          <div className={st.rowDesc}>{redownloadLine(offer.downloaded, offer.downloadedUnread)}</div>
+          <div className={st.buttons}>
+            <PrimaryButton onClick={() => void redownload(false)} disabled={busy !== null}>
+              Download all
+            </PrimaryButton>
+            {offer.downloadedUnread > 0 && offer.downloadedUnread < offer.downloaded && (
+              <OutlinedButton onClick={() => void redownload(true)} disabled={busy !== null}>
+                Unread only
+              </OutlinedButton>
+            )}
+          </div>
+        </>
+      )}
+
+      {signIn && (
+        <>
+          <div className={st.rowDesc}>Your AniList tracking came back. Sign in to keep it in sync from this computer.</div>
+          <div className={st.buttons}>
+            <OutlinedButton onClick={() => void signInAniList()} disabled={busy !== null || anilist.data?.signingIn === true}>
+              {anilist.data?.signingIn === true ? "Waiting for AniList…" : "Sign in to AniList"}
+            </OutlinedButton>
+          </div>
+        </>
+      )}
+
+      {note && (
+        <div className={note.ok ? st.ok : l.error} role={note.ok ? "status" : "alert"}>
+          {note.text}
+        </div>
+      )}
+      <div className={st.buttons}>
+        <TextButton onClick={() => void api.restoreDismiss()}>Done</TextButton>
+      </div>
+    </div>
+  );
+}

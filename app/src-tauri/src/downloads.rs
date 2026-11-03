@@ -169,7 +169,7 @@ pub fn manager(state: &AppState) -> R<&DownloadManager> {
         .ok_or_else(|| CmdError::internal("downloads are not ready yet"))
 }
 
-fn request(manga: &Manga, ch: &Chapter) -> ChapterRequest {
+pub(crate) fn request(manga: &Manga, ch: &Chapter) -> ChapterRequest {
     ChapterRequest {
         source_id: manga.source,
         manga_url: manga.url.clone(),

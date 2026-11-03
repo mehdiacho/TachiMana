@@ -156,6 +156,11 @@ fn parse_source(id: &str) -> R<i64> {
 
 // ---- status, repos, extensions -----------------------------------------------------------
 
+/// Whether the extension helper is installed (starting it is then only a matter of time).
+pub fn host_available(state: &AppState) -> bool {
+    host_config(state).jar().is_file()
+}
+
 #[tauri::command]
 pub fn browse_status(state: State<'_, AppState>) -> BrowseStatusDto {
     let cfg = host_config(&state);
@@ -215,6 +220,7 @@ pub fn ext_repo_remove(state: State<'_, AppState>, base_url: String) -> R<()> {
 #[tauri::command]
 pub async fn ext_installed(state: State<'_, AppState>) -> R<Vec<InstalledExtensionDto>> {
     let exts = client(&state)?.extensions().await?;
+    state.sync.set_installed(&exts);
     Ok(exts.iter().map(InstalledExtensionDto::from).collect())
 }
 
@@ -223,12 +229,10 @@ pub async fn ext_installed(state: State<'_, AppState>) -> R<Vec<InstalledExtensi
 pub async fn ext_catalog(state: State<'_, AppState>) -> R<CatalogDto> {
     let repos = state.db.extension_repos()?;
     let c = client(&state)?;
-    let installed: HashMap<String, model::Extension> = c
-        .extensions()
-        .await?
-        .into_iter()
-        .map(|e| (e.pkg_name.clone(), e))
-        .collect();
+    let exts = c.extensions().await?;
+    state.sync.set_installed(&exts);
+    let installed: HashMap<String, model::Extension> =
+        exts.into_iter().map(|e| (e.pkg_name.clone(), e)).collect();
     let mut entries = Vec::new();
     let mut failures = Vec::new();
     for repo in &repos {

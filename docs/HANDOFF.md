@@ -17,4 +17,8 @@ Read this first if you are picking up TachiMana work in a fresh session.
   (installers plus the extension helper zips). `v*` tags are still the Kotlin app's.
 - **Running the app in a cloud container:** Xvfb on :99, `WEBKIT_DISABLE_COMPOSITING_MODE=1`,
   `TACHIMANA_DATA_DIR` for a throwaway data folder; `TM_EXTHOST_DIR` points at an unpacked helper.
+- **Data folder:** the Kotlin and Rust apps share `%LOCALAPPDATA%\TachiMana` on Windows (WebView
+  data is in `%LOCALAPPDATA%\tech.mehdiacho.tachimana`).
+- **Backups:** Mihon-compatible `.tachibk`; tags 900 (installed extensions, chapter downloaded)
+  are ours and shared with Mehdi's Mihon fork: `docs/rust-port/backup-schema.md`. Do not renumber.
 - **Next step:** see "Next step" in STATUS.md.

@@ -163,13 +163,13 @@ async fn main() {
             let s = tm_backup::import(&db, &b).unwrap();
             tm_backup::relink_local_covers(&db, &local).unwrap();
             tm_local::scan(&db, &local).unwrap();
-            let pending: Vec<&str> = s.pending_repos.iter().map(|r| r.index_url()).collect();
+            let added: Vec<&str> = s.repos_added.iter().map(|r| r.index_url()).collect();
             println!(
-                "IMPORTED manga+={} chapters+={} categories+={} pending=[{}]",
+                "IMPORTED manga+={} chapters+={} categories+={} repos_added=[{}]",
                 s.manga_added,
                 s.chapters_added,
                 s.categories_added,
-                pending.join(", ")
+                added.join(", ")
             );
             let show = |v: &Vec<Vec<u8>>| {
                 v.iter()
