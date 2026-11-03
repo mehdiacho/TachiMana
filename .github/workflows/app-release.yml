@@ -3,12 +3,18 @@ name: App release (Rust)
 # Builds the Rust app's installers and the extension helper zips (PLAN.md §P8.4–5).
 # A tag `app-v<version>` (e.g. app-v0.2.0) publishes a release with all of them in the public
 # repository mehdiacho/tachimana-releases; the app's updater and helper download read from there.
-# Running it by hand builds everything as workflow artifacts without releasing. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
+# Running it by hand builds everything as workflow artifacts; give it a version to publish that
+# version too. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
 
 on:
   push:
     tags: ["app-v*.*.*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Publish this version (e.g. 0.1.0) as a release; leave empty to only build"
+        required: false
+        default: ""
   # A PR that touches packaging builds everything once (no release) so a broken installer shows
   # up before a tag does.
   pull_request:
@@ -27,8 +33,12 @@ jobs:
       version: ${{ steps.v.outputs.version }}
     steps:
       - id: v
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_EVENT_NAME}" = push ]; then v="${GITHUB_REF_NAME#app-v}"; else v="0.0.0-dev.${GITHUB_RUN_NUMBER}"; fi
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_EVENT_NAME}" = push ]; then v="${GITHUB_REF_NAME#app-v}"
+          elif [ -n "${INPUT_VERSION}" ]; then v="${INPUT_VERSION}"
+          else v="0.0.0-dev.${GITHUB_RUN_NUMBER}"; fi
           echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "bad version $v"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
@@ -133,7 +143,8 @@ jobs:
           path: dist/*
 
   release:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    # A pushed `app-v*` tag, or a manual run with a version (for when pushing tags is not possible).
+    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
     needs: [version, ext-host, app]
     runs-on: ubuntu-24.04
     steps:
@@ -153,7 +164,7 @@ jobs:
         with:
           repository: mehdiacho/tachimana-releases
           token: ${{ secrets.RELEASES_TOKEN }}
-          tag_name: ${{ github.ref_name }}
+          tag_name: app-v${{ needs.version.outputs.version }}
           name: TachiMana ${{ needs.version.outputs.version }}
           body: Installers for Windows (setup.exe, msi) and Linux (deb, AppImage), and the extension helper zips the app downloads on first use.
           files: dist/*
