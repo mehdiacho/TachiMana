@@ -5,7 +5,8 @@ import { ArrowDownToLine, BookOpen, Check, CircleAlert, CloudUpload, Download, T
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, useOnDisk } from "../../api/queries";
-import { EmptyState, ErrorState, IconButton, Loading, TextButton } from "../../components/ui";
+import { EmptyState, ErrorState, IconButton, SkeletonRows, TextButton } from "../../components/ui";
+import { useAction } from "../../hooks/useAction";
 import type { CmdError } from "../../gen/CmdError";
 import type { DownloadedChapterDto } from "../../gen/DownloadedChapterDto";
 import type { DownloadJobDto } from "../../gen/DownloadJobDto";
@@ -123,7 +124,7 @@ function OnDisk({ onError }: { onError: (m: string | null) => void }) {
     }
   };
 
-  if (disk.isLoading) return <Loading />;
+  if (disk.isLoading) return <SkeletonRows count={4} cover={false} />;
   if (disk.isError) return <ErrorState message={(disk.error as unknown as CmdError).message} onRetry={() => void disk.refetch()} />;
   if (groups.length === 0) return <div className={b.itemSub}>Nothing downloaded yet.</div>;
   return (
@@ -155,7 +156,7 @@ function OnDisk({ onError }: { onError: (m: string | null) => void }) {
                       icon={Trash2}
                       label={`Delete ${d.chapterName}`}
                       size={18}
-                      disabled={busy === `${d.mangaId}:${d.chapterId}`}
+                      busy={busy === `${d.mangaId}:${d.chapterId}`}
                       onClick={() => void remove(d)}
                     />
                   </>
@@ -171,6 +172,7 @@ function OnDisk({ onError }: { onError: (m: string | null) => void }) {
 
 export function DownloadsScreen() {
   const jobs = useDownloads((d) => d.jobs);
+  const ready = useDownloads((d) => d.ready);
   const uploads = useDownloads((d) => d.uploads);
   const init = useDownloads((d) => d.init);
   const qc = useQueryClient();
@@ -185,6 +187,10 @@ export function DownloadsScreen() {
   const anyFinished = jobs.some((j) => j.status === "DONE" || j.status === "FAILED");
   const run = (p: Promise<unknown>) =>
     void p.catch((e: unknown) => setError((e as CmdError).message));
+  const clearDone = useAction(api.downloadsClearFinished);
+  const retryUploads = useAction(api.nasUploadsRetry, { ok: () => "Retrying the failed uploads." });
+  const clearUploads = useAction(api.nasUploadsClearFinished);
+  const shownError = error ?? clearDone.error ?? retryUploads.error ?? clearUploads.error;
 
   return (
     <div className={s.screen}>
@@ -193,14 +199,20 @@ export function DownloadsScreen() {
           <span className={s.title}>Downloads</span>
           {active > 0 && <span className={s.active}>{active} in progress</span>}
           <span className={s.grow} />
-          {anyFinished && <TextButton onClick={() => run(api.downloadsClearFinished())}>Clear finished</TextButton>}
+          {anyFinished && (
+            <TextButton busy={clearDone.pending} onClick={() => void clearDone.run()}>
+              {clearDone.pending ? "Clearing…" : "Clear finished"}
+            </TextButton>
+          )}
         </div>
-        {error && (
+        {shownError && (
           <div className={b.notice} role="alert">
-            {error}
+            {shownError}
           </div>
         )}
-        {jobs.length === 0 ? (
+        {!ready ? (
+          <SkeletonRows count={3} />
+        ) : jobs.length === 0 ? (
           <EmptyState icon={ArrowDownToLine} title="Nothing downloading" detail="Download chapters from a manga's chapter list to read them offline." />
         ) : (
           <div role="list" aria-label="Download queue">
@@ -216,8 +228,16 @@ export function DownloadsScreen() {
                 Uploads to the NAS
               </span>
               <span className={s.grow} />
-              {uploads.some((u) => u.status === "FAILED") && <TextButton onClick={() => run(api.nasUploadsRetry())}>Retry failed</TextButton>}
-              {uploads.some((u) => u.status === "DONE") && <TextButton onClick={() => run(api.nasUploadsClearFinished())}>Clear finished</TextButton>}
+              {uploads.some((u) => u.status === "FAILED") && (
+                <TextButton busy={retryUploads.pending} onClick={() => void retryUploads.run()}>
+                  {retryUploads.pending ? "Retrying…" : "Retry failed"}
+                </TextButton>
+              )}
+              {uploads.some((u) => u.status === "DONE") && (
+                <TextButton busy={clearUploads.pending} onClick={() => void clearUploads.run()}>
+                  {clearUploads.pending ? "Clearing…" : "Clear finished"}
+                </TextButton>
+              )}
             </div>
             <div role="list" aria-label="Uploads to the NAS">
               {uploads.map((u) => (

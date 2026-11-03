@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-03 by Claude (implementing; the planned agent was unavailable)
-Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). 0.1.1 released with full backup restore. Now: restore progress, drop-to-restore and crash fixes (feat/restore-progress), then 0.1.2. The Kotlin app stays until Mehdi has tried the Windows installer
+Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). 0.1.2 released (restore progress). Now: UI states everywhere and an in-place updater (feat/ui-states), then 0.1.3. The Kotlin app stays until Mehdi has tried the Windows installer
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -145,7 +145,24 @@ Restore progress (feat/restore-progress, 2026-11-03), from Mehdi trying 0.1.1 on
 - Logs: `<data>/logs/tachimana.log` (rotated at 5 MB) and `crash-<time>.txt` with a backtrace for
   any panic (newest 10 kept). On Windows: `%LOCALAPPDATA%\TachiMana\logs`.
 
-Next step: merge feat/restore-progress, release 0.1.2. Then, from Mehdi 2026-11-03: back up the NAS
+UI states and updater (feat/ui-states, 2026-11-03), from Mehdi: "everything should have its states":
+- Shared pieces: `busy` on every button (spinner, disabled, aria-busy), `Skeleton`/`SkeletonRows`/
+  `SkeletonGrid`, `Loading` with a line, `useAction` (pending from the click, no double runs,
+  error kept or toasted), toasts, and a thin activity bar under the title bar for running actions,
+  mutations and first loads. Screens fade in. Reader pages show a spinner while loading and
+  "Couldn't load page N · Retry" on failure. Read marks and categories change at once
+  (optimistic) and roll back on failure. Every screen and dialog was gone through.
+- Updater: one "Update now" downloads (bar from 0% at once) and runs the NSIS installer with
+  `/P /UPDATE /R` (passive window, no pages, no uninstall, reopens the app); the banner says
+  "Installing… will close and reopen". Checked under Xvfb with a fake release server
+  (`TM_UPDATE_API`, plus debug-only `TM_UPDATE_PLATFORM=windows`): progress, then the installer was
+  started with exactly those arguments and the app quit. The real NSIS run is untested here.
+- Big freeze found while testing with Mehdi's library: `latest_names` (library list) used a
+  correlated subquery, 7 s per library refresh in release (45 s debug) on 172,000 chapters, on the
+  UI thread. Now one grouped pass (0.1 s, same results) and `library` runs off the UI thread. A
+  test checks the query plan has no correlated subquery.
+
+Next step: merge feat/ui-states, release 0.1.3. Then, from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download
 all as the fallback (needs his Mihon fork too; that work is owned by his local session, brief in

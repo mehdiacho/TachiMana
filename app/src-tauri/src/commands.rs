@@ -30,15 +30,20 @@ pub fn app_info(state: State<'_, AppState>) -> AppInfo {
     }
 }
 
+/// Each manga's end first, then a join back: one pass over the chapters. A correlated subquery
+/// (re-scanning a manga's chapters for every one of its chapters) took 7 s, 45 s in a debug
+/// build, on a 172,000-chapter library.
+const LATEST_SQL: &str = "WITH pick AS (SELECT c.manga_id AS manga_id, CASE WHEN m.source = 0 \
+     THEN MAX(c.source_order) ELSE MIN(c.source_order) END AS so \
+     FROM chapters c JOIN mangas m ON m._id = c.manga_id GROUP BY c.manga_id) \
+     SELECT c.manga_id, c.name FROM pick p \
+     JOIN chapters c ON c.manga_id = p.manga_id AND c.source_order = p.so";
+
 /// Newest chapter name per manga. Online sources list newest first (`source_order` 0 is the
 /// newest); the local importer numbers files in natural order (0 is the oldest).
 pub fn latest_names(db: &tm_db::Db) -> R<HashMap<i64, String>> {
     Ok(db.read(|c| {
-        let mut st = c.prepare(
-            "SELECT c.manga_id, c.name FROM chapters c JOIN mangas m ON m._id = c.manga_id \
-             WHERE c.source_order = (SELECT CASE WHEN m.source = 0 THEN MAX(source_order) \
-             ELSE MIN(source_order) END FROM chapters WHERE manga_id = c.manga_id)",
-        )?;
+        let mut st = c.prepare(LATEST_SQL)?;
         let rows = st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
         let mut out = HashMap::new();
         for row in rows {
@@ -49,8 +54,17 @@ pub fn latest_names(db: &tm_db::Db) -> R<HashMap<i64, String>> {
     })?)
 }
 
+/// The library list. Runs off the UI thread: it reads every chapter, and a big library must
+/// never freeze the window while it does.
 #[tauri::command]
-pub fn library(state: State<'_, AppState>) -> R<Vec<LibraryEntryDto>> {
+pub async fn library(app: tauri::AppHandle) -> R<Vec<LibraryEntryDto>> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || library_now(&app.state::<AppState>()))
+        .await
+        .map_err(|e| CmdError::internal(format!("Reading the library failed: {e}")))?
+}
+
+fn library_now(state: &AppState) -> R<Vec<LibraryEntryDto>> {
     let mangas = state.db.library()?;
     let unread = state.db.unread_counts()?;
     let cats = state.db.category_assignments()?;
@@ -64,7 +78,7 @@ pub fn library(state: State<'_, AppState>) -> R<Vec<LibraryEntryDto>> {
                 .get(&m.id)
                 .map(|s| s.iter().copied().collect())
                 .unwrap_or_default(),
-            downloaded: crate::downloads::has_any(&state, m),
+            downloaded: crate::downloads::has_any(state, m),
             latest_chapter: latest.get(&m.id).cloned(),
         })
         .collect())
@@ -449,5 +463,19 @@ mod tests {
         let names = latest_names(&db).unwrap();
         assert_eq!(names.get(&online).map(String::as_str), Some("c3"));
         assert_eq!(names.get(&local).map(String::as_str), Some("Ch 2"));
+    }
+
+    #[test]
+    fn latest_chapter_reads_the_chapters_once() {
+        // The plan must not re-scan chapters per chapter (that made big libraries take minutes).
+        let db = Db::open_in_memory().unwrap();
+        let plan: Vec<String> = db
+            .read(|c| {
+                let mut st = c.prepare(&format!("EXPLAIN QUERY PLAN {LATEST_SQL}"))?;
+                let rows = st.query_map([], |r| r.get::<_, String>(3))?;
+                Ok(rows.collect::<Result<Vec<_>, _>>()?)
+            })
+            .unwrap();
+        assert!(plan.iter().all(|p| !p.contains("CORRELATED")), "{plan:?}");
     }
 }

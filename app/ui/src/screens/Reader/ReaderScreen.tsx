@@ -37,7 +37,7 @@ export interface Position {
 export function ReaderScreen({ mangaId, chapterId }: { mangaId: number; chapterId: number }) {
   const detail = useMangaDetail(mangaId);
   const close = useUi((u) => u.closeReader);
-  if (detail.isLoading) return <div className={s.reader}><Loading /></div>;
+  if (detail.isLoading) return <div className={s.reader}><Loading label="Opening the chapter…" /></div>;
   if (detail.isError || !detail.data)
     return (
       <div className={s.reader}>

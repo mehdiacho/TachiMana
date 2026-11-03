@@ -1,0 +1,103 @@
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--tm-motion-chrome) ease;
+}
+.bar[data-shown="true"] {
+  opacity: 1;
+}
+.bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  background: var(--tm-color-accent);
+  border-radius: 2px;
+  animation: slide 1.2s ease-in-out infinite;
+}
+@keyframes slide {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+.toasts {
+  position: absolute;
+  right: var(--tm-space-xl);
+  bottom: var(--tm-space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-md);
+  z-index: 60;
+  pointer-events: none;
+  max-width: min(420px, calc(100% - 2 * var(--tm-space-xl)));
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tm-space-md);
+  padding: var(--tm-space-md) var(--tm-space-lg);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-color-surface-raised);
+  color: var(--tm-color-on-background);
+  font: var(--tm-type-caption);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  border: var(--tm-hairline) solid var(--tm-color-outline-faint);
+  animation: toastIn var(--tm-motion-sheet) ease-out;
+}
+.toastIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--tm-color-accent);
+}
+.toast[data-kind="ok"] .toastIcon {
+  color: var(--tm-color-sync-ok);
+}
+.toast[data-kind="error"] .toastIcon {
+  color: var(--tm-color-close-hover);
+}
+.toastText {
+  flex: 1;
+  line-height: 1.4;
+}
+.toastClose {
+  flex: none;
+  color: var(--tm-color-on-background-dim);
+  border-radius: var(--tm-radius-sm);
+}
+.toastClose:hover {
+  color: var(--tm-color-on-background);
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar::after,
+  .toast {
+    animation: none;
+  }
+  .bar::after {
+    left: 0;
+    width: 100%;
+    opacity: 0.6;
+  }
+}

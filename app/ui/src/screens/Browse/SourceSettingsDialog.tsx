@@ -6,7 +6,7 @@ import { Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, useSourcePrefs } from "../../api/queries";
-import { ErrorState, IconButton, Loading, Toggle } from "../../components/ui";
+import { ErrorState, IconButton, SkeletonRows, Spinner, Toggle } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { PreferenceDto } from "../../gen/PreferenceDto";
 import l from "../Library/Library.module.css";
@@ -107,16 +107,20 @@ export function SourceSettingsDialog({ source, onClose }: { source: { id: string
   const prefs = useSourcePrefs(source?.id ?? null);
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(0);
   useEffect(() => setError(null), [source?.id]);
 
   const set = async (pref: PreferenceDto, value: unknown) => {
     if (!source) return;
     setError(null);
+    setSaving((n) => n + 1);
     try {
       const next = await api.sourcePreferenceSet(source.id, pref.key, value);
       if (next.accepted === false) setError(`The source did not accept that value for “${pref.title}”.`);
     } catch (e) {
       setError((e as CmdError).message);
+    } finally {
+      setSaving((n) => n - 1);
     }
     // A change can enable or hide other settings, so read them all again.
     void qc.invalidateQueries({ queryKey: keys.prefs(source.id) });
@@ -129,13 +133,18 @@ export function SourceSettingsDialog({ source, onClose }: { source: { id: string
         <Dialog.Content className={l.dialog} style={{ width: 520 }} aria-describedby={undefined}>
           <div className={l.dialogHead}>
             <Dialog.Title style={{ font: "inherit", margin: 0 }}>{source?.name ?? ""} settings</Dialog.Title>
+            {saving > 0 && (
+              <span className={l.meta} role="status" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: "auto", marginRight: 8 }}>
+                <Spinner size={14} /> Saving…
+              </span>
+            )}
             <Dialog.Close asChild>
               <IconButton icon={X} label="Close" />
             </Dialog.Close>
           </div>
           {error && <div className={l.error}>{error}</div>}
           <div className={l.catList}>
-            {prefs.isLoading && <Loading />}
+            {prefs.isLoading && <SkeletonRows count={5} cover={false} />}
             {prefs.isError && <ErrorState message={(prefs.error as unknown as CmdError).message} onRetry={() => void prefs.refetch()} />}
             {prefs.data && prefs.data.length === 0 && <div className={l.meta}>This source has no settings.</div>}
             {prefs.data?.map((p) => <PrefRow key={p.key} pref={p} onSet={(v) => void set(p, v)} />)}

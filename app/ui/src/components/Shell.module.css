@@ -143,3 +143,36 @@
   flex: 1;
   min-width: 0;
 }
+
+.activity {
+  position: relative;
+  height: 0;
+  flex: none;
+}
+
+.bannerProgress {
+  width: 160px;
+  height: 6px;
+  flex: none;
+  accent-color: var(--tm-color-accent);
+}
+
+/* Each screen fades in when it opens (a remount; re-renders don't replay it). */
+.content > * {
+  animation: screenIn var(--tm-motion-nav) ease-out;
+}
+@keyframes screenIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .content > * {
+    animation: none;
+  }
+}

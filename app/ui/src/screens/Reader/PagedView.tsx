@@ -1,5 +1,6 @@
 // Paged reading: L→R, R→L, and two-page spreads (cover-solo optional). Turning past either end
 // of a chapter moves into the neighbouring chapter; spreads never cross chapters.
+import { PageImage } from "./PageImage";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EmptyState, Loading, TextButton } from "../../components/ui";
 import type { ChapterDto } from "../../gen/ChapterDto";
@@ -111,7 +112,7 @@ export function PagedView({
   const load = win.loads.get(pos.chapter);
   let content;
   if (!chapter) content = null;
-  else if (!load || load.state === "loading") content = <Loading />;
+  else if (!load || load.state === "loading") content = <Loading label={`Opening ${chapter.name}…`} />;
   else if (load.state === "error")
     content = <EmptyState icon={BookCheck} title={load.message} action={<TextButton onClick={() => win.retry(pos.chapter)}>Try again</TextButton>} />;
   else if (load.pages.length === 0) content = <EmptyState icon={BookCheck} title="This chapter has no pages." />;
@@ -127,14 +128,12 @@ export function PagedView({
           const nat = p?.w && p?.h ? { w: p.w, h: p.h } : (natural.get(key) ?? UNKNOWN);
           const size = fitSize(fit, zoom, nat, vp, unit.length);
           return (
-            <img
+            <PageImage
               key={key}
               src={pageUrl(chapter.id, i)}
-              alt={`Page ${i + 1}`}
+              page={i}
               width={size.w}
               height={size.h}
-              draggable={false}
-              decoding="async"
               onLoad={
                 p?.w && p?.h
                   ? undefined

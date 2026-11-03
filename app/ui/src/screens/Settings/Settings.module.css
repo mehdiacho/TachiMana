@@ -168,3 +168,14 @@
   text-align: left;
   cursor: pointer;
 }
+.inlineSkeleton {
+  display: inline-block;
+  vertical-align: middle;
+}
+.progress {
+  width: 100%;
+  max-width: 320px;
+  height: 6px;
+  margin-top: var(--tm-space-xs, 4px);
+  accent-color: var(--tm-color-accent);
+}

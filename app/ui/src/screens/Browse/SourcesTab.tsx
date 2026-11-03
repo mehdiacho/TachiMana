@@ -2,7 +2,7 @@
 import { Compass, PackagePlus, Search, Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSources } from "../../api/queries";
-import { Chip, EmptyState, ErrorState, IconButton, Loading } from "../../components/ui";
+import { Chip, EmptyState, ErrorState, IconButton, SkeletonRows } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { SourceDto } from "../../gen/SourceDto";
 import { groupSources, initials, langName } from "../../lib/browse";
@@ -34,7 +34,7 @@ export function SourcesTab() {
   const open = (src: SourceDto) => openSource({ sourceId: src.id, name: src.name, supportsLatest: src.supportsLatest, mode: "popular", query: "" });
 
   let body;
-  if (sources.isLoading) body = <Loading />;
+  if (sources.isLoading) body = <SkeletonRows count={10} />;
   else if (sources.isError) body = <ErrorState message={(sources.error as unknown as CmdError).message} onRetry={() => void sources.refetch()} />;
   else if ((sources.data ?? []).length === 0)
     body = (

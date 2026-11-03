@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { useAppInfo, useCategories, useLibrary, useLibraryInvalidate, useSetSettings, useSettings } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
-import { Chip, Cover, EmptyState, ErrorState, IconButton, Loading, UnreadBadge } from "../../components/ui";
+import { Chip, Cover, EmptyState, ErrorState, IconButton, SkeletonGrid, SkeletonRows, Spinner, UnreadBadge } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { LibraryEntryDto } from "../../gen/LibraryEntryDto";
 import {
@@ -259,7 +259,7 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
     categoryId === null ? "All" : categoryId === UNCATEGORIZED ? "Uncategorised" : (cats.data?.find((c) => c.id === categoryId)?.name ?? "All");
 
   let body;
-  if (lib.isLoading) body = <Loading />;
+  if (lib.isLoading) body = grid ? <SkeletonGrid /> : <SkeletonRows />;
   else if (lib.isError) body = <ErrorState message={(lib.error as unknown as CmdError).message} onRetry={() => void lib.refetch()} />;
   else if ((lib.data ?? []).length === 0)
     body = (
@@ -268,8 +268,8 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
         title="Your library is empty"
         detail={`Put manga folders or CBZ files in ${info.data?.localDir ?? "the local folder"}, then rescan.`}
         action={
-          <Chip onClick={() => void rescan()} disabled={scanning}>
-            <RefreshCw size={15} /> Rescan local folder
+          <Chip onClick={() => void rescan()} disabled={scanning} aria-busy={scanning || undefined}>
+            {scanning ? <Spinner size={15} /> : <RefreshCw size={15} />} {scanning ? "Scanning…" : "Rescan local folder"}
           </Chip>
         }
       />
@@ -328,11 +328,11 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
                 icon={CloudDownload}
                 label={update ? `Updating ${update.done} of ${update.total}` : "Update library from sources"}
                 size={18}
-                disabled={update !== null}
+                busy={update !== null}
                 onClick={() => void startUpdate().then((m) => m && setToast(m))}
               />
             )}
-            <IconButton icon={RefreshCw} label="Rescan local folder" size={18} onClick={() => void rescan()} disabled={scanning} />
+            <IconButton icon={RefreshCw} label={scanning ? "Scanning the local folder…" : "Rescan local folder"} size={18} onClick={() => void rescan()} busy={scanning} />
           </div>
           {update && (
             <div className={s.updateBar} role="status">

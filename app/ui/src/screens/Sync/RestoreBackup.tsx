@@ -99,7 +99,7 @@ export function RestoreBackup({ disabled }: { disabled: boolean }) {
               : "Add a .tachibk or .proto.gz from Mihon, Yōkai, Tachiyomi or TachiMana to your library, or drop the file here. Nothing already here is removed."}
           </span>
         </div>
-        <OutlinedButton onClick={() => void run(api.backupRestore)} disabled={disabled || busy}>
+        <OutlinedButton onClick={() => void run(api.backupRestore)} disabled={disabled} busy={busy}>
           {busy ? "Restoring…" : "Choose file…"}
         </OutlinedButton>
       </div>
@@ -109,7 +109,7 @@ export function RestoreBackup({ disabled }: { disabled: boolean }) {
           <div className={st.rowTitle}>Restore {fileName(dropped)}?</div>
           <div className={st.rowDesc}>Its manga, progress, categories and tracking are added to your library. Nothing already here is removed.</div>
           <div className={st.buttons}>
-            <PrimaryButton onClick={confirmDrop} disabled={disabled || busy}>
+            <PrimaryButton onClick={confirmDrop} disabled={disabled} busy={busy}>
               Restore
             </PrimaryButton>
             <TextButton onClick={() => setDropped(null)}>Cancel</TextButton>

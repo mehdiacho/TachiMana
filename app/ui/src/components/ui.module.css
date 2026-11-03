@@ -198,3 +198,101 @@
     transform: rotate(360deg);
   }
 }
+
+.primaryBtn,
+.outlinedBtn,
+.textBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--tm-motion-fast) ease,
+    filter var(--tm-motion-fast) ease,
+    transform var(--tm-motion-fast) ease,
+    opacity var(--tm-motion-fast) ease;
+}
+.primaryBtn:active:not(:disabled),
+.outlinedBtn:active:not(:disabled),
+.textBtn:active:not(:disabled),
+.iconBtn:active:not(:disabled),
+.chip:active {
+  transform: scale(0.97);
+}
+.outlinedBtn,
+.textBtn {
+  gap: var(--tm-space-sm);
+}
+.outlinedBtn:disabled,
+.textBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+[aria-busy="true"]:disabled {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+.skeleton {
+  display: block;
+  border-radius: var(--tm-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--tm-color-hover-strong) 0%,
+    var(--tm-color-outline-faint) 50%,
+    var(--tm-color-hover-strong) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  padding: var(--tm-space-sm) 0;
+}
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-lg);
+  padding: var(--tm-space-md) var(--tm-space-lg);
+}
+.skeletonLines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-sm);
+}
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: var(--tm-space-lg);
+  padding: var(--tm-space-lg);
+}
+.skeletonTile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-sm);
+}
+.skeletonCover {
+  aspect-ratio: 2 / 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .primaryBtn:active:not(:disabled),
+  .outlinedBtn:active:not(:disabled),
+  .textBtn:active:not(:disabled),
+  .iconBtn:active:not(:disabled),
+  .chip:active {
+    transform: none;
+  }
+}

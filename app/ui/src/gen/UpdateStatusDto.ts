@@ -16,4 +16,8 @@ progress: number | null,
 /**
  * The installer is downloaded and ready to run.
  */
-ready: boolean, };
+ready: boolean, 
+/**
+ * The installer is running; the app closes and reopens on the new version.
+ */
+installing: boolean, };

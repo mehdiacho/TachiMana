@@ -1,8 +1,9 @@
 // Continuous vertical strip. Page heights are known from the headers read in Rust, so the list
 // never jumps while images load, and prepending the previous chapter keeps the view anchored.
+import { PageImage } from "./PageImage";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { TextButton } from "../../components/ui";
+import { Spinner, TextButton } from "../../components/ui";
 import type { ChapterDto } from "../../gen/ChapterDto";
 import { ratioOf, stripWidth, type ReaderFit } from "../../lib/reader";
 import { pageUrl } from "../../lib/tmUrl";
@@ -203,11 +204,10 @@ export function StripView({
           return (
             <div key={vi.key} className={s.stripItem} style={style}>
               {it.kind === "page" && (
-                <img
+                <PageImage
                   src={pageUrl(it.chapterId, it.page)}
-                  alt={`Page ${it.page + 1}`}
-                  decoding="async"
-                  draggable={false}
+                  page={it.page}
+                  fill
                   onLoad={it.known ? undefined : (e) => learn(it.key, e.currentTarget)}
                 />
               )}
@@ -216,7 +216,12 @@ export function StripView({
                   <span className={s.markerTitle}>{it.name}</span>
                 </div>
               )}
-              {it.kind === "loading" && <div className={s.marker}>Loading {seq[it.chapter]?.name}…</div>}
+              {it.kind === "loading" && (
+                <div className={s.marker} role="status">
+                  <Spinner size={22} />
+                  Loading {seq[it.chapter]?.name}…
+                </div>
+              )}
               {it.kind === "empty" && <div className={s.marker}>This chapter has no pages.</div>}
               {it.kind === "error" && (
                 <div className={s.marker}>
