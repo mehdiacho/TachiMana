@@ -52,7 +52,19 @@ pub struct ImportSummary {
     pub downloaded: Vec<DownloadedChapter>,
     /// Tracker ids (`sync_id`) with at least one restored row.
     pub trackers: Vec<i64>,
+    /// Manga that could not be restored (each rolled back on its own), at most [`MAX_ERRORS`].
+    pub errors: Vec<RestoreError>,
 }
+
+/// A manga a restore skipped, and why.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RestoreError {
+    pub title: String,
+    pub message: String,
+}
+
+/// Cap on the errors an import reports.
+pub const MAX_ERRORS: usize = 500;
 
 /// A chapter that was downloaded on the backup's device, mapped to this library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -318,15 +330,50 @@ fn passthrough(c: &Connection, kind: &str) -> Result<Vec<Vec<u8>>> {
 // Import
 // ---------------------------------------------------------------------------------------------
 
-/// Apply a backup to the database in one transaction: all of it lands, or none of it.
+/// Apply a backup to the database. Categories, then manga in batches of [`BATCH`], then repos
+/// and preferences, each in its own transaction so the app can read in between. A manga that
+/// cannot be written is rolled back on its own and listed in [`ImportSummary::errors`].
 pub fn import(db: &Db, backup: &Backup) -> Result<ImportSummary> {
-    let now = now_ms();
-    Ok(db.write(|c| import_in(c, backup, now).map_err(into_db))?)
+    import_with(db, backup, &mut |_, _, _| {})
 }
 
-fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary> {
+/// [`import`], calling `progress(done, total, title)` before each manga and once at the end
+/// (`done == total`). A manga that fails is rolled back on its own and listed in `errors`.
+pub fn import_with(
+    db: &Db,
+    backup: &Backup,
+    progress: &mut dyn FnMut(usize, usize, &str),
+) -> Result<ImportSummary> {
+    let now = now_ms();
     let mut s = ImportSummary::default();
+    let category_by_order = db.write(|c| import_categories(c, backup, &mut s).map_err(into_db))?;
+    let total = backup.backup_manga.len();
+    let mut done = 0usize;
+    for chunk in backup.backup_manga.chunks(BATCH) {
+        db.write(|c| {
+            for bm in chunk {
+                progress(done, total, &bm.title);
+                done = done.saturating_add(1);
+                import_one(c, bm, now, &category_by_order, &mut s).map_err(into_db)?;
+            }
+            Ok(())
+        })?;
+    }
+    progress(total, total, "");
+    db.write(|c| import_tail(c, backup, &mut s).map_err(into_db))?;
+    Ok(s)
+}
 
+/// Manga per transaction: big enough to be fast, small enough that the app is never locked out
+/// of the database for long.
+pub const BATCH: usize = 25;
+
+/// Add the backup's categories by name; returns backup order value -> our category id.
+fn import_categories(
+    c: &Connection,
+    backup: &Backup,
+    s: &mut ImportSummary,
+) -> Result<HashMap<i64, i64>> {
     // Categories first, matched by name (the cross-app key).
     let mut by_name: HashMap<String, Category> = all_categories(c)?
         .into_iter()
@@ -360,8 +407,7 @@ fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary>
         next_sort = next_sort.saturating_add(1);
         s.categories_added += 1;
     }
-    // Backup order value -> our category id.
-    let category_by_order: HashMap<i64, i64> = backup
+    Ok(backup
         .backup_categories
         .iter()
         .filter_map(|bc| {
@@ -369,73 +415,46 @@ fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary>
                 .get(&bc.name().trim().to_lowercase())
                 .map(|k| (bc.order, k.id))
         })
-        .collect();
+        .collect())
+}
 
-    for bm in &backup.backup_manga {
-        if bm.url().is_empty() {
-            continue;
-        }
-        let existing = tm_db::manga_by_url_tx(c, bm.url(), bm.source())?;
-        let manga_id = match &existing {
-            Some(m) => {
-                s.manga_updated += 1;
-                m.id
-            }
-            None => {
-                s.manga_added += 1;
-                insert_manga(c, bm, now)?
-            }
-        };
-
-        // Mihon fields: keep whichever side was modified later, so a restore never rewinds
-        // the user's own edits.
-        if bm.last_modified_at >= existing.as_ref().map_or(0, |m| m.last_modified_at) {
-            c.execute(
-                q("mangas", "setMihonFields")?,
-                named_params! {":notes": bm.notes, ":version": bm.version,
-                ":lastModifiedAt": bm.last_modified_at,
-                ":favoriteModifiedAt": bm.favorite_modified_at, ":memo": bm.memo(),
-                ":mangaId": manga_id},
-            )?;
-        }
-
-        import_chapters(c, manga_id, bm, now, &mut s)?;
-        if bm.source() != LOCAL_SOURCE && bm.chapters.iter().any(|bc| bc.downloaded()) {
-            note_downloaded(c, manga_id, bm, &mut s)?;
-        }
-        import_history(c, manga_id, bm)?;
-
-        // Category membership is additive.
-        if !bm.categories.is_empty() {
-            let mut st = c.prepare_cached(q("categories", "findAllByMangaId")?)?;
-            let already = st
-                .query_map(named_params! {":mangaId": manga_id}, Category::from_row)?
-                .map(|r| r.map(|k| k.id))
-                .collect::<rusqlite::Result<HashSet<_>>>()?;
-            let wanted: BTreeSet<i64> = bm
-                .categories
-                .iter()
-                .filter_map(|o| category_by_order.get(o).copied())
-                .filter(|id| !already.contains(id))
-                .collect();
-            for cat in wanted {
-                c.execute(
-                    q("mangas_categories", "insert")?,
-                    named_params! {":mangaId": manga_id, ":categoryId": cat},
-                )?;
-            }
-        }
-
-        import_tracking(c, manga_id, bm)?;
-        for t in &bm.tracking {
-            if let Some(id) = t.sync_id.map(i64::from) {
-                if !s.trackers.contains(&id) {
-                    s.trackers.push(id);
-                }
+/// One manga in a savepoint: a failure rolls back only this manga and is reported.
+fn import_one(
+    c: &Connection,
+    bm: &BackupManga,
+    now: i64,
+    category_by_order: &HashMap<i64, i64>,
+    s: &mut ImportSummary,
+) -> Result<()> {
+    if bm.url().is_empty() {
+        return Ok(());
+    }
+    let mark = Mark::of(s);
+    c.execute_batch("SAVEPOINT tm_manga")?;
+    match import_manga(c, bm, now, category_by_order, s) {
+        Ok(()) => c.execute_batch("RELEASE tm_manga")?,
+        Err(e) => {
+            c.execute_batch("ROLLBACK TO tm_manga; RELEASE tm_manga")?;
+            mark.restore(s);
+            let title = if bm.title.trim().is_empty() {
+                bm.url()
+            } else {
+                bm.title.as_str()
+            };
+            tracing::warn!(%title, "manga not restored: {e}");
+            if s.errors.len() < MAX_ERRORS {
+                s.errors.push(RestoreError {
+                    title: title.to_owned(),
+                    message: e.to_string(),
+                });
             }
         }
     }
+    Ok(())
+}
 
+/// Repos, the extension and source lists for the restore offer, and preferences.
+fn import_tail(c: &Connection, backup: &Backup, s: &mut ImportSummary) -> Result<()> {
     // Stores are added (they are only addresses and a signing key); installing from them is the
     // user's call, offered from `extensions` / `source_ids`.
     let have: HashSet<String> = {
@@ -491,7 +510,108 @@ fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary>
         KIND_SOURCE_PREFERENCES,
         &backup.backup_source_preferences,
     )?;
-    Ok(s)
+    Ok(())
+}
+
+/// Counters an aborted manga must not leave behind.
+struct Mark {
+    manga_added: usize,
+    manga_updated: usize,
+    chapters_added: usize,
+    chapters_updated: usize,
+    downloaded: usize,
+    trackers: usize,
+}
+
+impl Mark {
+    fn of(s: &ImportSummary) -> Self {
+        Self {
+            manga_added: s.manga_added,
+            manga_updated: s.manga_updated,
+            chapters_added: s.chapters_added,
+            chapters_updated: s.chapters_updated,
+            downloaded: s.downloaded.len(),
+            trackers: s.trackers.len(),
+        }
+    }
+
+    fn restore(&self, s: &mut ImportSummary) {
+        s.manga_added = self.manga_added;
+        s.manga_updated = self.manga_updated;
+        s.chapters_added = self.chapters_added;
+        s.chapters_updated = self.chapters_updated;
+        s.downloaded.truncate(self.downloaded);
+        s.trackers.truncate(self.trackers);
+    }
+}
+
+fn import_manga(
+    c: &Connection,
+    bm: &BackupManga,
+    now: i64,
+    category_by_order: &HashMap<i64, i64>,
+    s: &mut ImportSummary,
+) -> Result<()> {
+    let existing = tm_db::manga_by_url_tx(c, bm.url(), bm.source())?;
+    let manga_id = match &existing {
+        Some(m) => {
+            s.manga_updated += 1;
+            m.id
+        }
+        None => {
+            s.manga_added += 1;
+            insert_manga(c, bm, now)?
+        }
+    };
+
+    // Mihon fields: keep whichever side was modified later, so a restore never rewinds
+    // the user's own edits.
+    if bm.last_modified_at >= existing.as_ref().map_or(0, |m| m.last_modified_at) {
+        c.execute(
+            q("mangas", "setMihonFields")?,
+            named_params! {":notes": bm.notes, ":version": bm.version,
+            ":lastModifiedAt": bm.last_modified_at,
+            ":favoriteModifiedAt": bm.favorite_modified_at, ":memo": bm.memo(),
+            ":mangaId": manga_id},
+        )?;
+    }
+
+    import_chapters(c, manga_id, bm, now, s)?;
+    if bm.source() != LOCAL_SOURCE && bm.chapters.iter().any(|bc| bc.downloaded()) {
+        note_downloaded(c, manga_id, bm, s)?;
+    }
+    import_history(c, manga_id, bm)?;
+
+    // Category membership is additive.
+    if !bm.categories.is_empty() {
+        let mut st = c.prepare_cached(q("categories", "findAllByMangaId")?)?;
+        let already = st
+            .query_map(named_params! {":mangaId": manga_id}, Category::from_row)?
+            .map(|r| r.map(|k| k.id))
+            .collect::<rusqlite::Result<HashSet<_>>>()?;
+        let wanted: BTreeSet<i64> = bm
+            .categories
+            .iter()
+            .filter_map(|o| category_by_order.get(o).copied())
+            .filter(|id| !already.contains(id))
+            .collect();
+        for cat in wanted {
+            c.execute(
+                q("mangas_categories", "insert")?,
+                named_params! {":mangaId": manga_id, ":categoryId": cat},
+            )?;
+        }
+    }
+
+    import_tracking(c, manga_id, bm)?;
+    for t in &bm.tracking {
+        if let Some(id) = t.sync_id.map(i64::from) {
+            if !s.trackers.contains(&id) {
+                s.trackers.push(id);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn insert_manga(c: &Connection, bm: &BackupManga, now: i64) -> Result<i64> {
@@ -567,10 +687,7 @@ fn import_chapters(
                 )?;
                 s.chapters_added += 1;
                 // A backup can list a chapter twice; the second copy merges into the first.
-                if let Some(row) = tm_db::chapters_tx(c, manga_id)?
-                    .into_iter()
-                    .find(|ch| ch.id == id)
-                {
+                if let Some(row) = tm_db::chapter_tx(c, id)? {
                     existing.insert(row.url.clone(), row);
                 }
             }

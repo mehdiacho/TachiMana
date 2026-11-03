@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tm_exthost::install::{install_zip, InstallError};
 use tm_update::{Asset, UpdateError, Updater};
 use ts_rs::TS;
@@ -150,8 +150,20 @@ pub async fn helper_download(app: AppHandle) -> R<HelperStatusDto> {
     };
     let updater = Updater::new().map_err(|e| CmdError::internal(e.to_string()))?;
     let dir = std::env::temp_dir().join("tachimana-helper");
+    let progress_app = app.clone();
+    let mut last = 0u64;
     let zip = updater
-        .download(&asset, &dir, |_, _| {})
+        .download(&asset, &dir, move |done, total| {
+            // The Sync screen shows this as a progress line; every 2 MB is plenty.
+            if done != total && done.saturating_sub(last) < 2 * 1024 * 1024 {
+                return;
+            }
+            last = done;
+            let _ = progress_app.emit(
+                "helper-progress",
+                serde_json::json!({ "done": done, "total": total }),
+            );
+        })
         .await
         .map_err(|e| match e {
             UpdateError::Status(404) => CmdError::new(

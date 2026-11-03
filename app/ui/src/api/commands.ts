@@ -130,6 +130,8 @@ export const api = {
   backupExport: () => call<string | null>("backup_export"),
   /** Opens a file dialog; resolves with what was restored, or null when cancelled. */
   backupRestore: () => call<RestoreDto | null>("backup_restore"),
+  /** Restores a backup file the user dropped on the window (after they confirmed). */
+  backupRestorePath: (path: string) => call<RestoreDto>("backup_restore_path", { path }),
   /** The extensions the last restore can install, matched against the user's repos. */
   restoreExtensions: () => call<RestoreExtensionsDto>("restore_extensions"),
   /** Queues the chapters the backup's device had downloaded; resolves with how many. */

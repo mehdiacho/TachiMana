@@ -236,6 +236,32 @@ pub struct SyncStatusDto {
 pub struct RestoreDto {
     pub file: String,
     pub summary: ImportSummaryDto,
+    /// How long the restore took, for the summary line.
+    #[ts(type = "number")]
+    pub elapsed_ms: u64,
+    /// Manga that could not be restored, and why.
+    pub errors: Vec<RestoreErrorDto>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreErrorDto {
+    pub title: String,
+    pub message: String,
+}
+
+/// Sent as `restore-progress` while a restore runs.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreProgressDto {
+    /// "read", "library", "local" or "done".
+    pub stage: String,
+    pub done: u32,
+    pub total: u32,
+    /// The manga being restored (library stage).
+    pub title: String,
 }
 
 /// What the last restore or pull can still do, for the Sync screen.
@@ -548,7 +574,25 @@ pub fn export_to(state: &AppState, path: &Path) -> R<()> {
 
 /// Restore `path` into the library. The repos it lists are added; installing extensions and
 /// downloading chapters again are offered (see [`RestoreOfferDto`]).
+#[cfg(test)]
 pub fn restore_from(state: &AppState, path: &Path) -> R<RestoreDto> {
+    restore_with(state, path, &mut |_| {})
+}
+
+/// [`restore_from`], reporting each step to `progress`.
+pub fn restore_with(
+    state: &AppState,
+    path: &Path,
+    progress: &mut dyn FnMut(RestoreProgressDto),
+) -> R<RestoreDto> {
+    let started = std::time::Instant::now();
+    let step = |stage: &str, done: usize, total: usize, title: &str| RestoreProgressDto {
+        stage: stage.to_owned(),
+        done: n(done),
+        total: n(total),
+        title: title.to_owned(),
+    };
+    progress(step("read", 0, 0, ""));
     let meta = std::fs::metadata(path)
         .map_err(|e| CmdError::new("io", format!("Could not open the file: {e}")))?;
     if meta.len() > tm_backup::codec::MAX_DECODED {
@@ -560,17 +604,39 @@ pub fn restore_from(state: &AppState, path: &Path) -> R<RestoreDto> {
     let bytes = std::fs::read(path)
         .map_err(|e| CmdError::new("io", format!("Could not read the file: {e}")))?;
     let backup = tm_backup::codec::decode(&bytes)?;
-    let summary = tm_backup::import(&state.db, &backup)?;
+    drop(bytes);
+    let summary = tm_backup::import_with(&state.db, &backup, &mut |done, total, title| {
+        progress(step("library", done, total, title));
+    })?;
+    progress(step("local", 0, 0, ""));
     let local = state.paths.local_library_dir();
     tm_backup::relink_local_covers(&state.db, &local)?;
     tm_local::scan(&state.db, &local)?;
     state.sync.set_offer(&summary);
+    let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    tracing::info!(
+        manga = summary.manga_added,
+        chapters = summary.chapters_added,
+        errors = summary.errors.len(),
+        elapsed_ms,
+        "backup restored"
+    );
+    progress(step("done", 0, 0, ""));
     Ok(RestoreDto {
         file: path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default(),
         summary: (&summary).into(),
+        elapsed_ms,
+        errors: summary
+            .errors
+            .iter()
+            .map(|e| RestoreErrorDto {
+                title: e.title.clone(),
+                message: e.message.clone(),
+            })
+            .collect(),
     })
 }
 
@@ -617,11 +683,48 @@ pub async fn backup_restore(app: AppHandle) -> R<Option<RestoreDto>> {
     let Some(path) = picked.and_then(|p| p.into_path().ok()) else {
         return Ok(None);
     };
-    let state = app.state::<AppState>();
-    let out = restore_from(&state, &path)?;
+    restore_in_background(app, path).await.map(Some)
+}
+
+/// Restore a backup the user dropped on the window (they confirmed it in the UI).
+#[tauri::command]
+pub async fn backup_restore_path(app: AppHandle, path: String) -> R<RestoreDto> {
+    let path = PathBuf::from(path.trim());
+    if !path.is_absolute() || !path.is_file() {
+        return Err(CmdError::new(
+            "invalid",
+            "That is not a file on this computer.",
+        ));
+    }
+    restore_in_background(app, path).await
+}
+
+/// Set while a restore runs, so a second one (a double drop) waits its turn with an error.
+static RESTORING: AtomicBool = AtomicBool::new(false);
+
+/// Run the restore on a blocking thread, sending `restore-progress` at most every 100 ms.
+async fn restore_in_background(app: AppHandle, path: PathBuf) -> R<RestoreDto> {
+    if RESTORING.swap(true, Ordering::AcqRel) {
+        return Err(CmdError::new("busy", "A restore is already running."));
+    }
+    let handle = app.clone();
+    let joined = tauri::async_runtime::spawn_blocking(move || {
+        let state = handle.state::<AppState>();
+        let mut last: Option<std::time::Instant> = None;
+        restore_with(&state, &path, &mut |p| {
+            let due = last.is_none_or(|t| t.elapsed() >= std::time::Duration::from_millis(100));
+            if due || p.stage != "library" || p.done == p.total {
+                last = Some(std::time::Instant::now());
+                let _ = handle.emit("restore-progress", p);
+            }
+        })
+    })
+    .await;
+    RESTORING.store(false, Ordering::Release);
+    let out = joined.map_err(|e| CmdError::internal(format!("The restore stopped: {e}")))??;
     let _ = app.emit("library-changed", ());
     emit(&app);
-    Ok(Some(out))
+    Ok(out)
 }
 
 /// The extensions the last restore can install: the backup's own list when it has one (tag

@@ -1,6 +1,7 @@
 // Wording and input checks for the Sync screen (ui/sync/SyncPage.kt).
-import type { ImportSummaryDto } from "../gen/ImportSummaryDto";
 import type { PullReportDto } from "../gen/PullReportDto";
+import type { RestoreDto } from "../gen/RestoreDto";
+import type { RestoreProgressDto } from "../gen/RestoreProgressDto";
 
 /** "123456" -> "123 456", easier to read across a room. */
 export const spacedCode = (code: string) => (code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code);
@@ -17,20 +18,55 @@ function kb(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function restoreLine(s: ImportSummaryDto): string {
-  const parts = [`+${plural(s.mangaAdded, "manga", "manga")}`, `+${plural(s.chaptersAdded, "chapter")}`];
-  if (s.categoriesAdded > 0) parts.push(`+${plural(s.categoriesAdded, "category", "categories")}`);
-  let line = `Restored ${parts.join(" · ")}`;
-  if (s.mangaUpdated > 0) line += ` (${s.mangaUpdated} already in your library)`;
+const count = (n: number) => n.toLocaleString("en-US");
+
+/** "app.mihon_2026.tachibk" from a Windows or Unix path. */
+export function fileName(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+/** "6.6 s", "2 min 5 s". */
+export function duration(ms: number): string {
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+/** The line under "Restoring…". */
+export function progressLine(p: RestoreProgressDto | null): string {
+  if (!p || p.stage === "read") return "Reading the backup…";
+  if (p.stage === "library") {
+    const title = p.title.trim() ? `: ${p.title}` : "";
+    return `Library ${count(Math.min(p.done + 1, p.total))} of ${count(p.total)}${title}`;
+  }
+  if (p.stage === "local") return "Checking the local folder…";
+  return "Finishing…";
+}
+
+/** The summary shown when a restore finishes, errors included even when there are none. */
+export function restoreSummary(r: RestoreDto): string {
+  const s = r.summary;
+  const parts = [`${count(s.mangaAdded)} manga`, `${count(s.chaptersAdded)} chapters`];
+  if (s.categoriesAdded > 0) parts.push(`${count(s.categoriesAdded)} ${s.categoriesAdded === 1 ? "category" : "categories"}`);
+  const errors = r.errors.length === 1 ? "1 error" : `${count(r.errors.length)} errors`;
+  let line = `Restored ${parts.join(", ")} from ${r.file} in ${duration(r.elapsedMs)}. ${errors}.`;
+  if (s.mangaUpdated > 0) line += ` ${count(s.mangaUpdated)} manga were already in your library and were updated.`;
   return line;
 }
 
-/** What looking up a backup's extensions found: what can be installed, and what no repo offers. */
-export function extensionsLine(toInstall: { name: string }[], missing: { name: string }[]): string {
+/**
+ * What looking up a backup's extensions found: what can be installed, and what no repo offers.
+ * When a repo could not be read (`reposFailed`), an unmatched extension may well be in it, so it is
+ * counted as not checked rather than listed as not found.
+ */
+export function extensionsLine(toInstall: { name: string }[], missing: { name: string }[], reposFailed = false): string {
   const names = (v: { name: string }[]) => v.map((e) => e.name).join(", ");
   const parts: string[] = [];
   if (toInstall.length > 0) parts.push(`${toInstall.length === 1 ? "1 extension" : `${toInstall.length} extensions`} to install: ${names(toInstall)}.`);
-  if (missing.length > 0) parts.push(`Not found in your repos: ${names(missing)}.`);
+  if (missing.length > 0 && reposFailed) {
+    parts.push(`${missing.length === 1 ? "1 extension" : `${missing.length} extensions`} could not be checked yet.`);
+  } else if (missing.length > 0) parts.push(`Not found in your repos: ${names(missing)}.`);
   return parts.length > 0 ? parts.join(" ") : "Every extension the backup used is installed.";
 }
 
