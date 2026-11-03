@@ -8,4 +8,8 @@ url: string, name: string, scanlator: string | null, read: boolean, bookmark: bo
 /**
  * Complete on disk (downloaded); always false for local chapters, which are files already.
  */
-downloaded: boolean, };
+downloaded: boolean, 
+/**
+ * The NAS holds this chapter, as far as the last listing of its folder knows.
+ */
+onNas: boolean, };

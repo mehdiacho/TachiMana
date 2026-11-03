@@ -1,7 +1,7 @@
 // Cases from desktop/src/main/kotlin/tachimana/library/CategorySelfTest.kt.
 import { describe, expect, it } from "vitest";
 import type { LibraryEntryDto } from "../gen/LibraryEntryDto";
-import { applyLibraryView, categoryCounts, DEFAULT_VIEW, nextSort, UNCATEGORIZED } from "./libraryView";
+import { applyLibraryView, categoryCounts, DEFAULT_VIEW, nextSort, noMatchesLine, UNCATEGORIZED } from "./libraryView";
 
 const READING = 1;
 const ON_HOLD = 2;
@@ -83,5 +83,17 @@ describe("categoryCounts and nextSort", () => {
   it("clicking again flips, a new sort uses its default", () => {
     expect(nextSort(DEFAULT_VIEW, "TITLE")).toEqual({ sort: "TITLE", descending: true });
     expect(nextSort(DEFAULT_VIEW, "UNREAD")).toEqual({ sort: "UNREAD", descending: true });
+  });
+});
+
+describe("noMatchesLine", () => {
+  const v = (p: Partial<typeof DEFAULT_VIEW>) => noMatchesLine({ ...DEFAULT_VIEW, ...p });
+  it("says why the view is empty, search first", () => {
+    expect(v({ query: " frieren ", unreadOnly: true })).toBe('Nothing matches "frieren".');
+    expect(v({ unreadOnly: true, downloadedOnly: true })).toBe("Nothing here is both unread and downloaded.");
+    expect(v({ unreadOnly: true })).toBe("Everything here is read.");
+    expect(v({ downloadedOnly: true })).toBe("Nothing here is downloaded yet.");
+    expect(v({ categoryId: UNCATEGORIZED })).toBe("Every manga is in a category.");
+    expect(v({ categoryId: 3 })).toBe("This category is empty.");
   });
 });

@@ -25,6 +25,7 @@ import type { CmdError } from "../../gen/CmdError";
 import type { LibraryEntryDto } from "../../gen/LibraryEntryDto";
 import {
   applyLibraryView,
+  noMatchesLine,
   categoryCounts,
   DEFAULT_VIEW,
   isSort,
@@ -273,7 +274,7 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
         }
       />
     );
-  else if (entries.length === 0) body = <EmptyState icon={Search} title="Nothing matches" detail="Try another search, category or filter." />;
+  else if (entries.length === 0) body = <EmptyState icon={Search} title={noMatchesLine(view)} />;
   else if (grid) body = <GridRows entries={entries} selected={selected} onSelect={select} cols={cls === "EXPANDED" ? 3 : compact ? 4 : 3} />;
   else body = <ListRows entries={entries} selected={selected} onSelect={select} />;
 

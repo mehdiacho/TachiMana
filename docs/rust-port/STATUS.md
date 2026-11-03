@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-03 by Claude (implementing; the planned agent was unavailable)
-Current phase: P8 done on feat/rust-p8 (stacked on P7, PR to main); next P9 (parity sweep)
+Current phase: P9 parity sweep on feat/rust-p9-parity (stacked on P8); the Kotlin app is not removed (needs Mehdi's OK)
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -111,13 +111,16 @@ Done:
   Checked by hand in the running app: screenshots in `docs/rust-port/shots/p8/`. Linux installers
   built here; sizes, start-up and memory in `baseline.md` ("Rust app").
 
-Next step: P7 and P8 PR review and CI, then P9 (parity sweep).
+Next step: merge #13 (P8) and #14 (P9); Mehdi creates the releases repository and secret, tries
+the Windows installer, then a follow-up PR removes `desktop/` and `release.yml` (ext-host and the
+Kotlin modules it needs stay).
 
 P8 not done yet:
-- Where the helper zip and app updates download from (open question 1): the repo is private, so
-  anonymous GitHub release downloads fail. The app uses the `extHostBaseUrl` setting when set
-  (no Settings field for it yet; edit `settings.json`), else this version's GitHub release, and
-  "From file…" always works. The updater only checks GitHub. Needs Mehdi's choice.
+- Open question 1 answered 2026-11-03 (Mehdi: public releases repo). Releases go to the public
+  repository `mehdiacho/tachimana-releases`; the updater and the helper download read from it
+  (`extHostBaseUrl` still overrides the helper's, and "From file…" always works). Before the
+  first `app-v*` tag, Mehdi creates that repository (with a README so it has a branch) and adds
+  the `RELEASES_TOKEN` secret here (fine-grained token, Contents read/write on it only).
 - The Windows installers are built by CI only; nobody has installed one yet.
 - The Tauri updater plugin was not used: it needs signed update manifests and public URLs, and the
   repo is private. The updater ports `UpdateChecker.kt` instead, as PLAN.md allows.
@@ -144,11 +147,63 @@ P5 not done yet:
   Settings), then `<resources>/ext-host`, then (debug builds) the Gradle output folder.
 - "Restart once, then surface the error": the app restarts a dead host on every call instead.
 
+## Parity table (P9)
+
+Every Kotlin self-test and every Kotlin desktop feature, and what covers it in the Rust app.
+"Test" means an automated Rust or UI test; "app" means checked by hand in the running app
+(screenshots under `shots/`). Swept 2026-11-03 against `desktop/src` at the head of this branch.
+
+### Kotlin self-tests
+
+| Kotlin self-test (checks) | Rust coverage |
+| --- | --- |
+| `syncSelfTest` (32) | `tm-sync` tests (LAN pull between two instances, code check and throttling, path guard, short files discarded, port moves on); `tm-backup` tests (Mihon round trip of every stored field, passthrough sections byte-identical, Kotlin backup restored, cover relink); interop script against the Kotlin app both ways (above) |
+| `libraryUpdateSelfTest` (12) | `tm-db` `sync_chapters_adds_new_and_never_touches_read_state` (new chapters added, read and in-progress state kept, source order realigned, re-run adds nothing, local untouched); app: library update button with progress (shots/p5) |
+| `categorySelfTest` (29) | `tm-db` `categories_crud_order_and_assignment`; `tm-backup` `categories_match_by_name_case_insensitively`, `progress_only_moves_forward_and_categories_are_additive`; UI `libraryView.test.ts` (the self-test's view cases) |
+| `downloadSelfTest` (16) | `tm-download` `download_self_test` (port of the same steps), `a_dismissed_queued_job_is_not_downloaded`, `incomplete_chapters_have_no_pages` |
+| `cloudflareSelfTest` (7) | runs inside the Kotlin ext-host (its `SelfTest.kt`); the Rust app only forwards the toggle (`PUT /v1/config`), tested in `tm-exthost` |
+| `trackSelfTest` (8) | `tm-track` tests (fake GraphQL server: search, sign-in session shape, bind/unbind, push never lowers, edits) plus a live AniList search (ignored by default, passed 2026-11-02); `tm-db` `track_rows_put_update_delete` |
+| `browseSelfTest` (18) | `tm-exthost` `install_browse_read` against the real host (install from Keiyoushi, popular, chapters, pages, images; ignored by default) and the ext-host's `:ext-host:selfTest`. Both need an open network: run 2026-11-03 with the packed helper, it stopped at the repo fetch (the container proxy answers 403 for github.com raw), as the Kotlin test does here |
+| `remoteSelfTest` (9) | `tm-remote` tests (fake WebDAV: names, index, mirror, upload queue, roles); app test `an_online_chapter_on_the_nas_is_read_from_it` |
+| `migrationSelfTest` (5) | `tm-db` `migration_29_to_30_preserves_rows`, `fresh_database_has_kotlin_schema_version`, `newer_database_opens_read_only` |
+| `updateSelfTest` (9) | `tm-update` `versions_compare_numerically` (the same cases plus the `app-v` prefix and overflow) and release picking |
+| `jsEngineSelfTest` (7) | stays in Kotlin: the JS engine is part of the ext-host |
+
+### Kotlin features
+
+| Feature (Kotlin file) | Rust app |
+| --- | --- |
+| Borderless window, title bar, nav rail, rotation (`AppShell.kt`) | Shell (shots/p4) |
+| Themes (`Theme.kt`, `Tokens.kt`) | four themes as CSS tokens, Settings (shots/p4) |
+| Library list and grid, search, sort, unread and downloaded filters, categories (`LibraryScreen.kt`, `LibraryView.kt`) | Library screen; filter empty states ported in P9 (shots/p9/2) |
+| Category dialog: create, rename, delete, reorder, assign (`CategoryDialog.kt`) | Categories menu on detail and `CategoryEditor.tsx`; `tm-db` and `libraryView.test.ts` |
+| Manga detail, continue reading, chapter read state (`LibraryScreen.kt`) | Manga detail (shots/p6/manga-detail-downloads, p8/1-detail); `chapters.test.ts` |
+| "Available on remote server" mark on chapters (`LibraryScreen.kt`, `BrowseScreen.kt`) | ported in P9: cloud mark from the saved NAS listing; the folder is listed once when a manga is opened. Tested in `nas.rs`; not seen on screen (no NAS with an online manga here) |
+| Local import, rescan (`LocalImporter.kt`, `ArchiveReader.kt`) | `tm-local`, `tm-archive` |
+| Reader: paged and strip, Fit W, Fit H, fit screen, original, zoom keys, cover solo, chapter to chapter (`ReaderScreen.kt`) | Reader (shots/p4 reader-*); `reader.test.ts` |
+| Recents (`RecentsScreen.kt`) | Recents screen (shots/p6/recents), `tm-db` `history_drives_recents` |
+| Browse: repos, catalog, install, sources, popular, search, add to library, source settings (`BrowseScreen.kt`, `SourceSettingsDialog.kt`, `ExtensionService.kt`) | Browse screens and `SourceSettingsDialog.tsx`; `tm-exthost` `real_host` tests. On screen only the offline states (shots/p5): the container cannot reach extension repos. The packed helper does start from Settings and serves Browse (log, 2026-11-02) |
+| Cloudflare bypass toggle | Settings (shots/p5/settings-cloudflare) |
+| Downloads queue, retry, clear finished, delete (`DownloadsScreen.kt`, `DownloadManager.kt`) | Downloads screen (shots/p6/downloads-failed-and-on-disk) |
+| NAS storage: settings, test, upload queue, reading from the NAS, cache (`remote/*`) | Settings NAS section, uploads (shots/p6) |
+| LAN sync, backup restore and export (`SyncPage.kt`, `sync/*`) | Sync screen (shots/p7) |
+| AniList sign-in and Track dialog (`track/*`, `TrackDialog.kt`) | Tracking dialog, Settings row (shots/p8) |
+| Update banner and installer (`UpdateBanner.kt`, `UpdateChecker.kt`) | banner ported in P9 (shots/p9/1) and Settings row; Windows installer run, other platforms open the release page |
+| Settings page (`SettingsPage.kt`) | Settings screen (shots/p8/8, 9) |
+| Packaged installer (`release.yml`, jpackage) | `app-release.yml`: NSIS, MSI, deb, AppImage, helper zips |
+
+### Still missing or different (P9)
+- Releases repository and `RELEASES_TOKEN` secret to be created by Mehdi (see P8 not done yet).
+- Windows: installers built by CI only; Windows measurements not taken (both apps).
+- Pinned manga do not exist in either app (the Kotlin app only round-trips the backup memo).
+- `browseSelfTest`-style online checks need an open network; not run here.
+- Removing `desktop/` (P9.3): Mehdi chose 2026-11-03 to remove it after he has tried the Rust app's Windows installer.
+
 Blockers / questions:
 - Gradle in the cloud container works with an init script that points Maven Central at Google's
   mirror (Central rate-limits with 429) and `github.com/<repo>/raw/` at raw.githubusercontent.com
   (the proxy answers 403). The Kotlin desktop app builds and its self-tests run here now.
-- Open question 1 in PLAN.md (where the ext-host zip downloads from, the repo is private) still stands.
+- Open question 1 answered (public releases repository); waits on the repository and secret above.
 
 Deviations from PLAN.md and why:
 - P8 release tags are `app-v<version>`, not `v*`: the Kotlin app's `release.yml` still owns `v*`

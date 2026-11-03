@@ -17,6 +17,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { useSetSettings, useSettings } from "../api/queries";
 import { useUi, type Screen } from "../store/ui";
 import s from "./Shell.module.css";
+import { UpdateBanner } from "./UpdateBanner";
 
 function win() {
   try {
@@ -158,6 +159,7 @@ export function Shell({ children }: { children: (cls: WidthClass) => ReactNode }
         }}
       >
         <TitleBar />
+        <UpdateBanner />
         <div className={s.body}>
           <Rail compact={cls === "COMPACT"} />
           <main className={s.content}>{children(cls)}</main>
