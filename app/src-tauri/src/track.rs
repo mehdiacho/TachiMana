@@ -248,6 +248,48 @@ pub async fn anilist_connect_token(app: AppHandle, token: String) -> R<AniListAc
     Ok(account_of(&state))
 }
 
+/// Sign in with the AniList token a restored backup carries, unless an account is already
+/// connected here. Returns the line the restore summary shows; never fails the restore.
+pub async fn adopt_from_backup(app: &AppHandle, login: tm_backup::prefs::TrackerLogin) -> String {
+    let state = app.state::<AppState>();
+    if let Some(s) = state.track.auth.session() {
+        return format!(
+            "AniList is already connected here as {}, so the backup's sign-in was left unused.",
+            s.user_name
+        );
+    }
+    let api = match state.track.api() {
+        Ok(api) => api,
+        Err(e) => {
+            return format!(
+                "Couldn't use the backup's AniList sign-in: {}. Sign in again below.",
+                e.message
+            )
+        }
+    };
+    let out = match state
+        .track
+        .auth
+        .adopt_until(api, &login.token, login.expires_at)
+        .await
+    {
+        Ok(s) => {
+            tracing::info!("AniList signed in from the backup");
+            format!("Signed in to AniList as {} from the backup.", s.user_name)
+        }
+        Err(TrackError::Invalid(_)) => {
+            "The AniList sign-in in this backup has expired or can't be used. Sign in again below."
+                .to_owned()
+        }
+        Err(e) => {
+            tracing::warn!("backup AniList sign-in refused: {e}");
+            format!("AniList didn't accept the backup's sign-in ({e}). Sign in again below.")
+        }
+    };
+    emit_account(app);
+    out
+}
+
 #[tauri::command]
 pub fn anilist_disconnect(app: AppHandle) -> R<AniListAccountDto> {
     let state = app.state::<AppState>();

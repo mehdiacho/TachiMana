@@ -542,3 +542,27 @@ fn one_bad_manga_is_reported_and_the_rest_is_restored() {
         ]
     );
 }
+
+/// A raw `BackupPreference` with only a key (field 1), enough for parking.
+fn pref_with_key(key: &str) -> Vec<u8> {
+    let mut v = vec![10, u8::try_from(key.len()).unwrap()];
+    v.extend_from_slice(key.as_bytes());
+    v
+}
+
+#[test]
+fn private_preferences_are_not_carried_into_a_later_backup() {
+    let db = Db::open_in_memory().unwrap();
+    let mut b = mihon_backup();
+    b.backup_preferences = vec![
+        pref_with_key("anilist_score_type"),
+        pref_with_key("__PRIVATE_track_token_2"),
+        pref_with_key("__PRIVATE_pref_mangasync_password_2"),
+    ];
+    import(&db, &b).unwrap();
+    let round = export(&db, &none()).unwrap();
+    assert_eq!(
+        round.backup_preferences,
+        vec![pref_with_key("anilist_score_type")]
+    );
+}

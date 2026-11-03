@@ -44,9 +44,12 @@ describe("sync helpers", () => {
     expect(progressLine(null)).toBe("Reading the backup…");
     expect(progressLine({ stage: "library", done: 9, total: 1688, title: "One Piece" })).toBe("Library 10 of 1,688: One Piece");
     const summary = { mangaAdded: 1688, mangaUpdated: 0, chaptersAdded: 172371, chaptersUpdated: 0, categoriesAdded: 17 };
-    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [] })).toBe(
+    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [], tracking: null })).toBe(
       "Restored 1,688 manga, 172,371 chapters, 17 categories from b.tachibk in 6.6 s. 0 errors.",
     );
-    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [{ title: "X", message: "y" }] })).toContain("1 error.");
+    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [{ title: "X", message: "y" }], tracking: null })).toContain("1 error.");
+    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [], tracking: "Signed in to AniList as mehdi from the backup." })).toMatch(
+      /0 errors\. Signed in to AniList as mehdi from the backup\.$/,
+    );
   });
 });

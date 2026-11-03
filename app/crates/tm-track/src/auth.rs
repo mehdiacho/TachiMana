@@ -70,12 +70,29 @@ impl Auth {
 
     /// Checks `raw` (a captured or pasted token) by asking AniList whose it is, then saves it.
     pub async fn adopt(&self, api: &AniListApi, raw: &str) -> Result<Session> {
+        self.adopt_until(api, raw, None).await
+    }
+
+    /// [`Self::adopt`] for a token whose expiry is known, such as one from a Mihon backup.
+    /// `None` assumes a fresh token. An expiry already past is refused without asking AniList.
+    pub async fn adopt_until(
+        &self,
+        api: &AniListApi,
+        raw: &str,
+        expires_at: Option<i64>,
+    ) -> Result<Session> {
         let token =
             clean_token(raw).ok_or_else(|| TrackError::Invalid("Paste the token first.".into()))?;
+        let now = now_ms();
+        if expires_at.is_some_and(|e| e <= now) {
+            return Err(TrackError::Invalid(
+                "That AniList sign-in has expired.".into(),
+            ));
+        }
         let user = api.viewer(&token).await?;
         let session = Session {
             token,
-            expires_at: now_ms().saturating_add(TOKEN_LIFE_MS),
+            expires_at: expires_at.unwrap_or_else(|| now.saturating_add(TOKEN_LIFE_MS)),
             user_id: user.id,
             user_name: user.name,
         };

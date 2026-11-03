@@ -198,7 +198,7 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
 
       {signIn && (
         <>
-          <div className={st.rowDesc}>Your AniList tracking came back. Sign in to keep it in sync from this computer.</div>
+          <div className={st.rowDesc}>Your AniList tracking came back. Sign in to keep it in sync from this computer. Next time, tick “Include sensitive settings” when you create the backup in Mihon, and TachiMana signs you in for you.</div>
           <div className={st.buttons}>
             <OutlinedButton onClick={() => void signInAniList()} disabled={busy !== null} busy={anilist.data?.signingIn === true}>
               {anilist.data?.signingIn === true ? "Waiting for AniList…" : "Sign in to AniList"}

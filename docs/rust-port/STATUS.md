@@ -162,7 +162,25 @@ UI states and updater (feat/ui-states, 2026-11-03), from Mehdi: "everything shou
   UI thread. Now one grouped pass (0.1 s, same results) and `library` runs off the UI thread. A
   test checks the query plan has no correlated subquery.
 
-Next step: merge feat/ui-states, release 0.1.3. Then, from Mehdi 2026-11-03: back up the NAS
+0.1.3 released 2026-11-03 18:27 UTC with the above.
+
+AniList sign-in from a Mihon backup (feat/backup-tracker-login, 2026-11-03), from Mihon's
+"Include sensitive settings" on Create backup:
+- `tm_backup::prefs` reads the private preferences in tag 104: `__PRIVATE_track_token_2` (the
+  JSON of Mihon's `ALOAuth`, `access_token` + `expires` ms), else
+  `__PRIVATE_pref_mangasync_password_2` (the bare token). Key names from Mihon's
+  `TrackPreferences.kt` and `Preference.kt` (Apache-2.0).
+- After a restore, `track::adopt_from_backup` checks the token with AniList and saves the session
+  with the backup's expiry, unless AniList is already connected here. The outcome is a line in
+  the restore summary (`RestoreDto.tracking`); a failure never fails the restore and the "Sign in
+  to AniList" card stays.
+- Private preferences are no longer parked for re-export, so a later desktop backup never
+  carries a token the user didn't choose to include. `TrackerLogin`'s Debug hides the token.
+- Not verified: a real Mihon token (needs Mihon's sensitive backup). The test uses a synthetic one
+  against a fake AniList. Other trackers (MAL, Kitsu…) aren't supported on desktop, so their
+  tokens are dropped.
+
+Next step: merge feat/backup-tracker-login, release 0.1.4. Then, from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download
 all as the fallback (needs his Mihon fork too; that work is owned by his local session, brief in

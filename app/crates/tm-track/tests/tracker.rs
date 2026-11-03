@@ -187,6 +187,21 @@ async fn adopt_checks_the_token_and_saves_a_kotlin_shaped_session() {
 }
 
 #[tokio::test]
+async fn a_backup_sign_in_keeps_its_expiry_and_an_expired_one_is_refused() {
+    let (api, _) = fake().await;
+    let dir = tempfile::tempdir().unwrap();
+    let a = Auth::open(&dir.path().join("anilist.json"));
+    assert!(matches!(
+        a.adopt_until(&api, "good", Some(1)).await,
+        Err(TrackError::Invalid(_))
+    ));
+    assert!(a.session().is_none());
+    let until = 4_000_000_000_000;
+    let s = a.adopt_until(&api, "good", Some(until)).await.unwrap();
+    assert_eq!((s.user_name.as_str(), s.expires_at), ("mehdi", until));
+}
+
+#[tokio::test]
 async fn bind_adopts_an_existing_entry_or_creates_one() {
     let (api, st) = fake().await;
     let (db, id) = library();
