@@ -549,3 +549,139 @@
   place-items: center;
   flex: none;
 }
+
+/* Tracking dialog (spec §2.22) */
+.trackTitle {
+  font: inherit;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trackAccount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tm-space-md);
+}
+.trackNote {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-med);
+}
+.trackFoot {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+}
+.trackUrl {
+  font: var(--tm-type-mono);
+  user-select: all;
+  word-break: break-all;
+}
+.trackConnect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-md);
+}
+.trackResults {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 320px;
+}
+.trackResult {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tm-space-xxs);
+  padding: var(--tm-space-md) var(--tm-space-base);
+  border: 0;
+  border-radius: var(--tm-radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.trackResult:hover:not(:disabled) {
+  background: var(--tm-color-hover);
+}
+.trackResultTitle {
+  font: var(--tm-type-body-row);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.trackCard {
+  border: var(--tm-hairline) solid var(--tm-color-outline-faint);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+.trackStrip {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  padding: var(--tm-space-md) var(--tm-space-base);
+  background: var(--tm-color-surface-raised);
+}
+.trackStripText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.trackChip {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-color-accent);
+  color: var(--tm-color-on-accent);
+  font: var(--tm-type-mono);
+}
+.trackLinked {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-sync-ok);
+}
+.trackGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+}
+.trackCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-xs);
+  padding: var(--tm-space-md) var(--tm-space-base);
+  min-width: 0;
+}
+.trackCell + .trackCell {
+  border-left: var(--tm-hairline) solid var(--tm-color-outline-faint);
+}
+.trackLabel {
+  font: var(--tm-type-caption);
+  font-family: var(--tm-font-mono);
+  text-transform: uppercase;
+  color: var(--tm-color-on-background-dim);
+}
+.trackValue {
+  font: var(--tm-type-body-row);
+  white-space: nowrap;
+}
+.trackSelect {
+  font: var(--tm-type-body-row);
+  color: var(--tm-color-accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.trackSelect option {
+  color: var(--tm-color-on-background);
+  background: var(--tm-color-surface);
+}
+.trackStepper {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-xs);
+}

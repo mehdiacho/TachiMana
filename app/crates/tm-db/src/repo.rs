@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use rusqlite::{named_params, Connection, OptionalExtension};
 
 use crate::{
-    q, Category, Chapter, Db, ExtensionRepo, Manga, RecentEntry, Result, SourceChapter,
+    q, Category, Chapter, Db, DbError, ExtensionRepo, Manga, RecentEntry, Result, SourceChapter,
     SourceManga, Track, LOCAL_SOURCE,
 };
 
@@ -671,6 +671,67 @@ impl Db {
                 .query_map(named_params! {":mangaId": manga_id}, Track::from_row)?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(v)
+        })
+    }
+
+    /// The manga's track row for `sync_id`, if any.
+    pub fn track(&self, manga_id: i64, sync_id: i64) -> Result<Option<Track>> {
+        Ok(self
+            .tracks(manga_id)?
+            .into_iter()
+            .find(|t| t.sync_id == sync_id))
+    }
+
+    /// Insert or replace the manga's row for `t.sync_id` (the table is unique on manga and
+    /// tracker, `ON CONFLICT REPLACE`). `t.id` is ignored. Returns the stored row.
+    pub fn put_track(&self, t: &Track) -> Result<Track> {
+        self.write(|c| {
+            c.execute(
+                q("manga_sync", "insert")?,
+                named_params! {
+                    ":mangaId": t.manga_id, ":syncId": t.sync_id, ":remoteId": t.remote_id,
+                    ":libraryId": t.library_id, ":title": t.title,
+                    ":lastChapterRead": t.last_chapter_read, ":totalChapters": t.total_chapters,
+                    ":status": t.status, ":score": t.score, ":remoteUrl": t.remote_url,
+                    ":startDate": t.start_date, ":finishDate": t.finish_date,
+                },
+            )?;
+            Ok(())
+        })?;
+        self.track(t.manga_id, t.sync_id)?
+            .ok_or_else(|| DbError::NotFound(format!("track of manga {}", t.manga_id)))
+    }
+
+    /// Change progress, status or score of the row `id`; `None` leaves a field as it is.
+    pub fn update_track(
+        &self,
+        id: i64,
+        last_chapter_read: Option<f64>,
+        status: Option<i64>,
+        score: Option<f64>,
+    ) -> Result<()> {
+        self.write(|c| {
+            c.execute(
+                q("manga_sync", "update")?,
+                named_params! {
+                    ":mangaId": None::<i64>, ":syncId": None::<i64>, ":remoteId": None::<i64>,
+                    ":libraryId": None::<i64>, ":title": None::<String>,
+                    ":lastChapterRead": last_chapter_read, ":totalChapters": None::<i64>,
+                    ":status": status, ":score": score, ":remoteUrl": None::<String>,
+                    ":startDate": None::<i64>, ":finishDate": None::<i64>, ":id": id,
+                },
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn delete_track(&self, manga_id: i64, sync_id: i64) -> Result<()> {
+        self.write(|c| {
+            c.execute(
+                q("manga_sync", "deleteForManga")?,
+                named_params! {":mangaId": manga_id, ":syncId": sync_id},
+            )?;
+            Ok(())
         })
     }
 }

@@ -31,8 +31,11 @@ tm-download = { path = "../crates/tm-download" }
 tm-remote = { path = "../crates/tm-remote" }
 tm-backup = { path = "../crates/tm-backup" }
 tm-sync = { path = "../crates/tm-sync" }
+tm-track = { path = "../crates/tm-track" }
+tm-update = { path = "../crates/tm-update" }
 tauri-plugin-dialog = "2"
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tauri-plugin-opener = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 
 [dev-dependencies]
 tempfile.workspace = true

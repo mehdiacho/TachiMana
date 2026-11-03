@@ -49,6 +49,10 @@ pub struct AppState {
     pub nas: crate::nas::Nas,
     /// LAN sync: identity, server, peers, the running pull.
     pub sync: crate::sync::Sync,
+    /// AniList account and client.
+    pub track: crate::track::Tracking,
+    /// Update check and the downloaded installer.
+    pub updates: crate::update::Updates,
     _lock: AppLock,
 }
 
@@ -65,6 +69,7 @@ impl AppState {
             .map_err(|e| e.to_string())?;
         let nas = crate::nas::Nas::open(&paths);
         let sync = crate::sync::Sync::open(&paths.identity_file());
+        let track = crate::track::Tracking::open(&paths);
         Ok(Self {
             paths,
             db,
@@ -79,6 +84,8 @@ impl AppState {
             downloads: OnceLock::new(),
             nas,
             sync,
+            track,
+            updates: crate::update::Updates::new(),
             _lock: lock,
         })
     }

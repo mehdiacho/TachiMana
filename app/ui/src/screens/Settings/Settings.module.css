@@ -155,3 +155,16 @@
 .field > button {
   align-self: flex-start;
 }
+.err {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-close-hover);
+  padding: 0 var(--tm-space-xl);
+}
+.navRow {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}

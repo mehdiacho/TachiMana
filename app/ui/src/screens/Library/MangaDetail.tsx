@@ -1,11 +1,11 @@
 // Manga detail (spec §3.1 detail region): info column and chapter list.
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Download, Heart, Play, RefreshCw, Tags } from "lucide-react";
+import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Download, Heart, Play, RefreshCw, Tags, TrendingUp } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
-import { keys, useCategories, useLibraryInvalidate, useMangaDetail, useSources } from "../../api/queries";
+import { keys, useCategories, useLibraryInvalidate, useMangaDetail, useSources, useTrack } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
 import { Cover, ErrorState, IconButton, Loading, OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
 import type { ChapterDto } from "../../gen/ChapterDto";
@@ -16,7 +16,21 @@ import { jobKey, jobsByChapter } from "../../lib/downloads";
 import { useDownloads } from "../../store/downloads";
 import { ProgressRing } from "../Downloads/DownloadsScreen";
 import { useUi } from "../../store/ui";
+import { TrackDialog } from "./TrackDialog";
 import s from "./Library.module.css";
+
+function TrackButton({ mangaId, title }: { mangaId: number; title: string }) {
+  const track = useTrack(mangaId);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <OutlinedButton onClick={() => setOpen(true)} aria-label="Tracking">
+        <TrendingUp size={16} /> Tracking · {track.data ? 1 : 0}
+      </OutlinedButton>
+      {open && <TrackDialog mangaId={mangaId} title={title} open={open} onOpenChange={setOpen} />}
+    </>
+  );
+}
 
 const STATUS = ["Unknown", "Ongoing", "Completed", "Licensed", "Publishing finished", "Cancelled", "On hiatus"];
 
@@ -242,6 +256,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
         <div className={s.actions}>
           {!manga.isLocal && <OnlineActions mangaId={manga.id} favorite={manga.favorite} onError={setError} />}
           {(manga.isLocal || manga.favorite) && <CategoryMenu mangaId={manga.id} current={categoryIds} />}
+          <TrackButton mangaId={manga.id} title={manga.title} />
         </div>
         {error && (
           <div className={s.error} role="alert">

@@ -13,6 +13,11 @@ import type { PeerDto } from "../gen/PeerDto";
 import type { PullReportDto } from "../gen/PullReportDto";
 import type { RestoreDto } from "../gen/RestoreDto";
 import type { SyncStatusDto } from "../gen/SyncStatusDto";
+import type { AniListAccountDto } from "../gen/AniListAccountDto";
+import type { MediaDto } from "../gen/MediaDto";
+import type { TrackDto } from "../gen/TrackDto";
+import type { UpdateStatusDto } from "../gen/UpdateStatusDto";
+import type { HelperStatusDto } from "../gen/HelperStatusDto";
 import type { ChapterPagesDto } from "../gen/ChapterPagesDto";
 import type { CmdError } from "../gen/CmdError";
 import type { ImportResultDto } from "../gen/ImportResultDto";
@@ -125,6 +130,35 @@ export const api = {
   /** Adds the pending extension stores with these index URLs (all when omitted). */
   backupAcceptRepos: (indexUrls?: string[]) => call<void>("backup_accept_repos", { indexUrls: indexUrls ?? null }),
   backupDismissRepos: () => call<void>("backup_dismiss_repos"),
+
+  // AniList. Account changes arrive as `anilist` events; a push after reading as `track-changed`.
+  anilistAccount: () => call<AniListAccountDto>("anilist_account"),
+  /** Opens the browser and waits (up to 5 minutes) for AniList to send the user back. */
+  anilistConnect: () => call<AniListAccountDto>("anilist_connect"),
+  anilistConnectToken: (token: string) => call<AniListAccountDto>("anilist_connect_token", { token }),
+  anilistDisconnect: () => call<AniListAccountDto>("anilist_disconnect"),
+  trackGet: (mangaId: number) => call<TrackDto | null>("track_get", { mangaId }),
+  trackSearch: (query: string) => call<MediaDto[]>("track_search", { query }),
+  trackBind: (mangaId: number, media: MediaDto) => call<TrackDto>("track_bind", { mangaId, media }),
+  trackUnbind: (mangaId: number) => call<void>("track_unbind", { mangaId }),
+  trackSetStatus: (mangaId: number, status: number) => call<TrackDto>("track_set_status", { mangaId, status }),
+  trackSetProgress: (mangaId: number, progress: number) => call<TrackDto>("track_set_progress", { mangaId, progress }),
+  trackSetScore: (mangaId: number, score: number) => call<TrackDto>("track_set_score", { mangaId, score }),
+  trackOpen: (mangaId: number) => call<void>("track_open", { mangaId }),
+
+  // Updates. Progress and results also arrive as `update` events.
+  updateStatus: () => call<UpdateStatusDto>("update_status"),
+  updateCheck: () => call<UpdateStatusDto>("update_check"),
+  updateDownload: () => call<UpdateStatusDto>("update_download"),
+  /** Runs the downloaded installer; the app quits so it can be replaced. */
+  updateInstall: () => call<void>("update_install"),
+  updateOpenPage: () => call<void>("update_open_page"),
+
+  // The extension helper (ext-host and its Java), installed into the data folder.
+  helperStatus: () => call<HelperStatusDto>("helper_status"),
+  /** Opens a file dialog; null when cancelled. */
+  helperInstallFile: () => call<HelperStatusDto | null>("helper_install_file"),
+  helperDownload: () => call<HelperStatusDto>("helper_download"),
 };
 
 export type { LibraryUpdateDto };
