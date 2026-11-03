@@ -1,7 +1,7 @@
 // Manga detail (spec §3.1 detail region): info column and chapter list.
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Download, Heart, Play, RefreshCw, Tags, TrendingUp } from "lucide-react";
+import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Cloud, Download, Heart, Play, RefreshCw, Tags, TrendingUp } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
@@ -119,6 +119,11 @@ function ChapterList({ chapters, onOpen, onToggleRead, downloads }: { chapters: 
                     {[st.text, c.scanlator].filter(Boolean).join(" · ")}
                   </span>
                 </button>
+                {c.onNas && (
+                  <span className={s.onNas} title="On the NAS" aria-label="On the NAS">
+                    <Cloud size={16} />
+                  </span>
+                )}
                 {downloads && <DownloadControl c={c} job={downloads.jobFor(c)} onDownload={() => downloads.onDownload(c)} onDelete={() => downloads.onDelete(c)} />}
                 <IconButton icon={c.read ? CircleCheck : Circle} label={c.read ? "Mark unread" : "Mark read"} size={18} active={c.read} onClick={() => onToggleRead(c)} />
               </div>
@@ -192,6 +197,22 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
   const byChapter = useMemo(() => jobsByChapter(jobs), [jobs]);
   // Only asked for online manga, so a local-only library never starts the extension host.
   const sources = useSources(online);
+  const qc = useQueryClient();
+  // List the manga's NAS folder once (the backend skips it when NAS storage is off or the folder
+  // is already known), then refresh so chapters the NAS holds get their mark.
+  useEffect(() => {
+    if (!online) return;
+    let live = true;
+    api
+      .nasListManga(mangaId)
+      .then((listed) => {
+        if (listed && live) void qc.invalidateQueries({ queryKey: keys.detail(mangaId) });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [mangaId, online, qc]);
   if (d.isLoading) return <Loading />;
   if (d.isError || !d.data) return <ErrorState message={(d.error as unknown as CmdError | null)?.message ?? "This manga could not be loaded."} onRetry={() => void d.refetch()} />;
   const { manga, categoryIds } = d.data;

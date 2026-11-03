@@ -152,6 +152,7 @@ pub fn detail_of(state: &AppState, id: i64) -> R<MangaDetailDto> {
             .iter()
             .map(|c| ChapterDto {
                 downloaded: crate::downloads::is_downloaded(state, &manga, c),
+                on_nas: crate::nas::holds(state, &manga, c),
                 ..ChapterDto::from(c)
             })
             .collect(),

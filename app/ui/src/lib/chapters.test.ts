@@ -16,6 +16,7 @@ const ch = (id: number, sourceOrder: number, read = false, lastPageRead = 0, pag
   sourceOrder,
   dateUpload: 0,
   downloaded: false,
+  onNas: false,
 });
 
 describe("chapter ordering", () => {

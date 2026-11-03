@@ -159,6 +159,54 @@ fn chapter_ref<'a>(name: Option<&'a str>, manga: &'a Manga, ch: &'a Chapter) -> 
     }
 }
 
+fn enabled(state: &AppState) -> bool {
+    state.settings.lock().is_ok_and(|s| s.remote_enabled())
+}
+
+/// Whether the NAS holds this chapter, from the saved listing only (no network). Local manga and
+/// NAS storage switched off are never "on the NAS".
+pub fn holds(state: &AppState, manga: &Manga, ch: &Chapter) -> bool {
+    if manga.is_local() || !enabled(state) {
+        return false;
+    }
+    let name = state.nas.source_name(manga.source);
+    mirror(state).holds(&state.nas.index, &chapter_ref(name.as_deref(), manga, ch))
+}
+
+/// Lists the manga's NAS folder when it has not been listed yet, so the chapter list can mark what
+/// the NAS holds (`RemoteMirror.holds` in the Kotlin app). Returns whether a listing was made.
+#[tauri::command]
+pub async fn nas_list_manga(state: State<'_, AppState>, id: i64) -> R<bool> {
+    list_manga(&state, id).await
+}
+
+async fn list_manga(state: &AppState, id: i64) -> R<bool> {
+    let Some(manga) = state.db.manga(id)? else {
+        return Ok(false);
+    };
+    if manga.is_local() {
+        return Ok(false);
+    }
+    let (Some(dav), Some(src)) = (dav(state), state.nas.source_name(manga.source)) else {
+        return Ok(false);
+    };
+    let (sd, md) = (
+        names::source_dir_name(&src),
+        names::manga_dir_name(&manga.title),
+    );
+    if state.nas.index.count_for(&sd, &md).is_some() {
+        return Ok(false);
+    }
+    match state.nas.index.refresh(&dav, &sd, &md).await {
+        Ok(_) => Ok(true),
+        Err(e) => {
+            // Not there yet, or the NAS is unreachable: no marks, and reading falls back as usual.
+            tracing::info!("NAS listing for {} failed: {e}", manga.title);
+            Ok(false)
+        }
+    }
+}
+
 /// The chapter's archive from the NAS, fetched into the mirror cache when needed. `None` when NAS
 /// storage is off, the NAS does not have it, or it can't be reached (logged).
 pub async fn fetch_chapter(state: &AppState, manga: &Manga, ch: &Chapter) -> Option<PathBuf> {
@@ -202,7 +250,7 @@ pub fn upload_finished(
     dir: PathBuf,
 ) {
     let state = app.state::<AppState>();
-    if !state.settings.lock().is_ok_and(|s| s.remote_enabled()) {
+    if !enabled(&state) {
         return;
     }
     let Some(name) = state.nas.source_name(source) else {
@@ -611,6 +659,16 @@ mod tests {
             );
             // The folder was listed (empty) a moment ago; a new listing finds the file.
             state.nas.index.invalidate();
+            let on_nas = |s: &AppState| {
+                crate::commands::detail_of(s, manga_id).unwrap().chapters[0].on_nas
+            };
+            assert!(!on_nas(&state), "not marked before the folder is listed");
+            assert!(list_manga(&state, manga_id).await.unwrap(), "listed");
+            assert!(on_nas(&state), "marked once listed");
+            assert!(
+                !list_manga(&state, manga_id).await.unwrap(),
+                "an already listed folder is not listed again"
+            );
 
             let got = fetch_chapter(&state, &manga, &ch)
                 .await
@@ -627,6 +685,7 @@ mod tests {
                 .unwrap()
                 .set(keys::REMOTE_ENABLED, false);
             assert!(fetch_chapter(&state, &manga, &ch).await.is_none());
+            assert!(!on_nas(&state), "no marks while NAS storage is off");
         });
     }
 

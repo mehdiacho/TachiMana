@@ -109,6 +109,7 @@ fn main() {
             nas::nas_uploads_clear_finished,
             nas::nas_cache_usage,
             nas::nas_cache_clear,
+            nas::nas_list_manga,
             sync::sync_status,
             sync::sync_add_peer,
             sync::sync_pull,

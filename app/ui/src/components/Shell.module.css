@@ -129,3 +129,17 @@
   display: flex;
   position: relative;
 }
+
+.banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-sm);
+  padding: var(--tm-space-sm) var(--tm-space-lg);
+  background: color-mix(in srgb, var(--tm-color-accent) 16%, transparent);
+  color: var(--tm-color-on-background);
+}
+.bannerText {
+  flex: 1;
+  min-width: 0;
+}

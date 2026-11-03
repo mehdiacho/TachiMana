@@ -36,10 +36,18 @@ pub struct Updates {
     busy: AtomicBool,
 }
 
+/// Debug builds can point the check at a fake GitHub API (`TM_UPDATE_API`) to try the update UI.
+fn updater() -> Result<Updater, UpdateError> {
+    match std::env::var("TM_UPDATE_API") {
+        Ok(api) if cfg!(debug_assertions) => Updater::with(&api, tm_update::DEFAULT_REPO),
+        _ => Updater::new(),
+    }
+}
+
 impl Updates {
     pub fn new() -> Self {
         Self {
-            updater: Updater::new().ok(),
+            updater: updater().ok(),
             inner: Mutex::new(Inner::default()),
             busy: AtomicBool::new(false),
         }

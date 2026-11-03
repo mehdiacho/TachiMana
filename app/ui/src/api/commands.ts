@@ -118,6 +118,8 @@ export const api = {
   nasUploadsClearFinished: () => call<void>("nas_uploads_clear_finished"),
   nasCacheUsage: () => call<number>("nas_cache_usage"),
   nasCacheClear: () => call<number>("nas_cache_clear"),
+  /** Lists the manga's NAS folder if it has not been listed yet; true when it was. */
+  nasListManga: (id: number) => call<boolean>("nas_list_manga", { id }),
 
   // LAN sync and backup files. Status changes arrive as `sync` events.
   syncStatus: () => call<SyncStatusDto>("sync_status"),

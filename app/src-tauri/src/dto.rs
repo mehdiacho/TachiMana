@@ -128,6 +128,8 @@ pub struct ChapterDto {
     pub date_upload: i64,
     /// Complete on disk (downloaded); always false for local chapters, which are files already.
     pub downloaded: bool,
+    /// The NAS holds this chapter, as far as the last listing of its folder knows.
+    pub on_nas: bool,
 }
 
 impl From<&tm_db::Chapter> for ChapterDto {
@@ -146,6 +148,7 @@ impl From<&tm_db::Chapter> for ChapterDto {
             source_order: c.source_order,
             date_upload: c.date_upload,
             downloaded: false,
+            on_nas: false,
         }
     }
 }
