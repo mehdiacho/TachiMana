@@ -26,7 +26,7 @@ function PeerRow({ peer, canPull, pulling, onPull }: { peer: PeerDto; canPull: b
           {peer.host}:{peer.port}
         </span>
       </div>
-      <PrimaryButton onClick={onPull} disabled={!canPull} title={canPull ? undefined : "Enter the other device's pairing code first"}>
+      <PrimaryButton onClick={onPull} disabled={!canPull} busy={pulling} title={canPull ? undefined : "Enter the other device's pairing code first"}>
         {pulling ? "Syncing…" : "Pull"}
       </PrimaryButton>
     </div>
@@ -44,7 +44,7 @@ export function SyncScreen() {
   const [backupNote, setBackupNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [backupBusy, setBackupBusy] = useState<"export" | null>(null);
 
-  if (status.isPending) return <Loading />;
+  if (status.isPending) return <Loading label="Starting sync…" />;
   if (status.isError) return <ErrorState message={(status.error as unknown as CmdError).message} onRetry={() => void status.refetch()} />;
   const st_ = status.data;
   const d = st_.device;
@@ -165,8 +165,8 @@ export function SyncScreen() {
             maxLength={255}
           />
           <input className={`${l.field} ${s.port}`} value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, "").slice(0, 5))} aria-label="Port" inputMode="numeric" />
-          <OutlinedButton onClick={() => void add()} disabled={adding || !host.trim()}>
-            <Plus size={16} /> {adding ? "Checking…" : "Add"}
+          <OutlinedButton onClick={() => void add()} disabled={!host.trim()} busy={adding}>
+            {!adding && <Plus size={16} />} {adding ? "Checking…" : "Add"}
           </OutlinedButton>
         </div>
         {addNote && (
@@ -202,7 +202,7 @@ export function SyncScreen() {
             <span className={st.rowTitle}>Export backup</span>
             <span className={st.rowDesc}>Save a .tachibk that Mihon, Yōkai or Tachiyomi can import: your library, read progress, categories, tracking, extension repos, the extensions you have installed and which chapters are downloaded (not the files). Settings and passwords are not included.</span>
           </div>
-          <OutlinedButton onClick={() => void save()} disabled={backupBusy !== null}>
+          <OutlinedButton onClick={() => void save()} busy={backupBusy !== null}>
             {backupBusy === "export" ? "Saving…" : "Save file…"}
           </OutlinedButton>
         </div>

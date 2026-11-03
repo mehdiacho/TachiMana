@@ -5,7 +5,8 @@ import { ExternalLink, Minus, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
 import { keys, queryClient, useAniList, useTrack } from "../../api/queries";
-import { IconButton, OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
+import { IconButton, OutlinedButton, PrimaryButton, SkeletonRows, Spinner, TextButton } from "../../components/ui";
+import { useAction } from "../../hooks/useAction";
 import type { CmdError } from "../../gen/CmdError";
 import type { MediaDto } from "../../gen/MediaDto";
 import type { TrackDto } from "../../gen/TrackDto";
@@ -31,14 +32,18 @@ function Connect({ onNote }: { onNote: (n: string | null) => void }) {
       setBusy(false);
     }
   };
+  const [checking, setChecking] = useState(false);
   const submitToken = async () => {
     onNote(null);
+    setChecking(true);
     try {
       const a = await api.anilistConnectToken(pasted);
       queryClient.setQueryData(keys.anilist, a);
       setPasted("");
     } catch (e) {
       onNote(`Token not accepted: ${msg(e)}`);
+    } finally {
+      setChecking(false);
     }
   };
   return (
@@ -46,7 +51,7 @@ function Connect({ onNote }: { onNote: (n: string | null) => void }) {
       <div className={s.trackNote}>
         Connect your AniList account to keep your reading progress there. Your browser opens; approve TachiMana and come back here.
       </div>
-      <PrimaryButton onClick={() => void connect()} disabled={waiting}>
+      <PrimaryButton onClick={() => void connect()} busy={waiting}>
         {waiting ? "Waiting for the browser…" : "Connect AniList"}
       </PrimaryButton>
       {waiting && account.data && (
@@ -63,8 +68,8 @@ function Connect({ onNote }: { onNote: (n: string | null) => void }) {
         }}
       >
         <input className={s.field} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Access token" aria-label="AniList access token" autoComplete="off" spellCheck={false} />
-        <OutlinedButton type="submit" disabled={pasted.trim() === ""}>
-          Use
+        <OutlinedButton type="submit" disabled={pasted.trim() === ""} busy={checking}>
+          {checking ? "Checking…" : "Use"}
         </OutlinedButton>
       </form>
     </div>
@@ -108,17 +113,26 @@ function Find({ mangaId, title, onNote }: { mangaId: number; title: string; onNo
         }}
       >
         <input className={s.field} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search AniList…" aria-label="Search AniList" maxLength={200} />
-        <PrimaryButton type="submit" disabled={searching || query.trim() === ""}>
-          <Search size={16} /> {searching ? "Searching…" : "Search"}
+        <PrimaryButton type="submit" disabled={query.trim() === ""} busy={searching}>
+          {!searching && <Search size={16} />} {searching ? "Searching…" : "Search"}
         </PrimaryButton>
       </form>
+      {searching && results === null && <SkeletonRows count={4} cover={false} />}
       {results !== null && results.length === 0 && <div className={s.trackNote}>No matches on AniList. Try another title.</div>}
       {results !== null && results.length > 0 && (
         <div className={s.trackResults} role="list">
           {results.map((m) => (
             <button key={m.id} type="button" role="listitem" className={s.trackResult} disabled={binding !== null} onClick={() => void bind(m)}>
               <span className={s.trackResultTitle}>{m.title}</span>
-              <span className={s.trackNote}>{binding === m.id ? "Linking…" : mediaLine(m)}</span>
+              <span className={s.trackNote}>
+                {binding === m.id ? (
+                  <>
+                    <Spinner size={12} /> Linking…
+                  </>
+                ) : (
+                  mediaLine(m)
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -152,7 +166,15 @@ function Linked({ mangaId, track, onNote }: { mangaId: number; track: TrackDto; 
         </span>
         <div className={s.trackStripText}>
           <span className={s.trackResultTitle}>{track.title}</span>
-          <span className={s.trackLinked}>Linked · updates on read</span>
+          <span className={s.trackLinked}>
+            {busy ? (
+              <>
+                <Spinner size={11} /> Saving to AniList…
+              </>
+            ) : (
+              "Linked · updates on read"
+            )}
+          </span>
         </div>
         <IconButton icon={ExternalLink} label="Open on AniList" size={18} onClick={() => void api.trackOpen(mangaId).catch((e) => onNote(msg(e)))} />
       </div>
@@ -196,23 +218,16 @@ export function TrackDialog({ mangaId, title, open, onOpenChange }: { mangaId: n
   const [note, setNote] = useState<string | null>(null);
   const connected = account.data?.connected === true;
   const t = track.data ?? null;
-  const unbind = async () => {
+  const unbind = useAction(async () => {
     setNote(null);
-    try {
-      await api.trackUnbind(mangaId);
-      queryClient.setQueryData(keys.track(mangaId), null);
-    } catch (e) {
-      setNote(msg(e));
-    }
-  };
-  const signOut = async () => {
+    await api.trackUnbind(mangaId);
+    queryClient.setQueryData(keys.track(mangaId), null);
+  });
+  const signOut = useAction(async () => {
     setNote(null);
-    try {
-      queryClient.setQueryData(keys.anilist, await api.anilistDisconnect());
-    } catch (e) {
-      setNote(msg(e));
-    }
-  };
+    queryClient.setQueryData(keys.anilist, await api.anilistDisconnect());
+  });
+  const shownNote = note ?? unbind.error ?? signOut.error;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -226,16 +241,24 @@ export function TrackDialog({ mangaId, title, open, onOpenChange }: { mangaId: n
           </div>
           <div className={s.trackAccount}>
             <span className={s.trackNote}>{accountLine(account.data?.userName ?? null, account.data?.expiresAt ?? null)}</span>
-            {connected && <TextButton onClick={() => void signOut()}>Sign out</TextButton>}
+            {connected && (
+              <TextButton onClick={() => void signOut.run()} busy={signOut.pending}>
+                {signOut.pending ? "Signing out…" : "Sign out"}
+              </TextButton>
+            )}
           </div>
-          {!connected ? (
+          {account.isLoading || (connected && track.isLoading) ? (
+            <SkeletonRows count={3} cover={false} />
+          ) : !connected ? (
             <Connect onNote={setNote} />
           ) : t ? (
             <>
               <Linked mangaId={mangaId} track={t} onNote={setNote} />
               <div className={s.addRow}>
                 <span className={s.grow} />
-                <TextButton onClick={() => void unbind()}>Stop tracking</TextButton>
+                <TextButton onClick={() => void unbind.run()} busy={unbind.pending}>
+                  {unbind.pending ? "Stopping…" : "Stop tracking"}
+                </TextButton>
               </div>
             </>
           ) : (
@@ -246,9 +269,9 @@ export function TrackDialog({ mangaId, title, open, onOpenChange }: { mangaId: n
               Linked to {t.title} ({chaptersLine(t.progress, t.total)}). Connect to update it.
             </div>
           )}
-          {note && (
+          {shownNote && (
             <div className={s.error} role="alert">
-              {note}
+              {shownNote}
             </div>
           )}
           <div className={s.trackFoot}>Finished chapters update AniList while you read. Progress there never goes down.</div>

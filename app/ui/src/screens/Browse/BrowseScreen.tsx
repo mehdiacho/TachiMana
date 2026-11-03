@@ -28,7 +28,7 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  if (status.isLoading) return <Loading />;
+  if (status.isLoading) return <Loading label="Starting the extension host…" />;
   if (status.data && !status.data.available)
     return (
       <EmptyState

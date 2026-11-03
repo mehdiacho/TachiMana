@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useState } from "react";
 import { api } from "../../api/commands";
 import { keys, queryClient, useAniList } from "../../api/queries";
+import { useAction } from "../../hooks/useAction";
 import { OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { RestoreExtensionsDto } from "../../gen/RestoreExtensionsDto";
@@ -17,6 +18,8 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
   const anilist = useAniList();
   const [plan, setPlan] = useState<RestoreExtensionsDto | null>(null);
   const [busy, setBusy] = useState<"look" | "install" | "download" | null>(null);
+  const [which, setWhich] = useState<"all" | "unread">("all");
+  const dismiss = useAction(api.restoreDismiss, { toastError: true });
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [helperNote, setHelperNote] = useState<string | null>(null);
 
@@ -130,7 +133,7 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
 
       {offer.hasExtensions && plan === null && (
         <div className={st.buttons}>
-          <PrimaryButton onClick={() => void look()} disabled={busy !== null}>
+          <PrimaryButton onClick={() => void look()} disabled={busy !== null} busy={busy === "look"}>
             {busy === "look" ? "Looking…" : "Find the extensions it used"}
           </PrimaryButton>
         </div>
@@ -138,6 +141,11 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
       {helperNote && (
         <div className={st.rowDesc} role="status">
           {helperNote}
+        </div>
+      )}
+      {busy === "look" && !helperNote && (
+        <div className={st.rowDesc} role="status">
+          Reading the extension repositories…
         </div>
       )}
       {plan !== null && (
@@ -150,7 +158,7 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
           )}
           {toInstall.length > 0 && (
             <div className={st.buttons}>
-              <PrimaryButton onClick={() => void installAll()} disabled={busy !== null}>
+              <PrimaryButton onClick={() => void installAll()} disabled={busy !== null} busy={busy === "install"}>
                 {busy === "install" ? "Installing…" : "Install all"}
               </PrimaryButton>
             </div>
@@ -162,11 +170,25 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
         <>
           <div className={st.rowDesc}>{redownloadLine(offer.downloaded, offer.downloadedUnread)}</div>
           <div className={st.buttons}>
-            <PrimaryButton onClick={() => void redownload(false)} disabled={busy !== null}>
+            <PrimaryButton
+              onClick={() => {
+                setWhich("all");
+                void redownload(false);
+              }}
+              disabled={busy !== null}
+              busy={busy === "download" && which === "all"}
+            >
               Download all
             </PrimaryButton>
             {offer.downloadedUnread > 0 && offer.downloadedUnread < offer.downloaded && (
-              <OutlinedButton onClick={() => void redownload(true)} disabled={busy !== null}>
+              <OutlinedButton
+                onClick={() => {
+                  setWhich("unread");
+                  void redownload(true);
+                }}
+                disabled={busy !== null}
+                busy={busy === "download" && which === "unread"}
+              >
                 Unread only
               </OutlinedButton>
             )}
@@ -178,7 +200,7 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
         <>
           <div className={st.rowDesc}>Your AniList tracking came back. Sign in to keep it in sync from this computer.</div>
           <div className={st.buttons}>
-            <OutlinedButton onClick={() => void signInAniList()} disabled={busy !== null || anilist.data?.signingIn === true}>
+            <OutlinedButton onClick={() => void signInAniList()} disabled={busy !== null} busy={anilist.data?.signingIn === true}>
               {anilist.data?.signingIn === true ? "Waiting for AniList…" : "Sign in to AniList"}
             </OutlinedButton>
           </div>
@@ -191,7 +213,9 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
         </div>
       )}
       <div className={st.buttons}>
-        <TextButton onClick={() => void api.restoreDismiss()}>Done</TextButton>
+        <TextButton onClick={() => void dismiss.run()} busy={dismiss.pending}>
+          Done
+        </TextButton>
       </div>
     </div>
   );

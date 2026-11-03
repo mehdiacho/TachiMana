@@ -2,7 +2,7 @@
 // resumable with one click.
 import { History } from "lucide-react";
 import { useRecents } from "../../api/queries";
-import { Cover, EmptyState, ErrorState, Loading } from "../../components/ui";
+import { Cover, EmptyState, ErrorState, SkeletonRows } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import { useUi } from "../../store/ui";
 import b from "../Browse/Browse.module.css";
@@ -15,7 +15,7 @@ export function RecentsScreen() {
   const openReader = useUi((u) => u.openReader);
 
   let body;
-  if (recents.isLoading) body = <Loading />;
+  if (recents.isLoading) body = <SkeletonRows count={8} />;
   else if (recents.isError) body = <ErrorState message={(recents.error as unknown as CmdError).message} onRetry={() => void recents.refetch()} />;
   else if ((recents.data ?? []).length === 0)
     body = <EmptyState icon={History} title="Nothing read yet" detail="Chapters you read appear here so you can resume." />;

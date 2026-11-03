@@ -1,4 +1,6 @@
 // TanStack Query hooks over the commands. Mutations invalidate what they change.
+import { errorText } from "../hooks/useAction";
+import { toast } from "../store/activity";
 import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UiSettings } from "../gen/UiSettings";
 import type { UiSettingsPatch } from "../gen/UiSettingsPatch";
@@ -86,8 +88,9 @@ export function useSetSettings() {
       }
       return { prev };
     },
-    onError: (_e, _p, ctx) => {
+    onError: (e, _p, ctx) => {
       if (ctx?.prev) qc.setQueryData(keys.settings, ctx.prev);
+      toast.error(`Couldn't save that setting: ${errorText(e)}`);
     },
     onSuccess: (s) => qc.setQueryData(keys.settings, s),
   });

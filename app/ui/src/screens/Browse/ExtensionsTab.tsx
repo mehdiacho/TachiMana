@@ -4,7 +4,8 @@ import { Check, Library, PackagePlus, RefreshCw, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { useBrowseInvalidate, useCatalog, useRepos, useSources } from "../../api/queries";
-import { Chip, EmptyState, ErrorState, IconButton, Loading, OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
+import { Chip, EmptyState, ErrorState, IconButton, Loading, OutlinedButton, PrimaryButton, SkeletonRows, TextButton } from "../../components/ui";
+import { toast } from "../../store/activity";
 import type { CatalogEntryDto } from "../../gen/CatalogEntryDto";
 import type { CmdError } from "../../gen/CmdError";
 import { catalogLangs, groupCatalog, langName } from "../../lib/browse";
@@ -15,11 +16,26 @@ import { SourceMark } from "./SourcesTab";
 
 type Row = { kind: "group"; title: string; count: number } | { kind: "entry"; entry: CatalogEntryDto };
 
-function EntryAction({ e, busy, onRun }: { e: CatalogEntryDto; busy: boolean; onRun: (op: "install" | "uninstall") => void }) {
-  if (busy) return <span className={l.meta}>Working…</span>;
-  if (e.updateAvailable) return <PrimaryButton onClick={() => onRun("install")}>Update</PrimaryButton>;
-  if (e.installedVersion) return <TextButton onClick={() => onRun("uninstall")}>Uninstall</TextButton>;
-  return <OutlinedButton onClick={() => onRun("install")}>Install</OutlinedButton>;
+type Op = "install" | "uninstall";
+
+function EntryAction({ e, busy, onRun }: { e: CatalogEntryDto; busy: Op | undefined; onRun: (op: Op) => void }) {
+  if (e.updateAvailable)
+    return (
+      <PrimaryButton busy={busy !== undefined} onClick={() => onRun("install")}>
+        {busy ? "Updating…" : "Update"}
+      </PrimaryButton>
+    );
+  if (e.installedVersion && busy !== "install")
+    return (
+      <TextButton busy={busy === "uninstall"} onClick={() => onRun("uninstall")}>
+        {busy ? "Uninstalling…" : "Uninstall"}
+      </TextButton>
+    );
+  return (
+    <OutlinedButton busy={busy === "install"} onClick={() => onRun("install")}>
+      {busy ? "Installing…" : "Install"}
+    </OutlinedButton>
+  );
 }
 
 export function ExtensionsTab() {
@@ -32,7 +48,7 @@ export function ExtensionsTab() {
   const [query, setQuery] = useState("");
   const [lang, setLang] = useState<string | null>(null);
   const [showNsfw, setShowNsfw] = useState(false);
-  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<ReadonlyMap<string, Op>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -60,17 +76,19 @@ export function ExtensionsTab() {
     overscan: 10,
   });
 
-  const run = async (e: CatalogEntryDto, op: "install" | "uninstall") => {
+  const run = async (e: CatalogEntryDto, op: Op) => {
+    if (busy.has(e.pkgName)) return;
     setError(null);
-    setBusy((b) => new Set(b).add(e.pkgName));
+    setBusy((b) => new Map(b).set(e.pkgName, op));
     try {
       if (op === "install") await api.extInstall(e.repoUrl, e.pkgName);
       else await api.extUninstall(e.pkgName);
+      toast.ok(op === "uninstall" ? `${e.name} uninstalled.` : e.updateAvailable ? `${e.name} updated to ${e.versionName}.` : `${e.name} installed.`);
     } catch (err) {
       setError(`${e.name}: ${(err as CmdError).message}`);
     } finally {
       setBusy((b) => {
-        const n = new Set(b);
+        const n = new Map(b);
         n.delete(e.pkgName);
         return n;
       });
@@ -79,7 +97,7 @@ export function ExtensionsTab() {
   };
 
   let body;
-  if (repos.isLoading) body = <Loading />;
+  if (repos.isLoading) body = <SkeletonRows count={10} />;
   else if (repos.isError) body = <ErrorState message={(repos.error as unknown as CmdError).message} onRetry={() => void repos.refetch()} />;
   else if (!hasRepos)
     body = (
@@ -94,7 +112,7 @@ export function ExtensionsTab() {
         }
       />
     );
-  else if (catalog.isLoading) body = <Loading />;
+  else if (catalog.isLoading) body = <Loading label="Reading the extension repositories…" />;
   else if (catalog.isError) body = <ErrorState message={(catalog.error as unknown as CmdError).message} onRetry={() => void catalog.refetch()} />;
   else if (rows.length === 0) body = <EmptyState icon={Search} title="No extension matches" detail="Try another search or language, or show NSFW extensions." />;
   else
@@ -130,7 +148,7 @@ export function ExtensionsTab() {
                       .join(" · ")}
                   </span>
                 </span>
-                <EntryAction e={e} busy={busy.has(e.pkgName)} onRun={(op) => void run(e, op)} />
+                <EntryAction e={e} busy={busy.get(e.pkgName)} onRun={(op) => void run(e, op)} />
               </div>
             );
           })}
@@ -163,7 +181,7 @@ export function ExtensionsTab() {
             ))}
           </>
         )}
-        {hasRepos && <IconButton icon={RefreshCw} label="Reload catalog" size={18} onClick={() => void catalog.refetch()} disabled={catalog.isFetching} />}
+        {hasRepos && <IconButton icon={RefreshCw} label={catalog.isFetching ? "Reloading…" : "Reload catalog"} size={18} onClick={() => void catalog.refetch()} busy={catalog.isFetching} />}
       </div>
       {(catalog.data?.failures ?? []).map((f) => (
         <div key={f.repoName} className={s.notice} role="status">

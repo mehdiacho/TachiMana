@@ -1,14 +1,15 @@
 // Settings (spec §3.7): theme, rotation, online sources, AniList, storage (data folder, page
 // cache, NAS), sync, updates and about.
 import { CheckCircle2, ChevronRight, Circle, Database, Puzzle, FolderOpen, HardDrive, Info, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
-import { useState } from "react";
 import { api } from "../../api/commands";
-import { keys, queryClient, useAniList, useAppInfo, useHelper, useCacheUsage, useSetSettings, useSettings, useUpdate } from "../../api/queries";
+import { keys, queryClient, useAniList, useAppInfo, useHelper, useCacheUsage, useSetSettings, useSettings } from "../../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { OutlinedButton, PrimaryButton, TextButton, Toggle } from "../../components/ui";
-import type { CmdError } from "../../gen/CmdError";
+import { OutlinedButton, PrimaryButton, Skeleton, Spinner, TextButton, Toggle } from "../../components/ui";
+import { useAction } from "../../hooks/useAction";
+import { helperProgressLine, useEvent } from "../../hooks/useEvent";
 import { accountLine } from "../../lib/track";
-import { updateAction, updateLine } from "../../lib/update";
+import { pendingLabel, updateLine } from "../../lib/update";
+import { useUpdateFlow } from "../../hooks/useUpdateFlow";
 import { helperLine } from "../../lib/helper";
 import { useUi } from "../../store/ui";
 import { NasSection } from "./NasSection";
@@ -31,19 +32,11 @@ const CACHE_SIZES = [1024, 2048, 5120, 10240, 20480, 51200];
 
 function AniListRow() {
   const account = useAniList();
-  const [note, setNote] = useState<string | null>(null);
   const a = account.data;
   const waiting = a?.signingIn === true;
-  const run = async (f: () => Promise<unknown>) => {
-    setNote(null);
-    try {
-      await f();
-    } catch (e) {
-      setNote((e as CmdError).message);
-    } finally {
-      void queryClient.invalidateQueries({ queryKey: keys.anilist });
-    }
-  };
+  const connect = useAction(api.anilistConnect, { ok: (r) => (r.connected ? `Signed in to AniList as ${r.userName ?? "you"}.` : null) });
+  const signOut = useAction(api.anilistDisconnect, { ok: () => "Signed out of AniList." });
+  const error = connect.error ?? signOut.error;
   return (
     <>
       <div className={s.row}>
@@ -51,20 +44,25 @@ function AniListRow() {
         <div className={s.rowText}>
           <span className={s.rowTitle}>AniList</span>
           <span className={s.rowDesc}>
-            {a ? accountLine(a.userName, a.expiresAt) : "…"}. Link a manga from its Tracking button; finished chapters update AniList.
+            {a ? `${accountLine(a.userName, a.expiresAt)}. ` : <Skeleton width={140} height={12} className={s.inlineSkeleton} />}
+            Link a manga from its Tracking button; finished chapters update AniList.
           </span>
         </div>
-        {a?.connected ? (
-          <TextButton onClick={() => void run(api.anilistDisconnect)}>Sign out</TextButton>
+        {!a ? (
+          <Skeleton width={84} height={30} radius="var(--tm-radius-pill)" />
+        ) : a.connected ? (
+          <TextButton busy={signOut.pending} onClick={() => void signOut.run()}>
+            {signOut.pending ? "Signing out…" : "Sign out"}
+          </TextButton>
         ) : (
-          <OutlinedButton disabled={waiting} onClick={() => void run(api.anilistConnect)}>
-            {waiting ? "Waiting for the browser…" : "Connect"}
+          <OutlinedButton busy={waiting || connect.pending} onClick={() => void connect.run()}>
+            {waiting || connect.pending ? "Waiting for the browser…" : "Connect"}
           </OutlinedButton>
         )}
       </div>
-      {note && (
+      {error && (
         <div className={s.err} role="alert">
-          {note}
+          {error}
         </div>
       )}
     </>
@@ -73,43 +71,44 @@ function AniListRow() {
 
 function HelperRow() {
   const helper = useHelper();
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
-  const [busy, setBusy] = useState<"file" | "download" | null>(null);
+  const [progress, setProgress] = useEvent<{ done: number; total: number }>("helper-progress");
   const h = helper.data;
-  const run = async (kind: "file" | "download", f: () => Promise<unknown>) => {
-    setBusy(kind);
-    setNote(null);
-    try {
-      const r = await f();
-      if (r) setNote({ ok: true, text: "The helper is installed. Browse can use extensions now." });
-    } catch (e) {
-      setNote({ ok: false, text: (e as CmdError).message });
-    } finally {
-      setBusy(null);
-      void queryClient.invalidateQueries({ queryKey: keys.helper });
-      void queryClient.invalidateQueries({ queryKey: keys.browseStatus });
-    }
+  const after = () => {
+    void queryClient.invalidateQueries({ queryKey: keys.helper });
+    void queryClient.invalidateQueries({ queryKey: keys.browseStatus });
   };
+  const ok = (r: unknown) => (r ? "The extension helper is installed. Browse can use extensions now." : null);
+  const fromFile = useAction(() => api.helperInstallFile().finally(after), { ok });
+  const download = useAction(
+    () => {
+      setProgress(null);
+      return api.helperDownload().finally(after);
+    },
+    { ok },
+  );
+  const busy = fromFile.pending || download.pending;
+  const error = fromFile.error ?? download.error;
   return (
     <>
       <div className={s.row}>
         <Puzzle size={20} className={s.rowIcon} />
         <div className={s.rowText}>
           <span className={s.rowTitle}>Extension helper</span>
-          <span className={s.rowDesc}>{h ? helperLine(h) : "…"}</span>
+          <span className={s.rowDesc}>{download.pending ? helperProgressLine(progress) : h ? helperLine(h) : <Skeleton width={220} height={12} />}</span>
+          {download.pending && progress && progress.total > 0 && <progress className={s.progress} value={progress.done} max={progress.total} />}
         </div>
-        <TextButton disabled={busy !== null} onClick={() => void run("file", api.helperInstallFile)}>
-          {busy === "file" ? "Installing…" : "From file…"}
+        <TextButton disabled={busy} busy={fromFile.pending} onClick={() => void fromFile.run()}>
+          {fromFile.pending ? "Installing…" : "From file…"}
         </TextButton>
         {h?.canDownload && (
-          <OutlinedButton disabled={busy !== null} onClick={() => void run("download", api.helperDownload)}>
-            {busy === "download" ? "Downloading…" : h.source === "missing" ? "Download" : "Reinstall"}
+          <OutlinedButton disabled={busy} busy={download.pending} onClick={() => void download.run()}>
+            {download.pending ? "Downloading…" : h.source === "missing" ? "Download" : "Reinstall"}
           </OutlinedButton>
         )}
       </div>
-      {note && (
-        <div className={note.ok ? s.ok : s.err} role={note.ok ? "status" : "alert"} style={note.ok ? { padding: "0 var(--tm-space-xl)" } : undefined}>
-          {note.text}
+      {error && (
+        <div className={s.err} role="alert">
+          {error}
         </div>
       )}
     </>
@@ -117,43 +116,40 @@ function HelperRow() {
 }
 
 function UpdateRow({ version, readOnly }: { version: string; readOnly: boolean }) {
-  const update = useUpdate();
-  const [note, setNote] = useState<string | null>(null);
-  const u = update.data;
-  const action = u ? updateAction(u) : null;
-  const run = async (f: () => Promise<unknown>) => {
-    setNote(null);
-    try {
-      await f();
-    } catch (e) {
-      setNote((e as CmdError).message);
-    } finally {
-      void queryClient.invalidateQueries({ queryKey: keys.update });
-    }
-  };
+  const { u, action, run, pending, error } = useUpdateFlow();
   return (
     <>
       <div className={s.row}>
         <Info size={20} className={s.rowIcon} />
         <div className={s.rowText}>
-          <span className={s.rowTitle}>TachiMana {version}</span>
+          <span className={s.rowTitle}>TachiMana {version || <Skeleton width={40} height={12} className={s.inlineSkeleton} />}</span>
           <span className={s.rowDesc}>
             A fork of Yōkai · Apache-2.0{readOnly ? " · This library was saved by a newer version, so editing is off." : ""}
           </span>
-          {u && <span className={s.rowDesc}>{updateLine(u)}</span>}
+          {u ? <span className={s.rowDesc}>{updateLine(u)}</span> : <Skeleton width={180} height={12} />}
+          {u?.progress != null && <progress className={s.progress} value={u.progress} max={1} />}
         </div>
         {action === "check" && (
-          <TextButton onClick={() => void run(api.updateCheck)}>
-            <RefreshCw size={14} style={{ verticalAlign: "-2px" }} /> Check now
+          <TextButton onClick={run} busy={pending}>
+            {!pending && <RefreshCw size={14} />}
+            {pending ? pendingLabel(action) : "Check now"}
           </TextButton>
         )}
-        {action === "download" && <PrimaryButton onClick={() => void run(api.updateDownload)}>Download</PrimaryButton>}
-        {action === "install" && <PrimaryButton onClick={() => void run(api.updateInstall)}>Install and restart</PrimaryButton>}
-        {action === "page" && <OutlinedButton onClick={() => void run(api.updateOpenPage)}>Release page</OutlinedButton>}
+        {action === "update" && (
+          <PrimaryButton onClick={run} busy={pending}>
+            {pending ? pendingLabel(action) : "Update now"}
+          </PrimaryButton>
+        )}
+        {action === "page" && (
+          <OutlinedButton onClick={run} busy={pending}>
+            Release page
+          </OutlinedButton>
+        )}
+        {action === null && u && <Spinner size={18} label="Working" />}
       </div>
-      {note && (
+      {error && (
         <div className={s.err} role="alert">
-          {note}
+          {error}
         </div>
       )}
     </>
@@ -170,10 +166,14 @@ export function SettingsScreen() {
   const setRotated = useUi((u) => u.setRotated);
   const setScreen = useUi((u) => u.setScreen);
   const st = settings.data;
-  const clear = async () => {
-    const u = await api.cacheClear().catch(() => null);
-    if (u) qc.setQueryData(keys.cache, u);
-  };
+  const clear = useAction(
+    async () => {
+      const u = await api.cacheClear();
+      qc.setQueryData(keys.cache, u);
+      return u;
+    },
+    { ok: () => "Page cache cleared.", toastError: true },
+  );
   return (
     <div className={s.screen}>
       <div className={s.col}>
@@ -247,14 +247,14 @@ export function SettingsScreen() {
           <Database size={20} className={s.rowIcon} />
           <div className={s.rowText}>
             <span className={s.rowTitle}>Data folder</span>
-            <span className={s.rowDesc}>{info.data?.dataDir ?? "…"}</span>
+            <span className={s.rowDesc}>{info.data?.dataDir ?? <Skeleton width={260} height={12} />}</span>
           </div>
         </div>
         <div className={s.row}>
           <FolderOpen size={20} className={s.rowIcon} />
           <div className={s.rowText}>
             <span className={s.rowTitle}>Local manga folder</span>
-            <span className={s.rowDesc}>{info.data?.localDir ?? "…"}</span>
+            <span className={s.rowDesc}>{info.data?.localDir ?? <Skeleton width={260} height={12} />}</span>
           </div>
         </div>
         <div className={s.row}>
@@ -262,7 +262,11 @@ export function SettingsScreen() {
           <div className={s.rowText}>
             <span className={s.rowTitle}>Page cache</span>
             <span className={s.rowDesc}>
-              {usage.data ? `${fmtBytes(usage.data.bytes)} used of ${fmtBytes(usage.data.capBytes)} · ${usage.data.entries} pages` : "…"}
+              {usage.data ? (
+                `${fmtBytes(usage.data.bytes)} used of ${fmtBytes(usage.data.capBytes)} · ${usage.data.entries} pages`
+              ) : (
+                <Skeleton width={200} height={12} />
+              )}
             </span>
           </div>
           <select
@@ -279,8 +283,9 @@ export function SettingsScreen() {
               </option>
             ))}
           </select>
-          <TextButton onClick={() => void clear()}>
-            <Trash2 size={14} style={{ verticalAlign: "-2px" }} /> Clear
+          <TextButton busy={clear.pending} onClick={() => void clear.run()}>
+            {!clear.pending && <Trash2 size={14} />}
+            {clear.pending ? "Clearing…" : "Clear"}
           </TextButton>
         </div>
         <NasSection />

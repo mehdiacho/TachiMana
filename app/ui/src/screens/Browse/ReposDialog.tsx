@@ -5,7 +5,8 @@ import { Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
 import { useBrowseInvalidate, useRepos } from "../../api/queries";
-import { Chip, IconButton, PrimaryButton } from "../../components/ui";
+import { Chip, IconButton, PrimaryButton, SkeletonRows, Spinner } from "../../components/ui";
+import { toast } from "../../store/activity";
 import type { CmdError } from "../../gen/CmdError";
 import { KEIYOUSHI_REPO } from "../../lib/browse";
 import l from "../Library/Library.module.css";
@@ -16,6 +17,7 @@ export function ReposDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   const invalidate = useBrowseInvalidate();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const add = async (u: string) => {
@@ -26,6 +28,7 @@ export function ReposDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     try {
       await api.extRepoAdd(trimmed);
       setUrl("");
+      toast.ok("Repository added. Its extensions are under Extensions.");
     } catch (e) {
       setError((e as CmdError).message);
     } finally {
@@ -34,12 +37,15 @@ export function ReposDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     }
   };
   const remove = async (baseUrl: string) => {
+    if (removing) return;
     setError(null);
+    setRemoving(baseUrl);
     try {
       await api.extRepoRemove(baseUrl);
     } catch (e) {
       setError((e as CmdError).message);
     } finally {
+      setRemoving(null);
       invalidate();
     }
   };
@@ -76,27 +82,28 @@ export function ReposDialog({ open, onOpenChange }: { open: boolean; onOpenChang
               maxLength={2000}
               disabled={busy}
             />
-            <PrimaryButton type="submit" disabled={busy || url.trim() === ""}>
+            <PrimaryButton type="submit" disabled={url.trim() === ""} busy={busy}>
               {busy ? "Adding…" : "Add"}
             </PrimaryButton>
           </form>
           {!hasKeiyoushi && (
             <div>
-              <Chip onClick={() => void add(KEIYOUSHI_REPO)} disabled={busy}>
-                <Plus size={15} /> Keiyoushi
+              <Chip onClick={() => void add(KEIYOUSHI_REPO)} disabled={busy} aria-busy={busy || undefined}>
+                {busy ? <Spinner size={15} /> : <Plus size={15} />} Keiyoushi
               </Chip>
             </div>
           )}
           {error && <div className={l.error}>{error}</div>}
           <div className={l.catList}>
-            {list.length === 0 && <div className={l.meta}>No repositories yet.</div>}
+            {repos.isLoading && <SkeletonRows count={2} cover={false} />}
+            {!repos.isLoading && list.length === 0 && <div className={l.meta}>No repositories yet.</div>}
             {list.map((r) => (
               <div key={r.baseUrl} className={s.repo}>
                 <div className={s.itemText}>
                   <span className={s.itemTitle}>{r.name}</span>
                   <span className={s.repoUrl}>{r.baseUrl}</span>
                 </div>
-                <IconButton icon={Trash2} label={`Remove ${r.name}`} size={18} onClick={() => void remove(r.baseUrl)} />
+                <IconButton icon={Trash2} label={removing === r.baseUrl ? `Removing ${r.name}…` : `Remove ${r.name}`} size={18} busy={removing === r.baseUrl} onClick={() => void remove(r.baseUrl)} />
               </div>
             ))}
           </div>

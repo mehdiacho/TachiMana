@@ -12,6 +12,8 @@ import { newlyDone } from "../lib/downloads";
 
 interface DownloadsState {
   jobs: DownloadJobDto[];
+  /** The queue has been read at least once (so an empty list means empty, not "not loaded"). */
+  ready: boolean;
   /** NAS uploads (`uploads` event). */
   uploads: UploadJobDto[];
   /** Subscribes once and loads the current queue. Safe to call from every screen. */
@@ -23,7 +25,7 @@ let started = false;
 export const useDownloads = create<DownloadsState>((set, get) => {
   const apply = (next: DownloadJobDto[]) => {
     const finished = newlyDone(get().jobs, next);
-    set({ jobs: next });
+    set({ jobs: next, ready: true });
     if (finished) {
       // Downloaded flags live on chapters and library entries.
       void queryClient.invalidateQueries({ queryKey: ["detail"] });
@@ -33,6 +35,7 @@ export const useDownloads = create<DownloadsState>((set, get) => {
   };
   return {
     jobs: [],
+    ready: false,
     uploads: [],
     init: () => {
       if (started) return;

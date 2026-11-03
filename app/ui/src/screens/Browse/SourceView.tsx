@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type BrowseMode } from "../../api/commands";
 import { keys, useSources } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
-import { Chip, Cover, EmptyState, ErrorState, IconButton, Loading, TextButton } from "../../components/ui";
+import { Chip, Cover, EmptyState, ErrorState, IconButton, Loading, SkeletonGrid, TextButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { OnlineMangaDto } from "../../gen/OnlineMangaDto";
 import { appendPage } from "../../lib/browse";
@@ -70,7 +70,7 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
 
   const more = () => void list.fetchNextPage();
   let body;
-  if (list.isLoading) body = <Loading />;
+  if (list.isLoading) body = <SkeletonGrid count={cls === "COMPACT" ? 8 : 12} />;
   else if (list.isError) body = <ErrorState message={(list.error as unknown as CmdError).message} onRetry={() => void list.refetch()} />;
   else if (mangas.length === 0)
     body = <EmptyState icon={SearchX} title="Nothing here" detail={view.mode === "search" ? "The source found nothing for that search." : "The source returned no titles."} />;
@@ -88,7 +88,7 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
         }}
         footer={
           list.isFetchingNextPage ? (
-            <Loading />
+            <Loading label="Loading more…" />
           ) : list.isFetchNextPageError ? (
             <TextButton onClick={more}>Couldn't load more. Retry</TextButton>
           ) : null

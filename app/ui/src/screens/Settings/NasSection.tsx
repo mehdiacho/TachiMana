@@ -1,11 +1,12 @@
 // NAS storage (PLAN §P6.5; settings from the Kotlin app's remote storage section): where the WebDAV
 // share is, how to sign in, what happens to downloads after upload, and the read cache.
+import { useAction } from "../../hooks/useAction";
 import { useQueryClient } from "@tanstack/react-query";
 import { Archive, CloudCog, HardDriveDownload, PlugZap, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, useNasCache, useNasSettings } from "../../api/queries";
-import { OutlinedButton, PrimaryButton, TextButton, Toggle } from "../../components/ui";
+import { OutlinedButton, PrimaryButton, SkeletonRows, TextButton, Toggle } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { NasSettingsDto } from "../../gen/NasSettingsDto";
 import type { NasSettingsPatch } from "../../gen/NasSettingsPatch";
@@ -49,8 +50,15 @@ export function NasSection() {
     if (nas.data && draft === null) setDraft(draftOf(nas.data));
   }, [nas.data, draft]);
 
+  const clearCache = useAction(
+    async () => {
+      const left = await api.nasCacheClear();
+      qc.setQueryData(keys.nasCache, left);
+    },
+    { ok: () => "NAS cache cleared.", toastError: true },
+  );
   const n = nas.data;
-  if (!n || !draft) return null;
+  if (!n || !draft) return <SkeletonRows count={2} cover={false} />;
   const edit = (p: Partial<Draft>) => {
     setDraft({ ...draft, ...p });
     setResult(null);
@@ -80,10 +88,6 @@ export function NasSection() {
     } finally {
       setBusy(null);
     }
-  };
-  const clearCache = async () => {
-    const left = await api.nasCacheClear().catch(() => null);
-    if (left !== null) qc.setQueryData(keys.nasCache, left);
   };
   const field = (label: string, key: keyof Draft, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <label className={s.field}>
@@ -126,10 +130,10 @@ export function NasSection() {
           </div>
           <div className={s.fieldLabel}>{n.url ? `Saved address: ${n.url}` : "No address saved yet."}</div>
           <div className={s.buttons}>
-            <OutlinedButton onClick={() => void test()} disabled={busy !== null || !draft.host.trim()}>
-              <PlugZap size={16} /> {busy === "test" ? "Testing…" : "Test connection"}
+            <OutlinedButton onClick={() => void test()} disabled={busy !== null || !draft.host.trim()} busy={busy === "test"}>
+              {busy !== "test" && <PlugZap size={16} />} {busy === "test" ? "Testing…" : "Test connection"}
             </OutlinedButton>
-            <PrimaryButton onClick={() => void save(patchOf(draft))} disabled={busy !== null || !dirty}>
+            <PrimaryButton onClick={() => void save(patchOf(draft))} disabled={busy !== null || !dirty} busy={busy === "save"}>
               {busy === "save" ? "Saving…" : "Save"}
             </PrimaryButton>
             {n.passwordSet && (
@@ -174,7 +178,7 @@ export function NasSection() {
             <CloudCog size={20} className={s.rowIcon} />
             <div className={s.rowText}>
               <span className={s.rowTitle}>NAS read cache</span>
-              <span className={s.rowDesc}>{cache.data !== undefined ? `${fmtBytes(cache.data)} used` : "…"} · chapters read from the NAS are kept here</span>
+              <span className={s.rowDesc}>{cache.data !== undefined ? `${fmtBytes(cache.data)} used` : "Measuring…"} · chapters read from the NAS are kept here</span>
             </div>
             <select className={s.select} aria-label="NAS read cache size" value={n.cacheMb} onChange={(e) => void save({ cacheMb: Number(e.target.value) })}>
               {[...new Set([...CACHE_SIZES, n.cacheMb])]
@@ -185,8 +189,8 @@ export function NasSection() {
                   </option>
                 ))}
             </select>
-            <TextButton onClick={() => void clearCache()}>
-              <Trash2 size={14} style={{ verticalAlign: "-2px" }} /> Clear
+            <TextButton onClick={() => void clearCache.run()} busy={clearCache.pending}>
+              {!clearCache.pending && <Trash2 size={14} />} {clearCache.pending ? "Clearing…" : "Clear"}
             </TextButton>
           </div>
         </>

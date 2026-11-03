@@ -1,6 +1,9 @@
 //! Updates in the app (`update/UpdateChecker.kt`): a quiet check a little after start-up, a
-//! "Check now" in Settings, and on Windows a download then a separate click to run the installer.
-//! Elsewhere the release page opens instead. Failing to check never bothers the user.
+//! "Check now" in Settings, and on Windows one "Update now" that downloads the installer and runs it
+//! in place: passive (a small progress window, no wizard pages), in update mode (no uninstall
+//! first) and reopening the app when it is done. Elsewhere the release page opens instead. Failing
+//! to check never bothers the user. Every state change is sent as an `update` event the moment it
+//! starts, so the UI never waits on a command to learn what is happening.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +31,8 @@ struct Inner {
     /// Bytes so far and total while downloading.
     progress: Option<(u64, u64)>,
     installer: Option<PathBuf>,
+    /// The installer was started and this app is about to quit.
+    installing: bool,
 }
 
 pub struct Updates {
@@ -76,6 +81,8 @@ pub struct UpdateStatusDto {
     pub progress: Option<f64>,
     /// The installer is downloaded and ready to run.
     pub ready: bool,
+    /// The installer is running; the app closes and reopens on the new version.
+    pub installing: bool,
 }
 
 fn status_of(state: &AppState) -> UpdateStatusDto {
@@ -93,7 +100,17 @@ fn status_of(state: &AppState) -> UpdateStatusDto {
             .progress
             .map(|(n, t)| if t > 0 { n as f64 / t as f64 } else { 0.0 }),
         ready: i.installer.is_some(),
+        installing: i.installing,
     }
+}
+
+/// The platform the check asks for. Debug builds can pretend to be Windows
+/// (`TM_UPDATE_PLATFORM=windows`) to try the download and install flow elsewhere.
+fn platform() -> Platform {
+    if cfg!(debug_assertions) && std::env::var("TM_UPDATE_PLATFORM").is_ok_and(|v| v == "windows") {
+        return Platform::Windows;
+    }
+    Platform::current()
 }
 
 fn emit(app: &AppHandle) {
@@ -125,7 +142,7 @@ async fn check(app: &AppHandle) -> R<UpdateStatusDto> {
         return Ok(status_of(&state));
     }
     emit(app);
-    let r = updater.check(CURRENT, Platform::current()).await;
+    let r = updater.check(CURRENT, platform()).await;
     {
         let mut i = u.lock();
         i.checked = true;
@@ -192,6 +209,9 @@ pub async fn update_download(app: AppHandle) -> R<UpdateStatusDto> {
             "An update check or download is already running.",
         ));
     }
+    // Show the bar at 0% now: the checksum fetch comes before the first byte.
+    u.lock().progress = Some((0, asset.size));
+    emit(&app);
     let dir = std::env::temp_dir().join("tachimana-update");
     let progress_app = app.clone();
     let mut last_emit = std::time::Instant::now();
@@ -223,8 +243,14 @@ pub async fn update_download(app: AppHandle) -> R<UpdateStatusDto> {
     }
 }
 
-/// Runs the downloaded installer and quits so it can replace this app's files. The path is the
-/// one this app downloaded, never one from the page.
+/// Arguments for the Tauri NSIS installer (`installer.nsi` in tauri-bundler): `/P` passive (a
+/// progress window and no pages to click through), `/UPDATE` (install over this version without
+/// uninstalling it first; settings and data are untouched either way) and `/R` (start the app
+/// again when it finishes).
+pub const INSTALL_ARGS: [&str; 3] = ["/P", "/UPDATE", "/R"];
+
+/// Runs the downloaded installer in place and quits so it can replace this app's files. The path
+/// is the one this app downloaded, never one from the page.
 #[tauri::command]
 pub fn update_install(app: AppHandle, state: State<'_, AppState>) -> R<()> {
     let path = state
@@ -234,11 +260,17 @@ pub fn update_install(app: AppHandle, state: State<'_, AppState>) -> R<()> {
         .clone()
         .ok_or_else(|| CmdError::new("invalid", "Download the update first."))?;
     std::process::Command::new(&path)
+        .args(INSTALL_ARGS)
         .spawn()
         .map_err(|e| CmdError::new("update", format!("Couldn't start the installer: {e}")))?;
+    tracing::info!(installer = %path.display(), "update installer started");
+    state.updates.lock().installing = true;
+    emit(&app);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        // Long enough for the UI to show "Installing…", short enough that the installer never
+        // has to ask to close the app.
+        tokio::time::sleep(Duration::from_millis(800)).await;
         app.exit(0);
     });
     Ok(())
