@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-03 by Claude (implementing; the planned agent was unavailable)
-Current phase: P9 parity sweep on feat/rust-p9-parity (stacked on P8); the Kotlin app is not removed (needs Mehdi's OK)
+Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). Now: full backup restore (feat/backup-restore-all). The Kotlin app stays until Mehdi has tried the Windows installer
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -111,9 +111,24 @@ Done:
   Checked by hand in the running app: screenshots in `docs/rust-port/shots/p8/`. Linux installers
   built here; sizes, start-up and memory in `baseline.md` ("Rust app").
 
-Next step: merge #13 (P8) and #14 (P9); Mehdi creates the releases repository and secret, tries
-the Windows installer, then a follow-up PR removes `desktop/` and `release.yml` (ext-host and the
-Kotlin modules it needs stay).
+Full backup restore (2026-11-03, feat/backup-restore-all). Asked by Mehdi: a restore should bring
+everything back, including repos, extensions, tracking and downloads.
+- A stock Mihon `.tachibk` holds library, chapters (read, bookmark, page), history, categories,
+  tracking rows, sources (id + name), extension repos (tag 106) and preferences. It does not hold
+  installed extensions or download state. New optional tags 900 add them; the schema is in
+  `docs/rust-port/backup-schema.md`, shared with Mehdi's Mihon fork (its own thread does that side).
+- Restore now adds the backup's repos (http/https only), reports them, and offers on the Sync screen:
+  "Find the extensions it used" then "Install all" (tag 900 list, or for stock Mihon backups the
+  catalog extensions providing the library's sources), "Download all / Unread only" for chapters
+  marked downloaded, and "Sign in to AniList" when AniList rows came back without a session.
+  The same applies to a LAN pull.
+- Export writes tag 900 from the host's last-seen extension list (refreshed before saving, and
+  whenever Browse lists extensions) and marks chapters complete on disk as downloaded.
+- Both apps share `%LOCALAPPDATA%\TachiMana` on Windows, so a Rust install opens the Kotlin
+  library. Mehdi's PC was wiped clean 2026-11-03 for a fresh install.
+
+Next step: release 0.1.1 with the restore work; Mehdi tries the Windows installer, then a follow-up
+PR removes `desktop/` and `release.yml` (ext-host and the Kotlin modules it needs stay).
 
 P8 not done yet:
 - Open question 1 answered 2026-11-03 (Mehdi: public releases repo). Releases go to the public

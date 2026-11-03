@@ -4,12 +4,13 @@ import { ArchiveRestore, Laptop, Plus, RefreshCw, Save, Wifi } from "lucide-reac
 import { useState } from "react";
 import { api } from "../../api/commands";
 import { queryClient, keys, useSyncStatus } from "../../api/queries";
-import { ErrorState, Loading, OutlinedButton, PrimaryButton, TextButton } from "../../components/ui";
+import { ErrorState, Loading, OutlinedButton, PrimaryButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { PeerDto } from "../../gen/PeerDto";
 import { cleanCode, isCode, parsePort, reportLine, restoreLine, spacedCode, splitAddress } from "../../lib/sync";
 import l from "../Library/Library.module.css";
 import st from "../Settings/Settings.module.css";
+import { RestoreOffer } from "./RestoreOffer";
 import s from "./Sync.module.css";
 
 const DEFAULT_PORT = "27193";
@@ -104,7 +105,6 @@ export function SyncScreen() {
     }
   };
 
-  const pending = st_.pendingRepos;
   const r = st_.lastReport;
 
   return (
@@ -221,7 +221,7 @@ export function SyncScreen() {
           <Save size={20} className={st.rowIcon} />
           <div className={st.rowText}>
             <span className={st.rowTitle}>Export backup</span>
-            <span className={st.rowDesc}>Save a .tachibk that Mihon, Yōkai or Tachiyomi can import: your library, read progress, categories, tracking and extension repos. Settings and passwords are not included.</span>
+            <span className={st.rowDesc}>Save a .tachibk that Mihon, Yōkai or Tachiyomi can import: your library, read progress, categories, tracking, extension repos, the extensions you have installed and which chapters are downloaded (not the files). Settings and passwords are not included.</span>
           </div>
           <OutlinedButton onClick={() => void save()} disabled={backupBusy !== null}>
             {backupBusy === "export" ? "Saving…" : "Save file…"}
@@ -232,29 +232,7 @@ export function SyncScreen() {
             {backupNote.text}
           </div>
         )}
-        {pending.length > 0 && (
-          <div className={s.card}>
-            <div className={st.rowTitle}>Extension repos from that library</div>
-            <div className={st.rowDesc}>
-              It uses {pending.length === 1 ? "an extension repo" : `${pending.length} extension repos`} you haven't added. Nothing is added or installed unless you
-              accept.
-            </div>
-            <div role="list">
-              {pending.map((p) => (
-                <div key={p.indexUrl} className={s.repo} role="listitem">
-                  <span className={st.rowTitle}>{p.name || p.indexUrl}</span>
-                  <span className={st.rowDesc}>{p.indexUrl}</span>
-                </div>
-              ))}
-            </div>
-            <div className={st.buttons}>
-              <PrimaryButton onClick={() => void api.backupAcceptRepos().then(() => queryClient.invalidateQueries({ queryKey: keys.repos }))}>
-                {pending.length === 1 ? "Add repo" : "Add repos"}
-              </PrimaryButton>
-              <TextButton onClick={() => void api.backupDismissRepos()}>Not now</TextButton>
-            </div>
-          </div>
-        )}
+        <RestoreOffer offer={st_.offer} />
       </div>
     </div>
   );

@@ -4,7 +4,9 @@
 //!
 //! Import upserts manga by (source, url) and chapters by (url, manga), so a repeated restore or
 //! sync is idempotent. Read progress only moves forward. Categories are matched by name and added,
-//! never removed. Extension stores are only *reported* as pending; the user accepts them.
+//! never removed. Extension stores the backup lists are added (data only; nothing is installed).
+//! What a restore can then offer — the extensions to install, the chapters to download again,
+//! the trackers to sign in to — comes back in [`ImportSummary`] for the app to ask about.
 
 pub mod codec;
 pub mod model;
@@ -32,8 +34,7 @@ pub enum BackupError {
 
 pub type Result<T> = std::result::Result<T, BackupError>;
 
-/// What an import did, for the UI. `pending_repos` are extension stores the backup lists that
-/// this install does not have; they are NOT added until the user accepts them.
+/// What an import did, and what it can offer next, for the UI.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct ImportSummary {
     pub manga_added: usize,
@@ -41,8 +42,30 @@ pub struct ImportSummary {
     pub chapters_added: usize,
     pub chapters_updated: usize,
     pub categories_added: usize,
-    pub pending_repos: Vec<BackupExtensionStore>,
+    /// Extension stores this install did not have, now added.
+    pub repos_added: Vec<BackupExtensionStore>,
+    /// The extensions the backup says were installed (tag 900), first copy of each package.
+    pub extensions: Vec<BackupExtension>,
+    /// Online source ids the library uses, for backups without tag 900 (stock Mihon).
+    pub source_ids: Vec<i64>,
+    /// Chapters marked downloaded on the device that wrote the backup, as rows here.
+    pub downloaded: Vec<DownloadedChapter>,
+    /// Tracker ids (`sync_id`) with at least one restored row.
+    pub trackers: Vec<i64>,
 }
+
+/// A chapter that was downloaded on the backup's device, mapped to this library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct DownloadedChapter {
+    pub manga_id: i64,
+    pub chapter_id: i64,
+    pub read: bool,
+}
+
+/// Cap on the extensions an import reports; a real install has a few hundred at most.
+const MAX_EXTENSIONS: usize = 2_000;
+/// Cap on the downloaded chapters an import reports.
+const MAX_DOWNLOADED: usize = 100_000;
 
 const KIND_PREFERENCES: &str = "preferences";
 const KIND_SOURCE_PREFERENCES: &str = "source_preferences";
@@ -138,7 +161,30 @@ fn export_in(c: &Connection, source_names: &HashMap<i64, String>) -> Result<Back
         backup_preferences: passthrough(c, KIND_PREFERENCES)?,
         backup_source_preferences: passthrough(c, KIND_SOURCE_PREFERENCES)?,
         backup_extension_stores,
+        // Only the app knows these; it fills them in with `annotate`.
+        backup_extensions: Vec::new(),
     })
+}
+
+/// Add what only the app knows to an exported backup: the installed extensions (tag 900) and,
+/// per chapter, whether it is downloaded here. `is_downloaded(source, manga_url, chapter_url)`.
+pub fn annotate(
+    backup: &mut Backup,
+    extensions: Vec<BackupExtension>,
+    is_downloaded: impl Fn(i64, &str, &str) -> bool,
+) {
+    backup.backup_extensions = extensions;
+    for bm in &mut backup.backup_manga {
+        let (source, url) = (bm.source(), bm.url().to_owned());
+        if source == LOCAL_SOURCE {
+            continue;
+        }
+        for bc in &mut bm.chapters {
+            if is_downloaded(source, &url, bc.url()) {
+                bc.downloaded = Some(true);
+            }
+        }
+    }
 }
 
 fn export_manga(c: &Connection, m: &Manga) -> Result<BackupManga> {
@@ -240,6 +286,7 @@ fn export_chapter(ch: &Chapter) -> BackupChapter {
         version: ch.version,
         memo: Some(ch.memo.clone()),
         pages_left: i32::try_from(ch.pages_left).unwrap_or(0),
+        downloaded: None,
     }
 }
 
@@ -353,6 +400,9 @@ fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary>
         }
 
         import_chapters(c, manga_id, bm, now, &mut s)?;
+        if bm.source() != LOCAL_SOURCE && bm.chapters.iter().any(|bc| bc.downloaded()) {
+            note_downloaded(c, manga_id, bm, &mut s)?;
+        }
         import_history(c, manga_id, bm)?;
 
         // Category membership is additive.
@@ -377,9 +427,17 @@ fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary>
         }
 
         import_tracking(c, manga_id, bm)?;
+        for t in &bm.tracking {
+            if let Some(id) = t.sync_id.map(i64::from) {
+                if !s.trackers.contains(&id) {
+                    s.trackers.push(id);
+                }
+            }
+        }
     }
 
-    // Stores are surfaced, never added: restoring a backup must not install anything.
+    // Stores are added (they are only addresses and a signing key); installing from them is the
+    // user's call, offered from `extensions` / `source_ids`.
     let have: HashSet<String> = {
         let mut st = c.prepare_cached(q("extension_repos", "findAll")?)?;
         let v = st
@@ -391,11 +449,40 @@ fn import_in(c: &Connection, backup: &Backup, now: i64) -> Result<ImportSummary>
     let mut seen = HashSet::new();
     for store in &backup.backup_extension_stores {
         let key = store.index_url().trim().trim_end_matches('/').to_owned();
-        if key.is_empty() || have.contains(&key) || !seen.insert(key) {
+        if key.is_empty() || have.contains(&key) || !seen.insert(key.clone()) {
             continue;
         }
-        s.pending_repos.push(store.clone());
+        if !(key.starts_with("https://") || key.starts_with("http://")) {
+            tracing::warn!(url = %key, "backup lists a repo that is not a web address; skipped");
+            continue;
+        }
+        c.execute(
+            q("extension_repos", "upsert")?,
+            named_params! {":base_url": key, ":name": if store.name().trim().is_empty() {
+                key.as_str() } else { store.name() },
+            ":short_name": store.badge_label, ":website": store.contact_website,
+            ":fingerprint": store.signing_key},
+        )?;
+        s.repos_added.push(store.clone());
     }
+
+    let mut pkgs = HashSet::new();
+    s.extensions = backup
+        .backup_extensions
+        .iter()
+        .filter(|e| !e.pkg_name.trim().is_empty() && pkgs.insert(e.pkg_name.clone()))
+        .take(MAX_EXTENSIONS)
+        .cloned()
+        .collect();
+    let mut ids = BTreeSet::new();
+    s.source_ids = backup
+        .backup_sources
+        .iter()
+        .filter_map(|b| b.source_id)
+        .chain(backup.backup_manga.iter().map(BackupManga::source))
+        .filter(|id| *id != LOCAL_SOURCE && ids.insert(*id))
+        .take(MAX_EXTENSIONS)
+        .collect();
 
     // Park what we don't interpret so a re-export hands it back unchanged.
     park(c, KIND_PREFERENCES, &backup.backup_preferences)?;
@@ -550,6 +637,34 @@ fn import_history(c: &Connection, manga_id: i64, bm: &BackupManga) -> Result<()>
 }
 
 /// Tracking rows keyed by (manga, service); an existing row only moves forward.
+/// Record this manga's chapters the backup marks downloaded, as rows of this library.
+fn note_downloaded(
+    c: &Connection,
+    manga_id: i64,
+    bm: &BackupManga,
+    s: &mut ImportSummary,
+) -> Result<()> {
+    let wanted: HashSet<&str> = bm
+        .chapters
+        .iter()
+        .filter(|bc| bc.downloaded())
+        .map(BackupChapter::url)
+        .collect();
+    for ch in tm_db::chapters_tx(c, manga_id)? {
+        if s.downloaded.len() >= MAX_DOWNLOADED {
+            break;
+        }
+        if wanted.contains(ch.url.as_str()) {
+            s.downloaded.push(DownloadedChapter {
+                manga_id,
+                chapter_id: ch.id,
+                read: ch.read,
+            });
+        }
+    }
+    Ok(())
+}
+
 fn import_tracking(c: &Connection, manga_id: i64, bm: &BackupManga) -> Result<()> {
     let existing = tracks(c, manga_id)?;
     for t in &bm.tracking {
@@ -618,28 +733,6 @@ fn park(c: &Connection, kind: &str, blobs: &[Vec<u8>]) -> Result<()> {
 // ---------------------------------------------------------------------------------------------
 // After an import
 // ---------------------------------------------------------------------------------------------
-
-/// Add extension stores the user accepted from a backup, from the backup's own metadata.
-pub fn add_extension_repos(db: &Db, repos: &[BackupExtensionStore]) -> Result<()> {
-    for r in repos {
-        let url = r.index_url().trim().trim_end_matches('/');
-        if url.is_empty() {
-            continue;
-        }
-        db.upsert_extension_repo(&ExtensionRepo {
-            base_url: url.to_owned(),
-            name: if r.name().trim().is_empty() {
-                url.to_owned()
-            } else {
-                r.name().to_owned()
-            },
-            short_name: r.badge_label.clone(),
-            website: r.contact_website.clone(),
-            signing_key_fingerprint: r.signing_key.clone(),
-        })?;
-    }
-    Ok(())
-}
 
 /// Point local-source manga at their cover file under `local_root` on this machine. Call after
 /// a pull or restore: a backup's local thumbnail path belongs to the sender.

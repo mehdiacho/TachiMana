@@ -25,6 +25,22 @@ export function restoreLine(s: ImportSummaryDto): string {
   return line;
 }
 
+/** What looking up a backup's extensions found: what can be installed, and what no repo offers. */
+export function extensionsLine(toInstall: { name: string }[], missing: { name: string }[]): string {
+  const names = (v: { name: string }[]) => v.map((e) => e.name).join(", ");
+  const parts: string[] = [];
+  if (toInstall.length > 0) parts.push(`${toInstall.length === 1 ? "1 extension" : `${toInstall.length} extensions`} to install: ${names(toInstall)}.`);
+  if (missing.length > 0) parts.push(`Not found in your repos: ${names(missing)}.`);
+  return parts.length > 0 ? parts.join(" ") : "Every extension the backup used is installed.";
+}
+
+/** The question asked about chapters that were downloaded on the backup's device. */
+export function redownloadLine(total: number, unread: number): string {
+  const what = total === 1 ? "1 chapter was" : `${total} chapters were`;
+  const tail = unread > 0 && unread < total ? ` ${unread} of them are unread.` : "";
+  return `${what} downloaded on the other device. Download ${total === 1 ? "it" : "them"} here too?${tail}`;
+}
+
 export function reportLine(r: PullReportDto): string {
   return `+${plural(r.summary.mangaAdded, "manga", "manga")} · +${plural(r.summary.chaptersAdded, "chapter")} · ${plural(r.filesPulled, "file")} (${kb(r.bytesPulled)})`;
 }

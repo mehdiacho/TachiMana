@@ -87,7 +87,7 @@ fn restore_from_file_imports_library_and_relinks_covers() {
 }
 
 #[test]
-fn extension_stores_are_pending_until_accepted() {
+fn extension_stores_in_a_backup_are_added_on_restore() {
     let tmp = tempfile::tempdir().unwrap();
     let a = seeded(tmp.path());
     a.upsert_extension_repo(&ExtensionRepo {
@@ -108,17 +108,91 @@ fn extension_stores_are_pending_until_accepted() {
 
     let c = Db::open_in_memory().unwrap();
     let s = import(&c, &decoded).unwrap();
-    assert_eq!(s.pending_repos.len(), 1);
-    assert_eq!(s.pending_repos[0].name(), "Test Repo");
-    assert!(
-        c.extension_repos().unwrap().is_empty(),
-        "import must not add repos"
-    );
-    add_extension_repos(&c, &s.pending_repos).unwrap();
+    assert_eq!(s.repos_added.len(), 1);
+    assert_eq!(s.repos_added[0].name(), "Test Repo");
     let repos = c.extension_repos().unwrap();
     assert_eq!(repos.len(), 1);
     assert_eq!(repos[0].base_url, "https://example.com/testrepo");
-    assert!(import(&c, &decoded).unwrap().pending_repos.is_empty());
+    assert_eq!(repos[0].signing_key_fingerprint, "aa:bb:cc");
+    assert!(import(&c, &decoded).unwrap().repos_added.is_empty());
+}
+
+#[test]
+fn a_repo_that_is_not_a_web_address_is_not_added() {
+    let mut b = Backup::default();
+    b.backup_extension_stores.push(BackupExtensionStore {
+        index_url: Some("file:///etc/passwd".into()),
+        ..Default::default()
+    });
+    let c = Db::open_in_memory().unwrap();
+    assert!(import(&c, &b).unwrap().repos_added.is_empty());
+    assert!(c.extension_repos().unwrap().is_empty());
+}
+
+#[test]
+fn installed_extensions_and_download_state_survive_a_round_trip() {
+    let src = Db::open_in_memory().unwrap();
+    let mut seed = Backup::default();
+    let mut m = BackupManga::new(42, "/m/dl");
+    m.title = "Downloaded".into();
+    m.chapters = vec![
+        BackupChapter::new("/c/1", "Ch 1"),
+        BackupChapter::new("/c/2", "Ch 2"),
+        BackupChapter::new("/c/3", "Ch 3"),
+    ];
+    m.chapters[0].read = true;
+    m.tracking = vec![BackupTracking {
+        sync_id: Some(2),
+        media_id: 777,
+        ..Default::default()
+    }];
+    seed.backup_manga.push(m);
+    import(&src, &seed).unwrap();
+
+    let mut b = export(&src, &none()).unwrap();
+    let ext = BackupExtension {
+        pkg_name: "eu.kanade.tachiyomi.extension.en.test".into(),
+        name: Some("Test".into()),
+        version_code: Some(5),
+        repo_index_url: Some("https://example.com/index.min.json".into()),
+        source_ids: vec![42],
+        ..Default::default()
+    };
+    annotate(
+        &mut b,
+        vec![ext.clone(), ext.clone()],
+        |source, manga, ch| source == 42 && manga == "/m/dl" && ch != "/c/2",
+    );
+    let decoded = codec::decode(&codec::encode(&b).unwrap()).unwrap();
+    assert_eq!(decoded.backup_extensions.len(), 2);
+
+    let dst = Db::open_in_memory().unwrap();
+    let s = import(&dst, &decoded).unwrap();
+    assert_eq!(s.extensions, vec![ext], "one entry per package");
+    assert_eq!(s.source_ids, vec![42]);
+    assert_eq!(s.trackers, vec![2]);
+    let id = dst.library().unwrap()[0].id;
+    let chapters = dst.chapters(id).unwrap();
+    let by_url = |u: &str| chapters.iter().find(|c| c.url == u).unwrap().id;
+    let mut got: Vec<(i64, bool)> = s
+        .downloaded
+        .iter()
+        .map(|d| (d.chapter_id, d.read))
+        .collect();
+    got.sort_unstable();
+    let mut want = vec![(by_url("/c/1"), true), (by_url("/c/3"), false)];
+    want.sort_unstable();
+    assert_eq!(got, want);
+    assert!(s.downloaded.iter().all(|d| d.manga_id == id));
+}
+
+#[test]
+fn a_stock_mihon_backup_offers_its_sources_and_no_downloads() {
+    let db = Db::open_in_memory().unwrap();
+    let s = import(&db, &mihon_backup()).unwrap();
+    assert!(s.extensions.is_empty());
+    assert!(s.downloaded.is_empty());
+    assert!(s.source_ids.contains(&99));
 }
 
 fn mihon_backup() -> Backup {
@@ -175,6 +249,7 @@ fn mihon_backup() -> Backup {
             is_legacy: Some(false),
             extension_list_url: Some("https://example.com/list.pb".into()),
         }],
+        backup_extensions: Vec::new(),
     }
 }
 
@@ -183,7 +258,6 @@ fn mihon_round_trip_keeps_every_field_we_store() {
     let db = Db::open_in_memory().unwrap();
     let mihon = mihon_backup();
     import(&db, &mihon).unwrap();
-    add_extension_repos(&db, &mihon.backup_extension_stores).unwrap();
     let round = export(&db, &none()).unwrap();
 
     let rm = round
@@ -399,11 +473,8 @@ fn restores_a_backup_made_by_the_kotlin_app() {
         (s.manga_added, s.chapters_added, s.categories_added),
         (2, 4, 1)
     );
-    assert_eq!(s.pending_repos.len(), 1);
-    assert_eq!(
-        s.pending_repos[0].index_url(),
-        "https://example.com/index.pb"
-    );
+    assert_eq!(s.repos_added.len(), 1);
+    assert_eq!(s.repos_added[0].index_url(), "https://example.com/index.pb");
 
     let lib = db.library().unwrap();
     let mihon = lib.iter().find(|m| m.url == "/m/1").unwrap();

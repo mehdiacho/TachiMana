@@ -12,6 +12,7 @@ import type { UploadJobDto } from "../gen/UploadJobDto";
 import type { PeerDto } from "../gen/PeerDto";
 import type { PullReportDto } from "../gen/PullReportDto";
 import type { RestoreDto } from "../gen/RestoreDto";
+import type { RestoreExtensionsDto } from "../gen/RestoreExtensionsDto";
 import type { SyncStatusDto } from "../gen/SyncStatusDto";
 import type { AniListAccountDto } from "../gen/AniListAccountDto";
 import type { MediaDto } from "../gen/MediaDto";
@@ -129,9 +130,11 @@ export const api = {
   backupExport: () => call<string | null>("backup_export"),
   /** Opens a file dialog; resolves with what was restored, or null when cancelled. */
   backupRestore: () => call<RestoreDto | null>("backup_restore"),
-  /** Adds the pending extension stores with these index URLs (all when omitted). */
-  backupAcceptRepos: (indexUrls?: string[]) => call<void>("backup_accept_repos", { indexUrls: indexUrls ?? null }),
-  backupDismissRepos: () => call<void>("backup_dismiss_repos"),
+  /** The extensions the last restore can install, matched against the user's repos. */
+  restoreExtensions: () => call<RestoreExtensionsDto>("restore_extensions"),
+  /** Queues the chapters the backup's device had downloaded; resolves with how many. */
+  restoreRedownload: (unreadOnly: boolean) => call<number>("restore_redownload", { unreadOnly }),
+  restoreDismiss: () => call<void>("restore_dismiss"),
 
   // AniList. Account changes arrive as `anilist` events; a push after reading as `track-changed`.
   anilistAccount: () => call<AniListAccountDto>("anilist_account"),

@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
-use tm_backup::{BackupExtensionStore, ImportSummary};
+use tm_backup::{BackupExtension, BackupExtensionStore, DownloadedChapter, ImportSummary};
 use tm_db::Db;
 use tm_sync::discovery::Discovery;
 use tm_sync::server::SyncServer;
@@ -33,8 +33,10 @@ pub struct Sync {
     progress: Mutex<Option<String>>,
     last_report: Mutex<Option<PullReport>>,
     last_error: Mutex<Option<String>>,
-    /// Extension stores from the last restore or pull, waiting for the user to accept.
-    pending: Mutex<Vec<BackupExtensionStore>>,
+    /// What the last restore or pull can still do: install extensions, download chapters again.
+    offer: Mutex<RestoreOffer>,
+    /// Installed extensions as last seen from the host, written into backups (tag 900).
+    installed: Mutex<Vec<BackupExtension>>,
     pulling: AtomicBool,
 }
 
@@ -56,7 +58,8 @@ impl Sync {
             progress: Mutex::new(None),
             last_report: Mutex::new(None),
             last_error: Mutex::new(None),
-            pending: Mutex::new(Vec::new()),
+            offer: Mutex::new(RestoreOffer::default()),
+            installed: Mutex::new(Vec::new()),
             pulling: AtomicBool::new(false),
         }
     }
@@ -68,9 +71,41 @@ impl Sync {
         peers.sort_by_key(|p| p.name.to_lowercase());
     }
 
-    fn set_pending(&self, stores: Vec<BackupExtensionStore>) {
-        *lock(&self.pending) = stores;
+    fn set_offer(&self, s: &ImportSummary) {
+        *lock(&self.offer) = RestoreOffer {
+            repos_added: s.repos_added.clone(),
+            extensions: s.extensions.clone(),
+            source_ids: s.source_ids.clone(),
+            downloaded: s.downloaded.clone(),
+            anilist: s.trackers.contains(&tm_db::ANILIST_SYNC_ID),
+        };
     }
+
+    /// Remember what the host has installed, for the next backup.
+    pub fn set_installed(&self, exts: &[tm_exthost::model::Extension]) {
+        *lock(&self.installed) = exts
+            .iter()
+            .map(|e| BackupExtension {
+                pkg_name: e.pkg_name.clone(),
+                name: Some(e.name.clone()),
+                version_code: Some(e.version_code),
+                version_name: Some(e.version_name.clone()),
+                lang: Some(e.lang.clone()),
+                source_ids: e.sources.iter().map(|s| s.id).collect(),
+                ..Default::default()
+            })
+            .collect();
+    }
+}
+
+/// The follow-up a restore offers. Cleared piece by piece as the user acts on it.
+#[derive(Debug, Clone, Default)]
+struct RestoreOffer {
+    repos_added: Vec<BackupExtensionStore>,
+    extensions: Vec<BackupExtension>,
+    source_ids: Vec<i64>,
+    downloaded: Vec<DownloadedChapter>,
+    anilist: bool,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -192,7 +227,7 @@ pub struct SyncStatusDto {
     pub progress: Option<String>,
     pub last_report: Option<PullReportDto>,
     pub last_error: Option<String>,
-    pub pending_repos: Vec<PendingRepoDto>,
+    pub offer: RestoreOfferDto,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -201,7 +236,44 @@ pub struct SyncStatusDto {
 pub struct RestoreDto {
     pub file: String,
     pub summary: ImportSummaryDto,
-    pub pending_repos: Vec<PendingRepoDto>,
+}
+
+/// What the last restore or pull can still do, for the Sync screen.
+#[derive(Debug, Clone, Default, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreOfferDto {
+    /// Extension repos the restore added.
+    pub repos_added: Vec<PendingRepoDto>,
+    /// Whether there are extensions or sources to look up and offer to install.
+    pub has_extensions: bool,
+    /// Chapters that were downloaded on the other device, and how many of them are unread.
+    pub downloaded: u32,
+    pub downloaded_unread: u32,
+    /// AniList rows came back but this install is not signed in.
+    pub anilist_sign_in: bool,
+}
+
+/// The extensions a restore can install, and the repos that could not be read to find them.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreExtensionsDto {
+    pub extensions: Vec<RestoreExtensionDto>,
+    /// "Repo name: error" for each repo whose catalog failed; its extensions show as not found.
+    pub failures: Vec<String>,
+}
+
+/// One extension a restore can install, or why it can't.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreExtensionDto {
+    pub pkg_name: String,
+    pub name: String,
+    /// Repo to install from; `None` when no added repo offers it.
+    pub repo_url: Option<String>,
+    pub installed: bool,
 }
 
 fn status_of(state: &AppState) -> SyncStatusDto {
@@ -224,7 +296,18 @@ fn status_of(state: &AppState) -> SyncStatusDto {
         progress: lock(&s.progress).clone(),
         last_report: lock(&s.last_report).as_ref().map(PullReportDto::from),
         last_error: lock(&s.last_error).clone(),
-        pending_repos: lock(&s.pending).iter().map(PendingRepoDto::from).collect(),
+        offer: offer_of(state),
+    }
+}
+
+fn offer_of(state: &AppState) -> RestoreOfferDto {
+    let o = lock(&state.sync.offer);
+    RestoreOfferDto {
+        repos_added: o.repos_added.iter().map(PendingRepoDto::from).collect(),
+        has_extensions: !o.extensions.is_empty() || !o.source_ids.is_empty(),
+        downloaded: n(o.downloaded.len()),
+        downloaded_unread: n(o.downloaded.iter().filter(|d| !d.read).count()),
+        anilist_sign_in: o.anilist && state.track.auth.session().is_none(),
     }
 }
 
@@ -246,7 +329,13 @@ impl AsRef<Db> for AppDb {
 }
 
 fn backup_bytes(state: &AppState) -> Result<Vec<u8>, String> {
-    let b = tm_backup::export(&state.db, &state.nas.source_names()).map_err(|e| e.to_string())?;
+    let mut b =
+        tm_backup::export(&state.db, &state.nas.source_names()).map_err(|e| e.to_string())?;
+    let installed = lock(&state.sync.installed).clone();
+    let dm = state.downloads.get();
+    tm_backup::annotate(&mut b, installed, |source, manga, chapter| {
+        dm.is_some_and(|d| d.is_downloaded(source, manga, chapter))
+    });
     tm_backup::codec::encode(&b).map_err(|e| e.to_string())
 }
 
@@ -412,7 +501,7 @@ pub async fn sync_pull(app: AppHandle, peer_id: String, code: String) -> R<PullR
     state.sync.pulling.store(false, Ordering::Release);
     let out = match result {
         Ok(report) => {
-            state.sync.set_pending(report.summary.pending_repos.clone());
+            state.sync.set_offer(&report.summary);
             let dto = PullReportDto::from(&report);
             *lock(&state.sync.last_report) = Some(report);
             let _ = app.emit("library-changed", ());
@@ -457,7 +546,8 @@ pub fn export_to(state: &AppState, path: &Path) -> R<()> {
         })
 }
 
-/// Restore `path` into the library; extension stores it lists become pending.
+/// Restore `path` into the library. The repos it lists are added; installing extensions and
+/// downloading chapters again are offered (see [`RestoreOfferDto`]).
 pub fn restore_from(state: &AppState, path: &Path) -> R<RestoreDto> {
     let meta = std::fs::metadata(path)
         .map_err(|e| CmdError::new("io", format!("Could not open the file: {e}")))?;
@@ -474,18 +564,13 @@ pub fn restore_from(state: &AppState, path: &Path) -> R<RestoreDto> {
     let local = state.paths.local_library_dir();
     tm_backup::relink_local_covers(&state.db, &local)?;
     tm_local::scan(&state.db, &local)?;
-    state.sync.set_pending(summary.pending_repos.clone());
+    state.sync.set_offer(&summary);
     Ok(RestoreDto {
         file: path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default(),
         summary: (&summary).into(),
-        pending_repos: summary
-            .pending_repos
-            .iter()
-            .map(PendingRepoDto::from)
-            .collect(),
     })
 }
 
@@ -504,7 +589,18 @@ pub async fn backup_export(app: AppHandle) -> R<Option<String>> {
     let Some(path) = picked.and_then(|p| p.into_path().ok()) else {
         return Ok(None);
     };
-    export_to(&app.state::<AppState>(), &path)?;
+    let state = app.state::<AppState>();
+    // Refresh the installed list when the host is set up; a backup without it is still a backup.
+    if crate::online::host_available(&state) {
+        match crate::online::client(&state) {
+            Ok(c) => match c.extensions().await {
+                Ok(exts) => state.sync.set_installed(&exts),
+                Err(e) => tracing::warn!("backup without the extension list: {e}"),
+            },
+            Err(e) => tracing::warn!("backup without the extension list: {}", e.message),
+        }
+    }
+    export_to(&state, &path)?;
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
@@ -528,32 +624,124 @@ pub async fn backup_restore(app: AppHandle) -> R<Option<RestoreDto>> {
     Ok(Some(out))
 }
 
-/// Add the pending extension stores the user accepted (by index URL), or all when `None`.
+/// The extensions the last restore can install: the backup's own list when it has one (tag
+/// 900), otherwise every catalog extension that provides one of the library's sources.
 #[tauri::command]
-pub fn backup_accept_repos(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    index_urls: Option<Vec<String>>,
-) -> R<()> {
-    let accepted: Vec<BackupExtensionStore> = {
-        let mut pending = lock(&state.sync.pending);
-        let (take, keep): (Vec<_>, Vec<_>) = pending.drain(..).partition(|s| {
-            index_urls
-                .as_ref()
-                .is_none_or(|u| u.iter().any(|x| x == s.index_url()))
-        });
-        *pending = keep;
-        take
+pub async fn restore_extensions(state: State<'_, AppState>) -> R<RestoreExtensionsDto> {
+    let (wanted, source_ids) = {
+        let o = lock(&state.sync.offer);
+        (o.extensions.clone(), o.source_ids.clone())
     };
-    tm_backup::add_extension_repos(&state.db, &accepted)?;
-    emit(&app);
-    Ok(())
+    if wanted.is_empty() && source_ids.is_empty() {
+        return Ok(RestoreExtensionsDto {
+            extensions: Vec::new(),
+            failures: Vec::new(),
+        });
+    }
+    let c = crate::online::client(&state)?;
+    let installed: std::collections::HashSet<String> = c
+        .extensions()
+        .await?
+        .into_iter()
+        .map(|e| e.pkg_name)
+        .collect();
+    let mut catalog = Vec::new();
+    let mut failures = Vec::new();
+    for repo in state.db.extension_repos()? {
+        match c.catalog(&repo.base_url).await {
+            Ok(list) => catalog.extend(list.into_iter().map(|e| (repo.base_url.clone(), e))),
+            Err(e) => {
+                tracing::warn!(repo = %repo.base_url, "catalog failed: {e}");
+                failures.push(format!("{}: {e}", repo.name));
+            }
+        }
+    }
+    Ok(RestoreExtensionsDto {
+        extensions: plan_extensions(&wanted, &source_ids, &installed, &catalog),
+        failures,
+    })
 }
 
-/// Forget the pending stores without adding them.
+/// Match a backup's extensions (or, lacking those, its source ids) against the catalog.
+fn plan_extensions(
+    wanted: &[BackupExtension],
+    source_ids: &[i64],
+    installed: &std::collections::HashSet<String>,
+    catalog: &[(String, tm_exthost::model::AvailableExtension)],
+) -> Vec<RestoreExtensionDto> {
+    let find = |pkg: &str| catalog.iter().find(|(_, e)| e.pkg_name == pkg);
+    let mut out: Vec<RestoreExtensionDto> = if wanted.is_empty() {
+        let mut seen = std::collections::HashSet::new();
+        catalog
+            .iter()
+            .filter(|(_, e)| e.sources.iter().any(|s| source_ids.contains(&s.id)))
+            .filter(|(_, e)| seen.insert(e.pkg_name.clone()))
+            .map(|(repo, e)| RestoreExtensionDto {
+                pkg_name: e.pkg_name.clone(),
+                name: e.name.clone(),
+                repo_url: Some(repo.clone()),
+                installed: installed.contains(&e.pkg_name),
+            })
+            .collect()
+    } else {
+        wanted
+            .iter()
+            .map(|w| {
+                let hit = find(&w.pkg_name);
+                RestoreExtensionDto {
+                    pkg_name: w.pkg_name.clone(),
+                    name: hit
+                        .map(|(_, e)| e.name.clone())
+                        .or_else(|| w.name.clone())
+                        .unwrap_or_else(|| w.pkg_name.clone()),
+                    repo_url: hit.map(|(r, _)| r.clone()),
+                    installed: installed.contains(&w.pkg_name),
+                }
+            })
+            .collect()
+    };
+    out.sort_by_key(|e| e.name.to_lowercase());
+    out
+}
+
+/// Queue the chapters the backup's device had downloaded, all of them or only the unread ones.
+/// Returns how many were queued; the offer is cleared either way.
 #[tauri::command]
-pub fn backup_dismiss_repos(app: AppHandle, state: State<'_, AppState>) {
-    state.sync.set_pending(Vec::new());
+pub fn restore_redownload(app: AppHandle, state: State<'_, AppState>, unread_only: bool) -> R<u32> {
+    let wanted = std::mem::take(&mut lock(&state.sync.offer).downloaded);
+    let dm = crate::downloads::manager(&state)?;
+    let mut queued = 0u32;
+    let mut by_manga: std::collections::BTreeMap<i64, Vec<i64>> = Default::default();
+    for d in wanted.iter().filter(|d| !(unread_only && d.read)) {
+        by_manga.entry(d.manga_id).or_default().push(d.chapter_id);
+    }
+    for (manga_id, ids) in by_manga {
+        let Some(manga) = state.db.manga(manga_id)? else {
+            continue;
+        };
+        if manga.is_local() {
+            continue;
+        }
+        let ids: std::collections::HashSet<i64> = ids.into_iter().collect();
+        for ch in state
+            .db
+            .chapters(manga_id)?
+            .iter()
+            .filter(|c| ids.contains(&c.id))
+        {
+            if dm.enqueue(crate::downloads::request(&manga, ch)) {
+                queued = queued.saturating_add(1);
+            }
+        }
+    }
+    emit(&app);
+    Ok(queued)
+}
+
+/// Put away what is left of the restore offer.
+#[tauri::command]
+pub fn restore_dismiss(app: AppHandle, state: State<'_, AppState>) {
+    *lock(&state.sync.offer) = RestoreOffer::default();
     emit(&app);
 }
 
@@ -561,6 +749,61 @@ pub fn backup_dismiss_repos(app: AppHandle, state: State<'_, AppState>) {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
     use super::*;
+
+    fn avail(pkg: &str, name: &str, source: i64) -> tm_exthost::model::AvailableExtension {
+        tm_exthost::model::AvailableExtension {
+            name: name.into(),
+            pkg_name: pkg.into(),
+            version_name: "1.4.1".into(),
+            version_code: 1,
+            lib_version: "1.4".into(),
+            lang: "en".into(),
+            nsfw: false,
+            icon_url: String::new(),
+            has_jar: true,
+            sources: vec![tm_exthost::model::AvailableSource {
+                id: source,
+                name: name.into(),
+                lang: "en".into(),
+                base_url: String::new(),
+            }],
+        }
+    }
+
+    #[test]
+    fn restore_plans_extensions_from_the_list_or_the_sources() {
+        let repo = "https://example.com/index.min.json".to_owned();
+        let catalog = vec![
+            (repo.clone(), avail("pkg.a", "Alpha", 1)),
+            (repo.clone(), avail("pkg.b", "Beta", 2)),
+            (repo.clone(), avail("pkg.c", "Gamma", 3)),
+        ];
+        let installed: std::collections::HashSet<String> = ["pkg.b".to_owned()].into();
+
+        // A backup with tag 900 asks for exactly its packages; missing ones have no repo.
+        let wanted = vec![
+            BackupExtension {
+                pkg_name: "pkg.b".into(),
+                ..Default::default()
+            },
+            BackupExtension {
+                pkg_name: "pkg.gone".into(),
+                name: Some("Gone".into()),
+                ..Default::default()
+            },
+        ];
+        let p = plan_extensions(&wanted, &[1, 3], &installed, &catalog);
+        let got: Vec<_> = p
+            .iter()
+            .map(|e| (e.name.as_str(), e.repo_url.is_some(), e.installed))
+            .collect();
+        assert_eq!(got, vec![("Beta", true, true), ("Gone", false, false)]);
+
+        // A stock Mihon backup: the extensions providing its sources.
+        let p = plan_extensions(&[], &[1, 3, 99], &installed, &catalog);
+        let names: Vec<_> = p.iter().map(|e| e.pkg_name.as_str()).collect();
+        assert_eq!(names, vec!["pkg.a", "pkg.c"]);
+    }
 
     #[test]
     fn today_is_a_date() {
@@ -603,8 +846,8 @@ mod tests {
         let b_dir = tempfile::tempdir().unwrap();
         let b = AppState::open(tm_core::AppPaths::at(b_dir.path()).unwrap()).unwrap();
         let r = restore_from(&b, &file).unwrap();
-        assert_eq!(r.pending_repos.len(), 1);
-        assert!(b.db.extension_repos().unwrap().is_empty());
-        assert_eq!(lock(&b.sync.pending).len(), 1);
+        assert_eq!(r.summary.manga_added, 0);
+        assert_eq!(b.db.extension_repos().unwrap().len(), 1, "repos are added");
+        assert_eq!(offer_of(&b).repos_added.len(), 1);
     }
 }
