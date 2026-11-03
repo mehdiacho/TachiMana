@@ -26,18 +26,33 @@ const MAX_OPEN_CHAPTERS: usize = 64;
 
 // ---- the host ----------------------------------------------------------------------------
 
-/// Where `ext-host.jar` lives: `TM_EXTHOST_DIR`, else the bundled resource folder, else (debug
-/// builds) the Gradle output in the repo.
-pub fn host_dir(state: &AppState) -> PathBuf {
+/// Where `ext-host.jar` lives, and why: `TM_EXTHOST_DIR` (`custom`), the helper installed in the
+/// data folder from Settings (`installed`), the installer's resource folder (`bundled`), or in
+/// debug builds the Gradle output in the repo (`dev`). `missing` when none has the jar.
+pub fn host_location(state: &AppState) -> (&'static str, PathBuf) {
     if let Some(dir) = std::env::var_os("TM_EXTHOST_DIR") {
-        return PathBuf::from(dir);
+        return ("custom", PathBuf::from(dir));
+    }
+    let installed = state.paths.ext_host_dir();
+    if installed.join("ext-host.jar").is_file() {
+        return ("installed", installed);
     }
     if let Some(dir) = state.host_dir.get() {
-        if dir.join("ext-host.jar").is_file() || !cfg!(debug_assertions) {
-            return dir.clone();
+        if dir.join("ext-host.jar").is_file() {
+            return ("bundled", dir.clone());
         }
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ext-host/build/ext-host")
+    if cfg!(debug_assertions) {
+        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../ext-host/build/ext-host");
+        if dev.join("ext-host.jar").is_file() {
+            return ("dev", dev);
+        }
+    }
+    ("missing", installed)
+}
+
+pub fn host_dir(state: &AppState) -> PathBuf {
+    host_location(state).1
 }
 
 fn host_config(state: &AppState) -> HostConfig {
@@ -65,6 +80,12 @@ pub fn client(state: &AppState) -> R<Client> {
         .lock()
         .map_err(|_| CmdError::internal("extension host lock poisoned"))?;
     state.touch_host();
+    if crate::helper::INSTALLING.load(std::sync::atomic::Ordering::Acquire) {
+        return Err(CmdError::new(
+            "busy",
+            "The extension helper is being installed. Try again in a moment.",
+        ));
+    }
     if let Some(host) = slot.as_mut() {
         if host.is_alive() {
             return Ok(host.client().clone());

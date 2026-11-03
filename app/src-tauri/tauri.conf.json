@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "tech.mehdiacho.tachimana",
   "build": {
-    "beforeDevCommand": "npm --prefix ui run dev",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm --prefix ui run build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../ui/dist"
   },
   "app": {
@@ -28,9 +28,31 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
-    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "targets": [
+      "nsis",
+      "msi",
+      "deb",
+      "appimage"
+    ],
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
     "category": "Entertainment",
-    "shortDescription": "A desktop-first manga reader"
+    "shortDescription": "A desktop-first manga reader",
+    "longDescription": "TachiMana reads manga from your own folders and from Mihon-compatible extensions, keeps backups and syncs between devices.",
+    "publisher": "TachiMana",
+    "copyright": "Apache-2.0",
+    "license": "Apache-2.0",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "linux": {
+      "deb": {
+        "section": "graphics"
+      }
+    }
   }
 }

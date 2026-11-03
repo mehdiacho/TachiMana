@@ -23,6 +23,7 @@ export const keys = {
   sync: ["sync"] as const,
   anilist: ["anilist"] as const,
   update: ["update"] as const,
+  helper: ["helper"] as const,
   track: (mangaId: number) => ["track", mangaId] as const,
   browseStatus: ["browse", "status"] as const,
   repos: ["browse", "repos"] as const,
@@ -31,6 +32,7 @@ export const keys = {
   prefs: (sourceId: string) => ["browse", "prefs", sourceId] as const,
 };
 
+export const useHelper = () => useQuery({ queryKey: keys.helper, queryFn: api.helperStatus });
 export const useUpdate = () => useQuery({ queryKey: keys.update, queryFn: api.updateStatus, staleTime: Infinity });
 export const useAniList = () => useQuery({ queryKey: keys.anilist, queryFn: api.anilistAccount, staleTime: Infinity });
 export const useTrack = (mangaId: number) => useQuery({ queryKey: keys.track(mangaId), queryFn: () => api.trackGet(mangaId) });

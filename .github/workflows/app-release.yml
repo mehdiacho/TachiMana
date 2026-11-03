@@ -1,0 +1,150 @@
+name: App release (Rust)
+
+# Builds the Rust app's installers and the extension helper zips (PLAN.md §P8.4–5).
+# A tag `app-v<version>` (e.g. app-v0.2.0) publishes a GitHub release with all of them; the app's
+# updater only looks at `app-v` releases. Running it by hand builds everything as workflow
+# artifacts without releasing. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
+
+on:
+  push:
+    tags: ["app-v*.*.*"]
+  workflow_dispatch:
+  # A PR that touches packaging builds everything once (no release) so a broken installer shows
+  # up before a tag does.
+  pull_request:
+    paths:
+      - ".github/workflows/app-release.yml"
+      - "app/scripts/**"
+      - "app/src-tauri/tauri.conf.json"
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_EVENT_NAME}" = push ]; then v="${GITHUB_REF_NAME#app-v}"; else v="0.0.0-dev.${GITHUB_RUN_NUMBER}"; fi
+          echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "bad version $v"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+  ext-host:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x64
+          - os: windows-latest
+            platform: windows-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 24
+          cache: gradle
+      - name: Build the host
+        shell: bash
+        run: bash ./gradlew --no-daemon :ext-host:fatJar
+      - name: Pack host + trimmed runtime
+        shell: bash
+        run: bash app/scripts/package-ext-host.sh ${{ matrix.platform }} dist
+      - name: The packed runtime starts the host
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/helper" && cd "$RUNNER_TEMP/helper"
+          unzip -q "$GITHUB_WORKSPACE/dist/tachimana-ext-host-linux-x64.zip"
+          export TM_EXTHOST_TOKEN=0123456789abcdef0123456789abcdef
+          ./runtime/bin/java -jar ext-host.jar --data-dir "$RUNNER_TEMP/d" --port 0 < <(sleep 30) > out 2> err &
+          for i in $(seq 1 60); do grep -q '^TM_EXTHOST_READY port=' out && break; sleep 1; done
+          port=$(sed -n 's/^TM_EXTHOST_READY port=\([0-9]*\).*/\1/p' out)
+          test -n "$port" || { cat err; exit 1; }
+          curl -sf -H "Authorization: Bearer $TM_EXTHOST_TOKEN" "http://127.0.0.1:$port/v1/health"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ext-host-${{ matrix.platform }}
+          path: dist/*
+
+  app:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 22.04 so the AppImage runs on older glibc too.
+          - os: ubuntu-22.04
+            bundles: deb,appimage
+          - os: windows-latest
+            bundles: nsis,msi
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries for Tauri (WebKitGTK)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/ui/package-lock.json
+      - name: Stamp the version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          # One number everywhere: Cargo (the About screen and the updater), tauri.conf (installers).
+          sed -i.bak -E "0,/^version = \".*\"/s//version = \"$VERSION\"/" Cargo.toml
+          node -e 'const f="src-tauri/tauri.conf.json";const fs=require("fs");const c=JSON.parse(fs.readFileSync(f));c.version=process.env.VERSION.replace(/-.*/,"");fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+          grep -m1 '^version' Cargo.toml
+      - run: npm ci
+        working-directory: app/ui
+      - name: Build installers
+        run: ui/node_modules/.bin/tauri build --bundles ${{ matrix.bundles }}
+      - name: Collect installers and checksums
+        run: |
+          mkdir -p ../dist
+          find target/release/bundle -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*-setup.exe' -o -name '*.msi' \) -exec cp {} ../dist/ \;
+          cd ../dist
+          for f in *; do sha256sum "$f" > "$f.sha256"; done
+          ls -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ runner.os }}
+          path: dist/*
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [version, ext-host, app]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: ls -l dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: TachiMana ${{ needs.version.outputs.version }} (Rust)
+          generate_release_notes: true
+          files: dist/*

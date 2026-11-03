@@ -82,7 +82,7 @@ impl AppPaths {
     pub fn page_cache_dir(&self) -> PathBuf {
         self.data_dir.join("cache").join("pages")
     }
-    /// Rust-only: where the extension host is installed (`<data>/ext-host/<version>/`).
+    /// Rust-only: where Settings installs the extension helper (`<data>/ext-host/`).
     pub fn ext_host_dir(&self) -> PathBuf {
         self.data_dir.join("ext-host")
     }

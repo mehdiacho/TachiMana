@@ -17,6 +17,7 @@ import type { AniListAccountDto } from "../gen/AniListAccountDto";
 import type { MediaDto } from "../gen/MediaDto";
 import type { TrackDto } from "../gen/TrackDto";
 import type { UpdateStatusDto } from "../gen/UpdateStatusDto";
+import type { HelperStatusDto } from "../gen/HelperStatusDto";
 import type { ChapterPagesDto } from "../gen/ChapterPagesDto";
 import type { CmdError } from "../gen/CmdError";
 import type { ImportResultDto } from "../gen/ImportResultDto";
@@ -152,6 +153,12 @@ export const api = {
   /** Runs the downloaded installer; the app quits so it can be replaced. */
   updateInstall: () => call<void>("update_install"),
   updateOpenPage: () => call<void>("update_open_page"),
+
+  // The extension helper (ext-host and its Java), installed into the data folder.
+  helperStatus: () => call<HelperStatusDto>("helper_status"),
+  /** Opens a file dialog; null when cancelled. */
+  helperInstallFile: () => call<HelperStatusDto | null>("helper_install_file"),
+  helperDownload: () => call<HelperStatusDto>("helper_download"),
 };
 
 export type { LibraryUpdateDto };

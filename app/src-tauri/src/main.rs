@@ -4,6 +4,7 @@
 mod commands;
 mod downloads;
 mod dto;
+mod helper;
 mod nas;
 mod online;
 mod protocol;
@@ -132,6 +133,9 @@ fn main() {
             update::update_download,
             update::update_install,
             update::update_open_page,
+            helper::helper_status,
+            helper::helper_install_file,
+            helper::helper_download,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

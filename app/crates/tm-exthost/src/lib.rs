@@ -3,6 +3,7 @@
 
 pub mod client;
 pub mod host;
+pub mod install;
 pub mod model;
 
 pub use client::Client;

@@ -1,14 +1,15 @@
 // Settings (spec §3.7): theme, rotation, online sources, AniList, storage (data folder, page
 // cache, NAS), sync, updates and about.
-import { CheckCircle2, ChevronRight, Circle, Database, FolderOpen, HardDrive, Info, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, Database, Puzzle, FolderOpen, HardDrive, Info, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
-import { keys, queryClient, useAniList, useAppInfo, useCacheUsage, useSetSettings, useSettings, useUpdate } from "../../api/queries";
+import { keys, queryClient, useAniList, useAppInfo, useHelper, useCacheUsage, useSetSettings, useSettings, useUpdate } from "../../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { OutlinedButton, PrimaryButton, TextButton, Toggle } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import { accountLine } from "../../lib/track";
 import { updateAction, updateLine } from "../../lib/update";
+import { helperLine } from "../../lib/helper";
 import { useUi } from "../../store/ui";
 import { NasSection } from "./NasSection";
 import s from "./Settings.module.css";
@@ -64,6 +65,51 @@ function AniListRow() {
       {note && (
         <div className={s.err} role="alert">
           {note}
+        </div>
+      )}
+    </>
+  );
+}
+
+function HelperRow() {
+  const helper = useHelper();
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState<"file" | "download" | null>(null);
+  const h = helper.data;
+  const run = async (kind: "file" | "download", f: () => Promise<unknown>) => {
+    setBusy(kind);
+    setNote(null);
+    try {
+      const r = await f();
+      if (r) setNote({ ok: true, text: "The helper is installed. Browse can use extensions now." });
+    } catch (e) {
+      setNote({ ok: false, text: (e as CmdError).message });
+    } finally {
+      setBusy(null);
+      void queryClient.invalidateQueries({ queryKey: keys.helper });
+      void queryClient.invalidateQueries({ queryKey: keys.browseStatus });
+    }
+  };
+  return (
+    <>
+      <div className={s.row}>
+        <Puzzle size={20} className={s.rowIcon} />
+        <div className={s.rowText}>
+          <span className={s.rowTitle}>Extension helper</span>
+          <span className={s.rowDesc}>{h ? helperLine(h) : "…"}</span>
+        </div>
+        <TextButton disabled={busy !== null} onClick={() => void run("file", api.helperInstallFile)}>
+          {busy === "file" ? "Installing…" : "From file…"}
+        </TextButton>
+        {h?.canDownload && (
+          <OutlinedButton disabled={busy !== null} onClick={() => void run("download", api.helperDownload)}>
+            {busy === "download" ? "Downloading…" : h.source === "missing" ? "Download" : "Reinstall"}
+          </OutlinedButton>
+        )}
+      </div>
+      {note && (
+        <div className={note.ok ? s.ok : s.err} role={note.ok ? "status" : "alert"} style={note.ok ? { padding: "0 var(--tm-space-xl)" } : undefined}>
+          {note.text}
         </div>
       )}
     </>
@@ -190,6 +236,8 @@ export function SettingsScreen() {
             onChange={(v) => save.mutate({ cloudflareBypassEnabled: v })}
           />
         </div>
+
+        <HelperRow />
 
         <div className={s.section}>Tracking</div>
         <AniListRow />

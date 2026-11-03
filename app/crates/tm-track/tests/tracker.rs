@@ -415,6 +415,9 @@ fn free_port() -> u16 {
 }
 
 async fn get(url: &str) -> String {
+    // reqwest is built without a default TLS provider; the library installs one when it makes its
+    // own client, but a capture test can run before any other test has done that.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     reqwest::get(url).await.unwrap().text().await.unwrap()
 }
 
