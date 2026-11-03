@@ -832,6 +832,15 @@ pub fn chapters_tx(c: &Connection, manga_id: i64) -> Result<Vec<Chapter>> {
     chapters_of(c, manga_id)
 }
 
+pub fn chapter_tx(c: &Connection, id: i64) -> Result<Option<Chapter>> {
+    Ok(c.query_row(
+        q("chapters", "getChaptersById")?,
+        named_params! {":id": id},
+        Chapter::from_row,
+    )
+    .optional()?)
+}
+
 pub fn insert_chapter_tx(
     c: &Connection,
     manga_id: i64,

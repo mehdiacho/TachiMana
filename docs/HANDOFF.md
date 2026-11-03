@@ -21,4 +21,8 @@ Read this first if you are picking up TachiMana work in a fresh session.
   data is in `%LOCALAPPDATA%\tech.mehdiacho.tachimana`).
 - **Backups:** Mihon-compatible `.tachibk`; tags 900 (installed extensions, chapter downloaded)
   are ours and shared with Mehdi's Mihon fork: `docs/rust-port/backup-schema.md`. Do not renumber.
+- **Logs and crash reports:** `<data>/logs/` (`tachimana.log`, `crash-*.txt`); ask Mehdi for these
+  first when he reports a crash.
+- **Mehdi's real backup** may be in a session scratchpad for testing. It is personal data: never
+  commit it or anything derived from it.
 - **Next step:** see "Next step" in STATUS.md.

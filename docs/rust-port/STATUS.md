@@ -1,6 +1,6 @@
 # Rust port status
 Updated: 2026-11-03 by Claude (implementing; the planned agent was unavailable)
-Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). Now: full backup restore (feat/backup-restore-all). The Kotlin app stays until Mehdi has tried the Windows installer
+Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). 0.1.1 released with full backup restore. Now: restore progress, drop-to-restore and crash fixes (feat/restore-progress), then 0.1.2. The Kotlin app stays until Mehdi has tried the Windows installer
 
 Done:
 - P0 baseline (PR #3): `docs/rust-port/baseline.md` (Linux numbers, self-test run) and scripts in
@@ -127,8 +127,30 @@ everything back, including repos, extensions, tracking and downloads.
 - Both apps share `%LOCALAPPDATA%\TachiMana` on Windows, so a Rust install opens the Kotlin
   library. Mehdi's PC was wiped clean 2026-11-03 for a fresh install.
 
-Next step: release 0.1.1 with the restore work; Mehdi tries the Windows installer, then a follow-up
-PR removes `desktop/` and `release.yml` (ext-host and the Kotlin modules it needs stay).
+Restore progress (feat/restore-progress, 2026-11-03), from Mehdi trying 0.1.1 on his real backup:
+- The restore held the one database lock for minutes on the UI thread, so the window hung and then
+  crashed while he moved around. It now runs on a background thread in batches of 25 manga (each
+  in a savepoint, so one bad manga is rolled back and listed as an error), and no longer re-reads
+  every chapter after each insert. His backup (1,688 manga, 172,371 chapters): 202 s to 6.6 s in a
+  release build, 30 s in a debug build. After restoring it under Xvfb, about 3 minutes of fast
+  scrolling, opening titles and switching screens: no crash and no panic in the log. Not yet tried
+  on Windows/WebView2.
+- Live progress (`restore-progress` events: "Library 215 of 1,688: <title>") and a summary with the
+  time and the error count, even 0; errors can be expanded.
+- Dropping a file on the Restore row asks "Restore <file>?" first (`backup_restore_path`). Drag and
+  drop cannot be driven under Xvfb, so this is untested in the app.
+- "Find the extensions it used" downloads the extension helper first when it is missing (with
+  progress). Under Xvfb the dev helper was found, so the download path ran only in unit tests. When
+  a repo cannot be read, unmatched extensions are "not checked yet", not "not found".
+- Logs: `<data>/logs/tachimana.log` (rotated at 5 MB) and `crash-<time>.txt` with a backtrace for
+  any panic (newest 10 kept). On Windows: `%LOCALAPPDATA%\TachiMana\logs`.
+
+Next step: merge feat/restore-progress, release 0.1.2. Then, from Mehdi 2026-11-03: back up the NAS
+connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
+and "sync from the original device" over the existing pairing when it is reachable, with Download
+all as the fallback (needs his Mihon fork too; that work is owned by his local session, brief in
+his worklog `projects/mihon-nas.md`). After he tries the Windows installer, a PR removes `desktop/`
+and `release.yml` (ext-host and the Kotlin modules it needs stay).
 
 P8 not done yet:
 - Open question 1 answered 2026-11-03 (Mehdi: public releases repo). Releases go to the public

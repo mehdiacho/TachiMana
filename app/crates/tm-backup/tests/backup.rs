@@ -497,3 +497,48 @@ fn restores_a_backup_made_by_the_kotlin_app() {
     assert_eq!(out.backup_source_preferences, b.backup_source_preferences);
     assert_eq!(out.backup_preferences, vec![vec![10u8, 3, 97, 98, 99]]);
 }
+
+#[test]
+fn one_bad_manga_is_reported_and_the_rest_is_restored() {
+    let db = Db::open_in_memory().unwrap();
+    db.write(|c| {
+        c.execute_batch(
+            "CREATE TRIGGER no_bad BEFORE INSERT ON mangas WHEN NEW.title = 'Bad' \
+             BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    let mut b = Backup::default();
+    for (url, title) in [("/a", "Good A"), ("/bad", "Bad"), ("/b", "Good B")] {
+        let mut m = BackupManga::new(7, url);
+        m.title = title.into();
+        m.chapters = vec![BackupChapter::new(format!("{url}/1"), "1")];
+        b.backup_manga.push(m);
+    }
+    let mut seen = Vec::new();
+    let s = import_with(&db, &b, &mut |done, total, title| {
+        seen.push((done, total, title.to_owned()));
+    })
+    .unwrap();
+    assert_eq!((s.manga_added, s.chapters_added), (2, 2));
+    assert_eq!(s.errors.len(), 1);
+    assert_eq!(s.errors[0].title, "Bad");
+    assert!(
+        s.errors[0].message.contains("refused"),
+        "{}",
+        s.errors[0].message
+    );
+    let titles: Vec<String> = db.library().unwrap().into_iter().map(|m| m.title).collect();
+    assert_eq!(titles.len(), 2);
+    assert!(!titles.iter().any(|t| t == "Bad"));
+    assert_eq!(
+        seen,
+        vec![
+            (0, 3, "Good A".to_owned()),
+            (1, 3, "Bad".to_owned()),
+            (2, 3, "Good B".to_owned()),
+            (3, 3, String::new()),
+        ]
+    );
+}

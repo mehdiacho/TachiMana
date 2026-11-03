@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanCode, extensionsLine, isCode, parsePort, redownloadLine, reportLine, restoreLine, spacedCode, splitAddress } from "./sync";
+import { cleanCode, duration, extensionsLine, fileName, progressLine, restoreSummary, isCode, parsePort, redownloadLine, reportLine, spacedCode, splitAddress } from "./sync";
 
 describe("sync helpers", () => {
   it("spaces and cleans pairing codes", () => {
@@ -22,7 +22,6 @@ describe("sync helpers", () => {
   });
   it("words results", () => {
     const s = { mangaAdded: 2, mangaUpdated: 1, chaptersAdded: 1, chaptersUpdated: 0, categoriesAdded: 1 };
-    expect(restoreLine(s)).toBe("Restored +2 manga · +1 chapter · +1 category (1 already in your library)");
     expect(reportLine({ peerName: "PC", summary: s, filesPulled: 3, bytesPulled: 2048 })).toBe("+2 manga · +1 chapter · 3 files (2 KB)");
   });
   it("asks about downloads in plain words", () => {
@@ -35,5 +34,19 @@ describe("sync helpers", () => {
     expect(extensionsLine([{ name: "MangaDex" }], [])).toBe("1 extension to install: MangaDex.");
     expect(extensionsLine([{ name: "A" }, { name: "B" }], [{ name: "Gone" }])).toBe("2 extensions to install: A, B. Not found in your repos: Gone.");
     expect(extensionsLine([], [{ name: "Gone" }])).toBe("Not found in your repos: Gone.");
+    expect(extensionsLine([], [{ name: "A" }, { name: "B" }], true)).toBe("2 extensions could not be checked yet.");
+  });
+  it("words restore progress and the summary", () => {
+    expect(fileName("C:\\Users\\m\\Downloads\\b.tachibk")).toBe("b.tachibk");
+    expect(fileName("/tmp/b.tachibk")).toBe("b.tachibk");
+    expect(duration(6600)).toBe("6.6 s");
+    expect(duration(125_000)).toBe("2 min 5 s");
+    expect(progressLine(null)).toBe("Reading the backup…");
+    expect(progressLine({ stage: "library", done: 9, total: 1688, title: "One Piece" })).toBe("Library 10 of 1,688: One Piece");
+    const summary = { mangaAdded: 1688, mangaUpdated: 0, chaptersAdded: 172371, chaptersUpdated: 0, categoriesAdded: 17 };
+    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [] })).toBe(
+      "Restored 1,688 manga, 172,371 chapters, 17 categories from b.tachibk in 6.6 s. 0 errors.",
+    );
+    expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [{ title: "X", message: "y" }] })).toContain("1 error.");
   });
 });

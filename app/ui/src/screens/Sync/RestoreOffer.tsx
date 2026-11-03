@@ -1,5 +1,6 @@
 // What a restore can still do once the library is back: the extension repos it added, the
 // extensions to install from them, chapters to download again, and an AniList sign-in.
+import { listen } from "@tauri-apps/api/event";
 import { useState } from "react";
 import { api } from "../../api/commands";
 import { keys, queryClient, useAniList } from "../../api/queries";
@@ -17,6 +18,7 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
   const [plan, setPlan] = useState<RestoreExtensionsDto | null>(null);
   const [busy, setBusy] = useState<"look" | "install" | "download" | null>(null);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [helperNote, setHelperNote] = useState<string | null>(null);
 
   const signIn = offer.anilistSignIn && anilist.data?.connected !== true;
   const nothing = offer.reposAdded.length === 0 && !offer.hasExtensions && offer.downloaded === 0 && !signIn;
@@ -26,6 +28,24 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
     setBusy("look");
     setNote(null);
     try {
+      // Online sources need the extension helper; fetch it first when this install has none.
+      const helper = await api.helperStatus();
+      if (helper.source === "missing") {
+        if (!helper.canDownload) throw { message: "This computer has no extension helper and none can be downloaded for it. Install one from Settings, Extension helper." };
+        setHelperNote("Downloading the extension helper…");
+        const un = await listen<{ done: number; total: number }>("helper-progress", (e) => {
+          const { done, total } = e.payload;
+          setHelperNote(total > 0 ? `Downloading the extension helper… ${Math.round((done / total) * 100)}% of ${Math.round(total / 1048576)} MB` : "Downloading the extension helper…");
+        });
+        try {
+          await api.helperDownload();
+        } finally {
+          un();
+          setHelperNote(null);
+        }
+        await queryClient.invalidateQueries({ queryKey: keys.helper });
+        await queryClient.invalidateQueries({ queryKey: keys.browseStatus });
+      }
       setPlan(await api.restoreExtensions());
     } catch (e) {
       setNote({ ok: false, text: `Couldn't look up the extensions: ${(e as CmdError).message}` });
@@ -115,12 +135,17 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
           </PrimaryButton>
         </div>
       )}
+      {helperNote && (
+        <div className={st.rowDesc} role="status">
+          {helperNote}
+        </div>
+      )}
       {plan !== null && (
         <>
-          <div className={st.rowDesc}>{extensionsLine(toInstall, missing)}</div>
+          <div className={st.rowDesc}>{extensionsLine(toInstall, missing, plan.failures.length > 0)}</div>
           {plan.failures.length > 0 && (
             <div className={l.error} role="alert">
-              Couldn't read {plan.failures.length === 1 ? "this repo" : "these repos"}, so some extensions may be missing above: {plan.failures.join("; ")}
+              Couldn't read {plan.failures.length === 1 ? "this repo" : "these repos"}, so some extensions could not be looked up. Try again when it can be reached: {plan.failures.join("; ")}
             </div>
           )}
           {toInstall.length > 0 && (

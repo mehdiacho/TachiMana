@@ -1,15 +1,16 @@
 // Sync (behaviour from ui/sync/SyncPage.kt): this device's pairing code and addresses, pulling
 // another device's library over the LAN, and Mihon-compatible backup files.
-import { ArchiveRestore, Laptop, Plus, RefreshCw, Save, Wifi } from "lucide-react";
+import { Laptop, Plus, RefreshCw, Save, Wifi } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
 import { queryClient, keys, useSyncStatus } from "../../api/queries";
 import { ErrorState, Loading, OutlinedButton, PrimaryButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { PeerDto } from "../../gen/PeerDto";
-import { cleanCode, isCode, parsePort, reportLine, restoreLine, spacedCode, splitAddress } from "../../lib/sync";
+import { cleanCode, isCode, parsePort, reportLine, spacedCode, splitAddress } from "../../lib/sync";
 import l from "../Library/Library.module.css";
 import st from "../Settings/Settings.module.css";
+import { RestoreBackup } from "./RestoreBackup";
 import { RestoreOffer } from "./RestoreOffer";
 import s from "./Sync.module.css";
 
@@ -41,7 +42,7 @@ export function SyncScreen() {
   const [adding, setAdding] = useState(false);
   const [pullingId, setPullingId] = useState<string | null>(null);
   const [backupNote, setBackupNote] = useState<{ ok: boolean; text: string } | null>(null);
-  const [backupBusy, setBackupBusy] = useState<"export" | "restore" | null>(null);
+  const [backupBusy, setBackupBusy] = useState<"export" | null>(null);
 
   if (status.isPending) return <Loading />;
   if (status.isError) return <ErrorState message={(status.error as unknown as CmdError).message} onRetry={() => void status.refetch()} />;
@@ -76,19 +77,6 @@ export function SyncScreen() {
       setAddNote((e as CmdError).message);
     } finally {
       setAdding(false);
-    }
-  };
-
-  const restore = async () => {
-    setBackupBusy("restore");
-    setBackupNote(null);
-    try {
-      const r = await api.backupRestore();
-      if (r) setBackupNote({ ok: true, text: `${restoreLine(r.summary)} from ${r.file}` });
-    } catch (e) {
-      setBackupNote({ ok: false, text: `Couldn't restore that backup: ${(e as CmdError).message}` });
-    } finally {
-      setBackupBusy(null);
     }
   };
 
@@ -207,16 +195,7 @@ export function SyncScreen() {
         )}
 
         <div className={st.section}>Backup</div>
-        <div className={st.row}>
-          <ArchiveRestore size={20} className={st.rowIcon} />
-          <div className={st.rowText}>
-            <span className={st.rowTitle}>Restore from backup</span>
-            <span className={st.rowDesc}>Add a .tachibk or .proto.gz from Mihon, Yōkai, Tachiyomi or TachiMana to your library. Nothing already here is removed.</span>
-          </div>
-          <OutlinedButton onClick={() => void restore()} disabled={backupBusy !== null}>
-            {backupBusy === "restore" ? "Restoring…" : "Choose file…"}
-          </OutlinedButton>
-        </div>
+        <RestoreBackup disabled={backupBusy !== null || busy} />
         <div className={st.row}>
           <Save size={20} className={st.rowIcon} />
           <div className={st.rowText}>

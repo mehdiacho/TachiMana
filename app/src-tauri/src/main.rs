@@ -5,6 +5,7 @@ mod commands;
 mod downloads;
 mod dto;
 mod helper;
+mod logging;
 mod nas;
 mod online;
 mod protocol;
@@ -16,7 +17,6 @@ mod update;
 use state::AppState;
 
 fn main() {
-    tracing_subscriber::fmt().with_target(false).init();
     let paths = match tm_core::AppPaths::from_env() {
         Ok(p) => p,
         Err(e) => {
@@ -24,6 +24,7 @@ fn main() {
             std::process::exit(1);
         }
     };
+    logging::init(&paths.logs_dir());
     let state = match AppState::open(paths) {
         Ok(s) => s,
         Err(e) => {
@@ -115,6 +116,7 @@ fn main() {
             sync::sync_pull,
             sync::backup_export,
             sync::backup_restore,
+            sync::backup_restore_path,
             sync::restore_extensions,
             sync::restore_redownload,
             sync::restore_dismiss,
