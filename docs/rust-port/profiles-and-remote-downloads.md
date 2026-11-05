@@ -13,6 +13,11 @@ Revision history:
 - 2026-11-05: phase 2 desktop half built (feat/linking). `POST /link` takes an optional `port`
   (where the asker serves); a different profile gets 409 with this side's profile and no key;
   fields are at most 128 characters and the body at most 4 KiB.
+- 2026-11-05: linking across profiles (feat/profile-join), from Mehdi: "an option to choose whose
+  version we're trying to keep". The PC can now take on the phone's profile (in place when its
+  library is empty, otherwise as a new profile, so nothing is erased) and copy the phone's
+  library. Keeping the PC's library is chosen on the phone (mehdiacho/mihon#9). The phone
+  camera opens the fork from the QR as it is (TachiMana #23, mihon#8).
 
 ## What Mehdi asked for
 
@@ -88,12 +93,17 @@ one-off pull, but not for an ongoing link where the PC talks to the phone in the
    setting up a link, and the existing lockout after wrong codes applies to it.
 
 **Rules**
-- **A link joins two copies of the same profile.** When the profile ids differ, the device that
-  scans chooses one:
-  - It adopts the other side's id when it is a new or empty profile, offering to restore the
-    other side's backup.
-  - Or it cancels.
-  - It never silently merges two different libraries.
+- **A link joins two copies of the same profile.** When the profile ids differ, the user chooses
+  whose library to keep, and the side whose library goes takes on the other side's id:
+  - **Keep the other device's.** This side takes on its id. On the PC: in place when this
+    profile's library is empty, otherwise as a new profile (nothing on the PC is erased). The PC
+    then links with the matching id, restarts into that profile (a `join.json` note in its folder)
+    and copies the other device's library over the link. On the phone: it backs up its own
+    library first, then replaces it with the computer's `/backup` (fork issue #9).
+  - **Keep this device's.** That replaces the other device's library, so it is finished on the
+    other device. When a phone's `POST /link` is refused with 409, the PC remembers it (device,
+    profile, address) and offers "Keep <phone>'s" with the phone's own pairing code.
+  - Or cancel. Two different libraries are never merged silently.
 - **One app profile per link.** A phone install links to one PC profile. A PC profile can link to
   several devices.
 - **Either side can unlink.** That deletes the key on that side, and the other side is told the

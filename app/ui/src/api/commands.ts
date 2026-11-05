@@ -4,6 +4,7 @@ import type { AppInfo } from "../gen/AppInfo";
 import type { ProfileInput } from "../gen/ProfileInput";
 import type { ProfilesDto } from "../gen/ProfilesDto";
 import type { LinkDto } from "../gen/LinkDto";
+import type { LinkOutcomeDto } from "../gen/LinkOutcomeDto";
 import type { LinksDto } from "../gen/LinksDto";
 import type { CacheUsageDto } from "../gen/CacheUsageDto";
 import type { CategoryDto } from "../gen/CategoryDto";
@@ -67,8 +68,15 @@ export const api = {
   profileSwitch: (id: string) => call<void>("profile_switch", { id }),
   profileDelete: (id: string) => call<ProfilesDto>("profile_delete", { id }),
   linksInfo: () => call<LinksDto>("links_info"),
-  /** `address` is `host[:port]` with `code`, or a pasted tachimana://link code (code ignored). */
-  linkDevice: (address: string, code: string) => call<LinkDto>("link_device", { address, code }),
+  /**
+   * `address` is `host[:port]` with `code`, or a pasted tachimana://link code (code ignored).
+   * `keep: "theirs"` takes on the other device's profile and library when the profiles differ;
+   * the app then restarts.
+   */
+  linkDevice: (address: string, code: string, keep?: "theirs") => call<LinkOutcomeDto>("link_device", { address, code, keep: keep ?? null }),
+  /** Takes on the profile of the device that was last refused, with that device's own code. */
+  linkRefused: (code: string) => call<LinkOutcomeDto>("link_refused", { code }),
+  dismissRefused: () => call<void>("dismiss_refused"),
   unlinkDevice: (peerDeviceId: string) => call<LinkDto[]>("unlink_device", { peerDeviceId }),
   library: () => call<LibraryEntryDto[]>("library"),
   recents: () => call<RecentDto[]>("recents"),

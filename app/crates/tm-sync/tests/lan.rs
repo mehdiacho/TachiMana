@@ -330,6 +330,7 @@ async fn linking_gives_a_key_that_replaces_the_code() {
     let tmp = tempfile::tempdir().unwrap();
     let a = instance(&tmp.path().join("A"), true);
     let links = Arc::new(tm_sync::LinkStore::open(&tmp.path().join("links.json")));
+    let refused = Arc::new(std::sync::Mutex::new(None));
     let id = DeviceIdentity {
         id: "A-id".into(),
         name: "Instance A".into(),
@@ -344,6 +345,7 @@ async fn linking_gives_a_key_that_replaces_the_code() {
             profile_id: "prof-1".into(),
             profile_name: "Main".into(),
             links: Arc::clone(&links),
+            refused: Arc::clone(&refused),
         }),
     )
     .await
@@ -371,6 +373,16 @@ async fn linking_gives_a_key_that_replaces_the_code() {
         other => panic!("{other:?}"),
     }
     assert!(links.list().is_empty());
+    let r = refused.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        (
+            r.peer_device_id.as_str(),
+            r.profile_id.as_str(),
+            r.address.as_str()
+        ),
+        ("B-id", "prof-2", "127.0.0.1:27200"),
+        "the refused device is remembered so this side can offer to take its profile"
+    );
 
     let ok = client
         .link("127.0.0.1", port, "123456", &link_req("prof-1"))

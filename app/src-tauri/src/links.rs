@@ -56,6 +56,20 @@ pub struct LinksDto {
     pub addresses: Vec<String>,
     pub pairing_code: String,
     pub links: Vec<LinkDto>,
+    /// A device that tried to link from another profile and was turned away.
+    pub refused: Option<RefusedDto>,
+    /// Whether this profile's library is empty (taking on another profile then changes this one
+    /// instead of making a new one).
+    pub empty: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RefusedDto {
+    pub peer_name: String,
+    pub profile_name: String,
+    pub address: String,
 }
 
 fn list(state: &AppState) -> Vec<LinkDto> {
@@ -107,6 +121,18 @@ pub fn links_info(state: State<'_, AppState>, profiles: State<'_, ProfileState>)
         addresses,
         pairing_code: state.sync.identity.pairing_code.clone(),
         links: list(&state),
+        refused: state
+            .sync
+            .refused
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .map(|r| RefusedDto {
+                peer_name: r.peer_name.clone(),
+                profile_name: r.profile_name.clone(),
+                address: r.address.clone(),
+            }),
+        empty: library_is_empty(&state).unwrap_or(false),
     }
 }
 
@@ -155,11 +181,64 @@ fn target(address: &str, code: &str) -> R<(String, u16, String)> {
     Ok((host, port, code.to_owned()))
 }
 
+/// What linking did. `restarting` when this PC took on the other device's profile: the app is
+/// restarting into it and copies that device's library once it is back.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LinkOutcomeDto {
+    pub link: LinkDto,
+    pub restarting: bool,
+}
+
+/// Left in a profile's folder by a link that took on another device's profile; read once on the
+/// next start, which then copies that device's library.
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct JoinMarker {
+    peer_device_id: String,
+    peer_name: String,
+}
+
+const JOIN_FILE: &str = "join.json";
+
+fn unreachable_err(host: &str, port: u16) -> CmdError {
+    CmdError::new(
+        "unreachable",
+        format!("No TachiMana answered at {host}:{port}. Check the address and that both devices are on the same network."),
+    )
+}
+
+fn address_of(host: &str, port: u16) -> String {
+    if host.contains(':') {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
+    }
+}
+
+/// Whether this profile's library is empty, so it can take on another device's profile in place.
+fn library_is_empty(state: &AppState) -> R<bool> {
+    Ok(state.db.library()?.is_empty())
+}
+
 /// Links this profile to the device at `address` with its pairing code (or a pasted link code),
 /// and keeps the key.
+///
+/// When the two are on different profiles the answer is an `otherProfile` error, unless `keep`
+/// is `"theirs"`: then this PC takes on the other device's profile (in place when this profile's
+/// library is empty, otherwise as a new profile, so nothing here is erased), links, restarts into
+/// it and copies the other device's library. Keeping this PC's library instead is chosen on the
+/// other device, which is the one whose library gets replaced.
 #[tauri::command]
-pub async fn link_device(app: AppHandle, address: String, code: String) -> R<LinkDto> {
+pub async fn link_device(
+    app: AppHandle,
+    address: String,
+    code: String,
+    keep: Option<String>,
+) -> R<LinkOutcomeDto> {
     let (host, port, code) = target(&address, &code)?;
+    let take_theirs = keep.as_deref() == Some("theirs");
     let Some((profile_id, profile_name)) = app.state::<ProfileState>().open_profile() else {
         return Err(CmdError::new(
             "unavailable",
@@ -167,7 +246,7 @@ pub async fn link_device(app: AppHandle, address: String, code: String) -> R<Lin
         ));
     };
     let state = app.state::<AppState>();
-    let req = LinkRequest {
+    let mut req = LinkRequest {
         device_id: state.sync.identity.id.clone(),
         device_name: state.sync.identity.name.clone(),
         profile_id: profile_id.clone(),
@@ -177,19 +256,24 @@ pub async fn link_device(app: AppHandle, address: String, code: String) -> R<Lin
     };
     let client = SyncClient::new()?;
     if client.probe(&host, port).await.is_none() {
-        return Err(CmdError::new(
-            "unreachable",
-            format!("No TachiMana answered at {host}:{port}. Check the address and that both devices are on the same network."),
-        ));
+        return Err(unreachable_err(&host, port));
     }
+    let mut joining: Option<(String, String)> = None;
     let answer = match client.link(&host, port, &code, &req).await {
         Ok(a) => a,
+        Err(SyncError::OtherProfile(theirs)) if take_theirs => {
+            // Ask again as a copy of their profile; the code is the same.
+            req.profile_id.clone_from(&theirs.profile_id);
+            req.profile_name.clone_from(&theirs.profile_name);
+            joining = Some((theirs.profile_id.clone(), theirs.profile_name.clone()));
+            client.link(&host, port, &code, &req).await?
+        }
         Err(SyncError::OtherProfile(theirs)) => {
             return Err(CmdError::new(
                 "otherProfile",
                 format!(
-                    "That device is on the profile \u{201c}{}\u{201d}, and this one is \u{201c}{profile_name}\u{201d}. Link from that device instead, or switch here to the matching profile first.",
-                    theirs.profile_name
+                    "{} is on its own profile, \u{201c}{}\u{201d}, with its own library, and this PC is on \u{201c}{profile_name}\u{201d}. Choose whose library to keep.",
+                    theirs.device_name, theirs.profile_name
                 ),
             ));
         }
@@ -207,25 +291,121 @@ pub async fn link_device(app: AppHandle, address: String, code: String) -> R<Lin
     let link = Link {
         peer_device_id: answer.device_id,
         peer_name: answer.device_name,
-        profile_id,
+        profile_id: req.profile_id.clone(),
         // The answer doesn't say; a phone is what links to a PC profile today.
         platform: "android".into(),
         key,
-        last_address: if host.contains(':') {
-            format!("[{host}]:{port}")
-        } else {
-            format!("{host}:{port}")
-        },
+        last_address: address_of(&host, port),
         linked_at: now_ms(),
     };
     let dto = LinkDto::from(&link);
-    state
-        .sync
-        .links
+    let Some((their_id, their_name)) = joining else {
+        state
+            .sync
+            .links
+            .put(link)
+            .map_err(|e| CmdError::new("io", format!("Couldn't save the link: {e}")))?;
+        tracing::info!(peer = %dto.peer_device_id, "linked to a device");
+        return Ok(LinkOutcomeDto {
+            link: dto,
+            restarting: false,
+        });
+    };
+    join_and_restart(&app, &their_id, &their_name, link)?;
+    Ok(LinkOutcomeDto {
+        link: dto,
+        restarting: true,
+    })
+}
+
+/// Takes on `their_id`, keeps `link` in that profile with a note to copy the peer's library,
+/// and restarts into it.
+fn join_and_restart(app: &AppHandle, their_id: &str, their_name: &str, link: Link) -> R<()> {
+    let state = app.state::<AppState>();
+    let profiles = app.state::<ProfileState>();
+    let in_place = library_is_empty(&state)?;
+    let marker = JoinMarker {
+        peer_device_id: link.peer_device_id.clone(),
+        peer_name: link.peer_name.clone(),
+    };
+    let dir = crate::profiles::take_profile(&state, &profiles, their_id, their_name, in_place)?;
+    let paths = tm_core::AppPaths::at(&dir).map_err(|e| CmdError::new("io", e.to_string()))?;
+    tm_sync::LinkStore::open(&paths.links_file())
         .put(link)
         .map_err(|e| CmdError::new("io", format!("Couldn't save the link: {e}")))?;
-    tracing::info!(peer = %dto.peer_device_id, "linked to a device");
-    Ok(dto)
+    let bytes = serde_json::to_vec(&marker).map_err(|e| CmdError::new("io", e.to_string()))?;
+    std::fs::write(dir.join(JOIN_FILE), bytes)
+        .map_err(|e| CmdError::new("io", format!("Couldn't save the link: {e}")))?;
+    tracing::info!(profile = %their_id, in_place, "restarting into the linked profile");
+    app.restart()
+}
+
+/// On start-up: if this profile was just taken on from another device, copy that device's
+/// library over the link, once. The note is removed first, so a failing copy never loops; the
+/// Sync screen shows the error and Sync from another device still works by hand.
+pub fn resume_join(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let file = state.paths.data_dir().join(JOIN_FILE);
+    let Ok(bytes) = std::fs::read(&file) else {
+        return;
+    };
+    let _ = std::fs::remove_file(&file);
+    let Ok(marker) = serde_json::from_slice::<JoinMarker>(&bytes) else {
+        tracing::warn!("ignoring a damaged {JOIN_FILE}");
+        return;
+    };
+    let Some(link) = state.sync.links.by_peer(&marker.peer_device_id) else {
+        tracing::warn!("no link to {} for the profile copy", marker.peer_name);
+        return;
+    };
+    let Some((host, port)) = (LinkInvite {
+        address: link.last_address.clone(),
+        device_id: String::new(),
+        profile_id: String::new(),
+        profile_name: String::new(),
+        code: String::new(),
+    })
+    .host_port() else {
+        return;
+    };
+    let peer = tm_sync::PeerDevice {
+        id: link.peer_device_id.clone(),
+        name: link.peer_name.clone(),
+        host,
+        port,
+    };
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tracing::info!(peer = %peer.id, "copying the linked device's library");
+        if let Err(e) = crate::sync::pull_from(&app, peer, link.key).await {
+            tracing::warn!("copying the linked device's library failed: {}", e.message);
+        }
+    });
+}
+
+/// Takes on the profile of the device that last tried to link from another profile, after it
+/// was refused. Needs that device's own pairing code, since this side has no key for it yet.
+#[tauri::command]
+pub async fn link_refused(app: AppHandle, code: String) -> R<LinkOutcomeDto> {
+    let refused = app
+        .state::<AppState>()
+        .sync
+        .refused
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+        .ok_or_else(|| CmdError::not_found("That device"))?;
+    link_device(app, refused.address, code, Some("theirs".into())).await
+}
+
+/// Forgets the refused attempt (the user chose to keep this PC's library, or closed the offer).
+#[tauri::command]
+pub fn dismiss_refused(state: State<'_, AppState>) {
+    *state
+        .sync
+        .refused
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 }
 
 /// Forgets the link to `peer_device_id`. The other device finds out the next time it calls.

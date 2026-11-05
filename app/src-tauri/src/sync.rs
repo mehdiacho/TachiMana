@@ -30,6 +30,8 @@ pub struct Sync {
     pub identity: DeviceIdentity,
     /// Devices linked to this profile (`POST /link`).
     pub links: Arc<LinkStore>,
+    /// The last device refused for being on another profile (shown with "keep whose library").
+    pub refused: Arc<Mutex<Option<tm_sync::server::RefusedLink>>>,
     server: Mutex<Option<SyncServer>>,
     serve_error: Mutex<Option<String>>,
     discovery: Mutex<Option<Discovery>>,
@@ -56,6 +58,7 @@ impl Sync {
         Self {
             identity: DeviceIdentity::load_or_create(identity_file),
             links: Arc::new(LinkStore::open(links_file)),
+            refused: Arc::new(Mutex::new(None)),
             server: Mutex::new(None),
             serve_error: Mutex::new(None),
             discovery: Mutex::new(None),
@@ -393,6 +396,7 @@ pub fn init(app: &AppHandle) {
                 profile_id: id,
                 profile_name: name,
                 links: Arc::clone(&state.sync.links),
+                refused: Arc::clone(&state.sync.refused),
             });
         let started =
             SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;
@@ -400,6 +404,8 @@ pub fn init(app: &AppHandle) {
             Ok(server) => {
                 let port = server.port();
                 *lock(&state.sync.server) = Some(server);
+                // A profile that just took on another device's: copy that device's library.
+                crate::links::resume_join(&app);
                 match start_discovery(&app, port) {
                     Ok(d) => *lock(&state.sync.discovery) = Some(d),
                     Err(e) => {
@@ -521,6 +527,13 @@ pub async fn sync_pull(app: AppHandle, peer_id: String, code: String) -> R<PullR
         .find(|p| p.id == peer_id)
         .cloned()
         .ok_or_else(|| CmdError::not_found("That device"))?;
+    pull_from(&app, peer, code).await
+}
+
+/// Pulls `peer`'s library with the pairing code or a link key, with progress on the Sync screen.
+pub async fn pull_from(app: &AppHandle, peer: PeerDevice, code: String) -> R<PullReportDto> {
+    let app = app.clone();
+    let state = app.state::<AppState>();
     if state.sync.pulling.swap(true, Ordering::AcqRel) {
         return Err(CmdError::new("busy", "A sync is already running."));
     }

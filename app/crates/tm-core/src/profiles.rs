@@ -58,6 +58,10 @@ pub enum ProfileError {
     Last,
     #[error("The first profile lives in the data folder itself, so it can't be deleted. Rename it instead.")]
     First,
+    #[error("The other device's profile id isn't one TachiMana can use.")]
+    BadId,
+    #[error("Another profile on this computer is already that profile. Switch to it and link from there.")]
+    IdTaken,
 }
 
 impl Profiles {
@@ -97,10 +101,15 @@ impl Profiles {
     /// root), and fixes up names, colours and the active id. `None` when nothing usable is left.
     fn cleaned(mut self) -> Option<Self> {
         let mut seen = std::collections::HashSet::new();
+        let mut folders = std::collections::HashSet::new();
+        // A folder is `profiles/<uuid>`. It starts as the profile's id, and stays put when the
+        // profile later takes on another device's id (`adopt_id`).
         self.profiles.retain(|p| {
             is_id(&p.id)
-                && (p.folder.is_empty() || p.folder == format!("{DIR}/{}", p.id))
+                && (p.folder.is_empty()
+                    || p.folder.strip_prefix(&format!("{DIR}/")).is_some_and(is_id))
                 && seen.insert(p.id.clone())
+                && (p.folder.is_empty() || folders.insert(p.folder.clone()))
         });
         // Only one profile may own the root folder.
         let mut root_owned = false;
@@ -193,6 +202,31 @@ impl Profiles {
             color.clone_into(&mut p.color);
         }
         Ok(p.clone())
+    }
+
+    /// Gives profile `id` the id `new_id`, keeping its folder, so it becomes the same profile as
+    /// another device's (`docs/rust-port/profiles-and-remote-downloads.md` §2). The caller checks
+    /// that the profile's library is empty, so two libraries are never merged.
+    pub fn adopt_id(&mut self, id: &str, new_id: &str) -> std::result::Result<(), ProfileError> {
+        if !is_id(new_id) {
+            return Err(ProfileError::BadId);
+        }
+        if id == new_id {
+            return Ok(());
+        }
+        if self.get(new_id).is_some() {
+            return Err(ProfileError::IdTaken);
+        }
+        let p = self
+            .profiles
+            .iter_mut()
+            .find(|p| p.id == id)
+            .ok_or(ProfileError::Unknown)?;
+        new_id.clone_into(&mut p.id);
+        if self.active == id {
+            new_id.clone_into(&mut self.active);
+        }
+        Ok(())
     }
 
     pub fn set_active(&mut self, id: &str) -> std::result::Result<(), ProfileError> {
@@ -342,6 +376,32 @@ mod tests {
         assert_ne!(a, new_id());
         assert!(!is_id("../../etc"));
         assert!(!is_id("ABCDEF00-0000-4000-8000-000000000000"));
+    }
+
+    #[test]
+    fn a_profile_can_take_another_devices_id_and_keeps_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let mut p = Profiles::load_or_init(root).unwrap();
+        let made = p.create("Phone", DEFAULT_COLOR).unwrap();
+        p.set_active(&made.id).unwrap();
+        let before = p.paths(root, &made.id).unwrap().data_dir().to_path_buf();
+        let phone = new_id();
+        assert_eq!(p.adopt_id(&made.id, "nope"), Err(ProfileError::BadId));
+        let main = p.profiles[0].id.clone();
+        assert_eq!(p.adopt_id(&made.id, &main), Err(ProfileError::IdTaken));
+        p.adopt_id(&made.id, &phone).unwrap();
+        assert_eq!(p.active, phone);
+        assert_eq!(p.paths(root, &phone).unwrap().data_dir(), before);
+        p.save(root).unwrap();
+        let back = Profiles::load_or_init(root).unwrap();
+        assert_eq!(back, p, "the moved id survives a reload");
+        // Two profiles may not share a folder, whatever their ids.
+        let mut twice = back.clone();
+        let mut copy = twice.profiles[1].clone();
+        copy.id = new_id();
+        twice.profiles.push(copy);
+        assert_eq!(twice.cleaned().unwrap().profiles.len(), 2);
     }
 
     #[test]

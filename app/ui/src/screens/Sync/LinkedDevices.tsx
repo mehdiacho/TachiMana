@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api } from "../../api/commands";
 import { keys, queryClient, useLinks } from "../../api/queries";
 import { OutlinedButton, Skeleton, TextButton } from "../../components/ui";
+import type { CmdError } from "../../gen/CmdError";
 import type { LinkDto } from "../../gen/LinkDto";
 import type { LinksDto } from "../../gen/LinksDto";
 import { useAction } from "../../hooks/useAction";
@@ -57,20 +58,56 @@ function LinkRow({ link }: { link: LinkDto }) {
   );
 }
 
-function LinkForm() {
+/** What "keep theirs" does here, in a sentence. */
+function keepTheirsText(empty: boolean, other: string): string {
+  return empty
+    ? `This profile is empty, so it becomes ${other}'s profile and copies its library. TachiMana restarts to do it.`
+    : `This profile already has a library, so it stays as it is and a new profile is made for ${other}'s library. TachiMana restarts into it.`;
+}
+
+/** The choice when the two devices are on different profiles. */
+function KeepChoice({ message, other, empty, busy, onTheirs, onCancel }: { message: string; other: string; empty: boolean; busy: boolean; onTheirs: () => void; onCancel: () => void }) {
+  return (
+    <div className={s.choice} role="alertdialog" aria-label="Choose whose library to keep">
+      <div className={st.rowDesc}>{message}</div>
+      <div className={s.option}>
+        <div className={st.rowTitle}>Keep {other}'s library</div>
+        <div className={st.rowDesc}>{keepTheirsText(empty, other)}</div>
+        <OutlinedButton busy={busy} onClick={onTheirs}>
+          {busy ? "Linking…" : `Keep ${other}'s`}
+        </OutlinedButton>
+      </div>
+      <div className={s.option}>
+        <div className={st.rowTitle}>Keep this PC's library</div>
+        <div className={st.rowDesc}>That replaces {other}'s library, so choose it there: scan this PC's code from {other} and pick "Keep the computer's". Its library is backed up on {other} first.</div>
+      </div>
+      <TextButton onClick={onCancel}>Cancel</TextButton>
+    </div>
+  );
+}
+
+function LinkForm({ empty }: { empty: boolean }) {
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
+  const [other, setOther] = useState<string | null>(null);
   const pasted = address.trim().startsWith("tachimana://");
   const link = useAction(
-    async () => {
-      const made = await api.linkDevice(address, code);
-      await queryClient.invalidateQueries({ queryKey: keys.links });
-      return made;
+    async (keep?: "theirs") => {
+      try {
+        const out = await api.linkDevice(address, code, keep);
+        await queryClient.invalidateQueries({ queryKey: keys.links });
+        setOther(null);
+        return out;
+      } catch (e) {
+        if ((e as CmdError).kind === "otherProfile") setOther((e as CmdError).message);
+        throw e;
+      }
     },
-    { ok: (m) => `Linked to ${m.peerName}.` },
+    { ok: (m) => (m.restarting ? `Linked to ${m.link.peerName}. Restarting into its profile…` : `Linked to ${m.link.peerName}.`) },
   );
   const submit = async () => {
-    if ((await link.run()) !== undefined) {
+    const r = await link.run();
+    if (r !== undefined) {
       setAddress("");
       setCode("");
     }
@@ -85,20 +122,73 @@ function LinkForm() {
     >
       <div className={st.rowDesc}>Enter the other device's address and the pairing code it shows, or paste its link code.</div>
       <div className={s.addRow}>
-        <input className={l.field} value={address} onChange={(e) => (setAddress(e.target.value), link.setError(null))} placeholder="192.168.x.x:27193 or tachimana://link?…" aria-label="Address or link code" spellCheck={false} maxLength={4096} />
+        <input className={l.field} value={address} onChange={(e) => (setAddress(e.target.value), link.setError(null), setOther(null))} placeholder="192.168.x.x:27193 or tachimana://link?…" aria-label="Address or link code" spellCheck={false} maxLength={4096} />
         {!pasted && (
-          <input className={`${l.field} ${s.codeInput}`} value={spacedCode(code)} onChange={(e) => setCode(cleanCode(e.target.value))} placeholder="6-digit code" inputMode="numeric" aria-label="Their pairing code" autoComplete="off" />
+          <input className={`${l.field} ${s.codeInput}`} value={spacedCode(code)} onChange={(e) => (setCode(cleanCode(e.target.value)), setOther(null))} placeholder="6-digit code" inputMode="numeric" aria-label="Their pairing code" autoComplete="off" />
         )}
-        <OutlinedButton type="submit" busy={link.pending} disabled={!address.trim() || (!pasted && code.length !== 6)}>
+        <OutlinedButton type="submit" busy={link.pending && other === null} disabled={!address.trim() || (!pasted && code.length !== 6) || other !== null}>
           {!link.pending && <Link2 size={16} />} {link.pending ? "Linking…" : "Link"}
         </OutlinedButton>
       </div>
-      {link.error && (
-        <div className={l.error} role="alert">
-          {link.error}
-        </div>
+      {other !== null ? (
+        <KeepChoice message={other} other="the other device" empty={empty} busy={link.pending} onTheirs={() => void link.run("theirs")} onCancel={() => (setOther(null), link.setError(null))} />
+      ) : (
+        link.error && (
+          <div className={l.error} role="alert">
+            {link.error}
+          </div>
+        )
       )}
     </form>
+  );
+}
+
+/** A device that scanned this PC's code from another profile and was turned away. */
+function RefusedOffer({ refused, empty }: { refused: NonNullable<LinksDto["refused"]>; empty: boolean }) {
+  const [code, setCode] = useState("");
+  const [choosing, setChoosing] = useState(false);
+  const take = useAction(async () => api.linkRefused(code), {
+    ok: (m) => `Linked to ${m.link.peerName}. Restarting into its profile…`,
+  });
+  const dismiss = useAction(async () => {
+    await api.dismissRefused();
+    await queryClient.invalidateQueries({ queryKey: keys.links });
+  });
+  const who = refused.peerName;
+  return (
+    <div className={s.card} role="alert">
+      <div className={s.deviceName}>
+        {who} tried to link from its own profile, “{refused.profileName}”
+      </div>
+      {!choosing ? (
+        <>
+          <div className={st.rowDesc}>Its library and this PC's are different. Choose whose to keep.</div>
+          <div className={st.buttons}>
+            <OutlinedButton onClick={() => setChoosing(true)}>Keep {who}'s</OutlinedButton>
+            <TextButton busy={dismiss.pending} onClick={() => void dismiss.run()}>
+              Keep this PC's
+            </TextButton>
+          </div>
+          <div className={st.rowDesc}>Keeping this PC's replaces {who}'s library, so finish it on {who}: scan again and pick "Keep the computer's".</div>
+        </>
+      ) : (
+        <>
+          <div className={st.rowDesc}>{keepTheirsText(empty, who)} Enter the pairing code shown on {who} (Settings, then LAN sync).</div>
+          <div className={s.addRow}>
+            <input className={`${l.field} ${s.codeInput}`} value={spacedCode(code)} onChange={(e) => setCode(cleanCode(e.target.value))} placeholder="6-digit code" inputMode="numeric" aria-label={`${who}'s pairing code`} autoComplete="off" autoFocus />
+            <OutlinedButton busy={take.pending} disabled={code.length !== 6} onClick={() => void take.run()}>
+              {take.pending ? "Linking…" : "Link and copy its library"}
+            </OutlinedButton>
+            <TextButton onClick={() => setChoosing(false)}>Back</TextButton>
+          </div>
+          {take.error && (
+            <div className={l.error} role="alert">
+              {take.error}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -126,7 +216,7 @@ export function LinkedDevices() {
           <div className={s.linkText}>
             <div className={s.deviceName}>Link a phone to {d.profileName ? `“${d.profileName}”` : "this profile"}</div>
             <div className={st.rowDesc}>
-              In the phone app, open Settings, then LAN sync, then Link to a computer, and scan this code. Or type one of these addresses and the pairing code {spacedCode(d.pairingCode)}.
+              Scan this code with your phone's camera, or in the phone app open Settings, then LAN sync, then Link to a computer, then Scan QR code. If you have more than one install, pick the one to link. Or type one of these addresses and the pairing code {spacedCode(d.pairingCode)}.
             </div>
             {d.addresses.length > 0 ? <div className={st.rowDesc}>{d.addresses.join(" · ")}</div> : <div className={st.rowDesc}>Waiting for the sync server to start…</div>}
             <div className={st.rowDesc}>Linked devices talk over your home network without encryption, the same as sync with the code.</div>
@@ -139,6 +229,7 @@ export function LinkedDevices() {
           </div>
         </div>
       </div>
+      {d.refused && <RefusedOffer refused={d.refused} empty={d.empty} />}
       <div role="list" aria-label="Linked devices">
         {d.links.length === 0 ? (
           <div className={s.searching}>No devices linked to this profile yet.</div>
@@ -147,7 +238,7 @@ export function LinkedDevices() {
         )}
       </div>
       <div className={st.fieldLabel}>Link to another device</div>
-      <LinkForm />
+      <LinkForm empty={d.empty} />
     </>
   );
 }
