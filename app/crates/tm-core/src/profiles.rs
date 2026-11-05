@@ -205,8 +205,8 @@ impl Profiles {
     }
 
     /// Gives profile `id` the id `new_id`, keeping its folder, so it becomes the same profile as
-    /// another device's (`docs/rust-port/profiles-and-remote-downloads.md` §2). The caller checks
-    /// that the profile's library is empty, so two libraries are never merged.
+    /// another device's (`docs/rust-port/profiles-and-remote-downloads.md` §2). The other
+    /// device's library is then merged into this one's by the caller.
     pub fn adopt_id(&mut self, id: &str, new_id: &str) -> std::result::Result<(), ProfileError> {
         if !is_id(new_id) {
             return Err(ProfileError::BadId);

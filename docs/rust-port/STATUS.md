@@ -231,7 +231,22 @@ differ, choosing whose library to keep.
   profile "Mihon Temp" and copied there, with Main untouched.
 - Keeping the PC's library is the phone's job: mehdiacho/mihon#9.
 
-Next step: release with this, then phase 3 (the phone's queue on the PC; the fork has #2).
+Merge instead of a new profile (fix/sync-merge, 2026-11-05):
+- From Mehdi: he restored the phone's backup into a profile, scanned to link, and the PC looked
+  wiped (no NAS, extensions offered again). Cause: a non-empty profile made a new one.
+- "Keep the phone's" is now **Merge into this profile** (default) or **New profile**
+  (`link_device`/`link_refused` `keep: "merge" | "new"`; `take_profile` re-ids a profile that
+  already had the phone's id, or reuses it for "new").
+- NAS settings travel as the fork's `remote_storage_*` preferences (`tm_backup::prefs::NasPrefs`,
+  `nas::adopt_backup_nas`, `nas::backup_nas`), never the password; installed extensions are
+  dropped from the restore offer after a pull or restore (`RestoreOffer::drop_installed`).
+- Checked: unit tests (each seen failing with its fix reverted), and two app copies under Xvfb:
+  a PC profile with 3 manga (2 shared, 1 its own) merged a 6-manga "phone" with NAS settings, in
+  place, ending with 7 manga, the same folder, and the NAS set up.
+- Asked the fork (mihon#11): how the NAS password travels, whether the phone changed anything at
+  Mehdi's scan, #9's state, and the outbox and release replies.
+
+Next step: release this, then phase 3 (the phone's queue on the PC; the fork has #2 and #3).
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download
