@@ -7,6 +7,9 @@ use crate::{io_err, CoreError, Result};
 /// Resolved data folder and every sub-path the app uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppPaths {
+    /// The machine's TachiMana folder: one lock, the logs, the device id and the helper.
+    root: PathBuf,
+    /// The active profile's folder (the root itself for the first profile).
     data_dir: PathBuf,
 }
 
@@ -36,7 +39,38 @@ impl AppPaths {
     pub fn at(data_dir: impl Into<PathBuf>) -> Result<Self> {
         let data_dir = data_dir.into();
         std::fs::create_dir_all(&data_dir).map_err(io_err(&data_dir))?;
-        Ok(Self { data_dir })
+        Ok(Self {
+            root: data_dir.clone(),
+            data_dir,
+        })
+    }
+
+    /// A profile's paths: `folder` is `""` (the root) or `profiles/<uuid>`, as
+    /// [`crate::profiles::Profiles`] keeps it. Anything else is refused, so a profile can never
+    /// point outside the root.
+    pub fn for_profile(root: &Path, folder: &str) -> Result<Self> {
+        let ok = folder.is_empty()
+            || folder
+                .strip_prefix("profiles/")
+                .is_some_and(crate::profiles::is_id);
+        if !ok {
+            return Err(CoreError::Profile(crate::profiles::ProfileError::Unknown));
+        }
+        let data_dir = if folder.is_empty() {
+            root.to_path_buf()
+        } else {
+            folder.split('/').fold(root.to_path_buf(), |p, s| p.join(s))
+        };
+        std::fs::create_dir_all(&data_dir).map_err(io_err(&data_dir))?;
+        Ok(Self {
+            root: root.to_path_buf(),
+            data_dir,
+        })
+    }
+
+    /// The machine's folder, shared by every profile.
+    pub fn root(&self) -> &Path {
+        &self.root
     }
 
     pub fn data_dir(&self) -> &Path {
@@ -45,14 +79,16 @@ impl AppPaths {
     pub fn database_file(&self) -> PathBuf {
         self.data_dir.join("tachimana.db")
     }
+    /// Machine-wide: one device id however many profiles there are.
     pub fn identity_file(&self) -> PathBuf {
-        self.data_dir.join("device.json")
+        self.root.join("device.json")
     }
     pub fn settings_file(&self) -> PathBuf {
         self.data_dir.join("settings.json")
     }
+    /// Machine-wide: one running app, whichever profile it has open.
     pub fn lock_file(&self) -> PathBuf {
-        self.data_dir.join("app.lock")
+        self.root.join("app.lock")
     }
     pub fn local_library_dir(&self) -> PathBuf {
         self.data_dir.join("local")
@@ -83,12 +119,13 @@ impl AppPaths {
         self.data_dir.join("cache").join("pages")
     }
     /// Rust-only: where Settings installs the extension helper (`<data>/ext-host/`).
+    /// Machine-wide, so a new profile doesn't download the helper again.
     pub fn ext_host_dir(&self) -> PathBuf {
-        self.data_dir.join("ext-host")
+        self.root.join("ext-host")
     }
     /// Rust-only: log files.
     pub fn logs_dir(&self) -> PathBuf {
-        self.data_dir.join("logs")
+        self.root.join("logs")
     }
     /// AniList session written by the Kotlin app (`anilist.json`).
     pub fn anilist_file(&self) -> PathBuf {

@@ -180,7 +180,26 @@ AniList sign-in from a Mihon backup (feat/backup-tracker-login, 2026-11-03), fro
   against a fake AniList. Other trackers (MAL, Kitsu…) aren't supported on desktop, so their
   tokens are dropped.
 
-Next step: merge feat/backup-tracker-login, release 0.1.4. Then, from Mehdi 2026-11-03: back up the NAS
+0.1.4 released 2026-11-03 19:20 UTC with the above.
+
+Profiles, phase 1 (feat/profiles, 2026-11-05), from Mehdi: "accounts and profiles… when I switch
+profiles, my library and all that stuff should switch". The plan for all five phases (profiles,
+linking a phone by QR, downloading the phone's queue on the PC to here/NAS/phone, telling the
+phone, badges) is `docs/rust-port/profiles-and-remote-downloads.md`. The phone side is drafted as
+issues for mehdiacho/mihon, but Issues are off on that repo until Mehdi turns them on.
+- `tm_core::profiles`: `profiles.json` at the data root. "Main" is the root itself, so upgrading
+  moves nothing. Others are in `profiles/<uuid>/`. Hostile or damaged entries are dropped, and
+  folders can only be `""` or `profiles/<uuid>`.
+- `AppPaths` splits root (lock, logs, device id, helper) from the profile folder (everything else).
+- Commands `profiles_list/create/edit/switch/delete`. A switch saves and calls `app.restart()`;
+  the new process retries the machine lock for 8 s while the old one exits.
+- UI: a title-bar switcher (avatar, menu, inline "New profile"), and Settings → Profiles (switch,
+  edit name and colour, delete with a typed name, moved to `profiles/.deleted/`).
+- Checked under Xvfb on a synthetic library: create, switch (the app restarts into an empty
+  library), switch back, delete (the folder is moved aside).
+
+Next step: merge feat/profiles, release 0.1.5, then phase 2 (linking, desktop half first).
+Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download
 all as the fallback (needs his Mihon fork too; that work is owned by his local session, brief in

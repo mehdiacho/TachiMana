@@ -19,6 +19,7 @@ import { useUi, type Screen } from "../store/ui";
 import s from "./Shell.module.css";
 import { ActivityBar, Toasts } from "./Activity";
 import { UpdateBanner } from "./UpdateBanner";
+import { ProfileSwitcher } from "../screens/Profiles/Profiles";
 
 function win() {
   try {
@@ -35,6 +36,7 @@ function TitleBar() {
         <span className={s.brandDot} data-tauri-drag-region />
         <span data-tauri-drag-region>TachiMana</span>
       </div>
+      <ProfileSwitcher />
       <button type="button" className={s.winBtn} aria-label="Minimise" onClick={() => void win()?.minimize()}>
         <Minus size={15} />
       </button>
