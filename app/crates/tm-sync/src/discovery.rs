@@ -25,14 +25,24 @@ impl Discovery {
         })
     }
 
-    /// Advertise this device on `port`.
-    pub fn advertise(&mut self, device_id: &str, device_name: &str, port: u16) -> Result<()> {
-        let props: HashMap<String, String> = [
+    /// Advertise this device on `port`. `profile_id` goes in the TXT record as `p`, so peers of
+    /// the same profile can be listed first.
+    pub fn advertise(
+        &mut self,
+        device_id: &str,
+        device_name: &str,
+        profile_id: Option<&str>,
+        port: u16,
+    ) -> Result<()> {
+        let mut props: HashMap<String, String> = [
             ("id".to_owned(), device_id.to_owned()),
             ("name".to_owned(), device_name.to_owned()),
         ]
         .into_iter()
         .collect();
+        if let Some(p) = profile_id {
+            props.insert("p".to_owned(), p.to_owned());
+        }
         let host: String = device_id
             .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-')

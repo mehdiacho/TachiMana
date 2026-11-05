@@ -10,6 +10,7 @@ import type { PeerDto } from "../../gen/PeerDto";
 import { cleanCode, isCode, parsePort, reportLine, spacedCode, splitAddress } from "../../lib/sync";
 import l from "../Library/Library.module.css";
 import st from "../Settings/Settings.module.css";
+import { LinkedDevices } from "./LinkedDevices";
 import { RestoreBackup } from "./RestoreBackup";
 import { RestoreOffer } from "./RestoreOffer";
 import s from "./Sync.module.css";
@@ -123,6 +124,9 @@ export function SyncScreen() {
             </div>
           )}
         </div>
+
+        <div className={st.section}>Linked devices</div>
+        <LinkedDevices />
 
         <div className={st.section}>Sync from another device</div>
         <label className={st.field}>

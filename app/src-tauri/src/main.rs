@@ -5,6 +5,7 @@ mod commands;
 mod downloads;
 mod dto;
 mod helper;
+mod links;
 mod logging;
 mod nas;
 mod online;
@@ -88,6 +89,9 @@ fn main() {
             profiles::profile_edit,
             profiles::profile_switch,
             profiles::profile_delete,
+            links::links_info,
+            links::link_device,
+            links::unlink_device,
             commands::library,
             commands::recents,
             commands::categories,

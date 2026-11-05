@@ -30,6 +30,17 @@ impl ProfileState {
         }
     }
 
+    /// Id and name of the profile this run has open; `None` when the profile list couldn't be
+    /// read and the data folder was opened bare.
+    pub fn open_profile(&self) -> Option<(String, String)> {
+        if self.open.is_empty() {
+            return None;
+        }
+        self.lock()
+            .get(&self.open)
+            .map(|p| (p.id.clone(), p.name.clone()))
+    }
+
     fn lock(&self) -> MutexGuard<'_, Profiles> {
         // The list is only ever replaced whole after a successful save, so a panic elsewhere
         // can't leave it half-changed.

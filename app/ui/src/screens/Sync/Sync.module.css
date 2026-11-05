@@ -100,3 +100,37 @@
   max-height: 200px;
   overflow: auto;
 }
+.linkCode {
+  display: flex;
+  gap: var(--tm-space-xl);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.qr {
+  flex: none;
+  border-radius: var(--tm-radius-md, 8px);
+  background: #fff;
+  image-rendering: pixelated;
+}
+.linkText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-sm);
+  flex: 1;
+  min-width: 220px;
+}
+.uri {
+  font: var(--tm-type-caption, 12px monospace);
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+  user-select: text;
+  color: var(--tm-color-on-background-med);
+}
+.addRow > input.codeInput {
+  flex: none;
+  width: 160px;
+}
+.linkText > button {
+  align-self: flex-start;
+  padding-left: 0;
+}

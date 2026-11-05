@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AppInfo } from "../gen/AppInfo";
 import type { ProfileInput } from "../gen/ProfileInput";
 import type { ProfilesDto } from "../gen/ProfilesDto";
+import type { LinkDto } from "../gen/LinkDto";
+import type { LinksDto } from "../gen/LinksDto";
 import type { CacheUsageDto } from "../gen/CacheUsageDto";
 import type { CategoryDto } from "../gen/CategoryDto";
 import type { DownloadJobDto } from "../gen/DownloadJobDto";
@@ -64,6 +66,10 @@ export const api = {
   /** Restarts the app into that profile; resolves only when it was already open. */
   profileSwitch: (id: string) => call<void>("profile_switch", { id }),
   profileDelete: (id: string) => call<ProfilesDto>("profile_delete", { id }),
+  linksInfo: () => call<LinksDto>("links_info"),
+  /** `address` is `host[:port]` with `code`, or a pasted tachimana://link code (code ignored). */
+  linkDevice: (address: string, code: string) => call<LinkDto>("link_device", { address, code }),
+  unlinkDevice: (peerDeviceId: string) => call<LinkDto[]>("unlink_device", { peerDeviceId }),
   library: () => call<LibraryEntryDto[]>("library"),
   recents: () => call<RecentDto[]>("recents"),
   categories: () => call<CategoryDto[]>("categories"),

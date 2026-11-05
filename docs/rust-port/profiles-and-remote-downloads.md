@@ -10,6 +10,9 @@ Revision history:
 - 2026-11-05: first version, from Mehdi's ask in the project thread.
 - 2026-11-05: phase 1 built (feat/profiles). Deletion moves the folder aside, not to the trash;
   the first profile can't be deleted; CEF stays per profile for now.
+- 2026-11-05: phase 2 desktop half built (feat/linking). `POST /link` takes an optional `port`
+  (where the asker serves); a different profile gets 409 with this side's profile and no key;
+  fields are at most 128 characters and the body at most 4 KiB.
 
 ## What Mehdi asked for
 
@@ -75,9 +78,11 @@ one-off pull, but not for an ongoing link where the PC talks to the phone in the
    `tachimana://link?h=<host>:<port>&d=<deviceId>&p=<profileId>&n=<profileName>&c=<6-digit code>`
 2. The other device scans it, or types the address and code, and sends `POST /link` with the
    `X-Pair-Code` header and a body of
-   `{deviceId, deviceName, profileId, profileName, platform: "android"|"desktop"}`.
+   `{deviceId, deviceName, profileId, profileName, platform: "android"|"desktop", port?}`.
+   `port` is where the asking device serves, so the other side can reach it back.
 3. If the code is right, the server answers `{deviceId, deviceName, profileId, profileName, key}`.
-   `key` is 32 random bytes as base64url, made for this link.
+   `key` is 32 random bytes as base64url without padding (43 characters), made for this link.
+   If the profile ids differ it answers 409 with the same fields and no `key`, and keeps nothing.
 4. Both sides keep the link: `{peerDeviceId, peerName, profileId, key, lastAddress}`.
 5. Every later request between them carries `X-Link-Key: <key>`. The 6-digit code is only for
    setting up a link, and the existing lockout after wrong codes applies to it.
