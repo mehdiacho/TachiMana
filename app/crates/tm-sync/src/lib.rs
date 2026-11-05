@@ -8,6 +8,7 @@
 pub mod client;
 pub mod discovery;
 pub mod identity;
+pub mod links;
 pub mod protocol;
 pub mod server;
 
@@ -16,6 +17,7 @@ use std::sync::Arc;
 
 pub use client::SyncClient;
 pub use identity::DeviceIdentity;
+pub use links::{Link, LinkStore};
 pub use protocol::{ManifestFile, PeerDevice, SyncManifest};
 use tm_backup::ImportSummary;
 use tm_db::Db;
@@ -28,6 +30,12 @@ pub enum SyncError {
     Http(String),
     #[error("wrong pairing code")]
     WrongCode,
+    /// A link key the other device no longer knows: it unlinked this one.
+    #[error("the other device no longer has this link")]
+    Unlinked,
+    /// `POST /link` to a device on another profile; carries that device's profile.
+    #[error("the other device is on another profile ({})", .0.profile_name)]
+    OtherProfile(Box<protocol::LinkResponse>),
     #[error("{0}")]
     Bind(String),
     #[error("{0}")]

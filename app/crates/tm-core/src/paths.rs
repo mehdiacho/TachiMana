@@ -127,6 +127,10 @@ impl AppPaths {
     pub fn logs_dir(&self) -> PathBuf {
         self.root.join("logs")
     }
+    /// Rust-only: devices linked to this profile (`tm-sync` links).
+    pub fn links_file(&self) -> PathBuf {
+        self.data_dir.join("links.json")
+    }
     /// AniList session written by the Kotlin app (`anilist.json`).
     pub fn anilist_file(&self) -> PathBuf {
         self.data_dir.join("anilist.json")

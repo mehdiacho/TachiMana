@@ -313,3 +313,104 @@ async fn the_port_moves_on_when_taken() {
         .unwrap();
     assert_ne!(second.port(), first.port());
 }
+
+fn link_req(profile: &str) -> tm_sync::protocol::LinkRequest {
+    tm_sync::protocol::LinkRequest {
+        device_id: "B-id".into(),
+        device_name: "Phone".into(),
+        profile_id: profile.into(),
+        profile_name: "Main".into(),
+        platform: "android".into(),
+        port: Some(27200),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn linking_gives_a_key_that_replaces_the_code() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = instance(&tmp.path().join("A"), true);
+    let links = Arc::new(tm_sync::LinkStore::open(&tmp.path().join("links.json")));
+    let id = DeviceIdentity {
+        id: "A-id".into(),
+        name: "Instance A".into(),
+        pairing_code: "123456".into(),
+    };
+    let server = SyncServer::start_with(
+        id,
+        a.local.clone(),
+        backup_fn(&a.db),
+        Some(0),
+        Some(tm_sync::server::Linking {
+            profile_id: "prof-1".into(),
+            profile_name: "Main".into(),
+            links: Arc::clone(&links),
+        }),
+    )
+    .await
+    .unwrap();
+    let port = server.port();
+    let client = SyncClient::new().unwrap();
+
+    let ping = client.probe("127.0.0.1", port).await.unwrap();
+    assert_eq!(ping.id, "A-id");
+
+    // Wrong code: refused, nothing kept.
+    let wrong = client
+        .link("127.0.0.1", port, "000000", &link_req("prof-1"))
+        .await;
+    assert!(matches!(wrong, Err(SyncError::WrongCode)), "{wrong:?}");
+    // Another profile: 409 with A's profile, no key, nothing kept.
+    match client
+        .link("127.0.0.1", port, "123456", &link_req("prof-2"))
+        .await
+    {
+        Err(SyncError::OtherProfile(r)) => {
+            assert_eq!(r.profile_id, "prof-1");
+            assert!(r.key.is_none());
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(links.list().is_empty());
+
+    let ok = client
+        .link("127.0.0.1", port, "123456", &link_req("prof-1"))
+        .await
+        .unwrap();
+    let key = ok.key.clone().unwrap();
+    assert_eq!(ok.device_id, "A-id");
+    let kept = links.by_peer("B-id").unwrap();
+    assert_eq!(kept.key, key);
+    assert_eq!(kept.last_address, "127.0.0.1:27200");
+
+    // The key works where the code did.
+    let peer = PeerDevice {
+        id: "A-id".into(),
+        name: "A".into(),
+        host: "127.0.0.1".into(),
+        port,
+    };
+    let m = client.fetch_manifest(&peer, &key).await.unwrap();
+    assert_eq!(m.device_id, "A-id");
+    // Once A forgets the link, B learns it was unlinked.
+    assert!(links.remove("B-id").unwrap());
+    let gone = client.fetch_manifest(&peer, &key).await;
+    assert!(matches!(gone, Err(SyncError::Unlinked)), "{gone:?}");
+    // A made-up key of the right shape is refused too.
+    let fake = tm_sync::links::new_key().unwrap();
+    assert!(matches!(
+        client.fetch_manifest(&peer, &fake).await,
+        Err(SyncError::Unlinked)
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_server_without_profiles_does_not_link() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = instance(&tmp.path().join("A"), false);
+    let server = serve(&a, "123456").await;
+    let client = SyncClient::new().unwrap();
+    let r = client
+        .link("127.0.0.1", server.port(), "123456", &link_req("p"))
+        .await;
+    assert!(matches!(r, Err(SyncError::Http(_))), "{r:?}");
+}

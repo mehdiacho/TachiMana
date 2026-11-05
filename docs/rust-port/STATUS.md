@@ -185,8 +185,8 @@ AniList sign-in from a Mihon backup (feat/backup-tracker-login, 2026-11-03), fro
 Profiles, phase 1 (feat/profiles, 2026-11-05), from Mehdi: "accounts and profiles… when I switch
 profiles, my library and all that stuff should switch". The plan for all five phases (profiles,
 linking a phone by QR, downloading the phone's queue on the PC to here/NAS/phone, telling the
-phone, badges) is `docs/rust-port/profiles-and-remote-downloads.md`. The phone side is drafted as
-issues for mehdiacho/mihon, but Issues are off on that repo until Mehdi turns them on.
+phone, badges) is `docs/rust-port/profiles-and-remote-downloads.md`. The phone side is filed as
+mehdiacho/mihon issues #1 (linking), #2 (queue), #3 (destinations), #4 (badges).
 - `tm_core::profiles`: `profiles.json` at the data root. "Main" is the root itself, so upgrading
   moves nothing. Others are in `profiles/<uuid>/`. Hostile or damaged entries are dropped, and
   folders can only be `""` or `profiles/<uuid>`.
@@ -198,7 +198,25 @@ issues for mehdiacho/mihon, but Issues are off on that repo until Mehdi turns th
 - Checked under Xvfb on a synthetic library: create, switch (the app restarts into an empty
   library), switch back, delete (the folder is moved aside).
 
-Next step: merge feat/profiles, release 0.1.5, then phase 2 (linking, desktop half first).
+Linking, phase 2 desktop half (feat/linking, stacked on feat/profiles, 2026-11-05):
+- `tm_sync::links`: `LinkStore` in the profile's `links.json` (at most 16, atomic save, the key
+  hidden from Debug), 32-byte base64url keys from the OS (no fallback).
+- Protocol: `X-Link-Key`; `/ping` adds `profileId`/`profileName`; `POST /link` (`LinkRequest` with
+  an optional `port`, `LinkResponse`; 409 with no key for another profile); `LinkInvite` builds
+  and parses `tachimana://link?h=&d=&p=&n=&c=`. mDNS TXT adds `p`.
+- Server: `SyncServer::start_with(.., Some(Linking))`; every route but `/ping` takes the code or a
+  known key, and wrong keys count towards the lockout. Client: a 43-character "code" is sent as
+  the link key; a 401 then is `SyncError::Unlinked`.
+- App: `links_info` (QR as SVG, addresses, code, list), `link_device` (address + code, or a pasted
+  link code), `unlink_device`. UI: Sync → Linked devices.
+- Checked: `tests/lan.rs` linking test (wrong code, other profile, key replaces code, unlink gives
+  401; it fails with key auth switched off). In the running app under Xvfb: a curl "phone" linked
+  (200) and another profile got 409, the row showed, Unlink emptied `links.json`.
+- Not done: the phone side (fork #1), adopting the other side's profile id when they differ (the
+  PC now says to link from the other device or switch profile), pushing `seen_at` updates.
+
+Next step: merge feat/profiles (PR #21), release 0.1.5, then the linking PR; then phase 3 (the
+phone's queue on the PC), which needs fork #2 to test against.
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download

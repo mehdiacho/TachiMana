@@ -15,7 +15,9 @@ use tm_backup::{BackupExtension, BackupExtensionStore, DownloadedChapter, Import
 use tm_db::Db;
 use tm_sync::discovery::Discovery;
 use tm_sync::server::SyncServer;
-use tm_sync::{DeviceIdentity, PeerDevice, PullProgress, PullReport, SyncClient, SyncError};
+use tm_sync::{
+    DeviceIdentity, LinkStore, PeerDevice, PullProgress, PullReport, SyncClient, SyncError,
+};
 use ts_rs::TS;
 
 use crate::dto::CmdError;
@@ -26,6 +28,8 @@ type R<T> = Result<T, CmdError>;
 /// Sync state held by [`AppState`].
 pub struct Sync {
     pub identity: DeviceIdentity,
+    /// Devices linked to this profile (`POST /link`).
+    pub links: Arc<LinkStore>,
     server: Mutex<Option<SyncServer>>,
     serve_error: Mutex<Option<String>>,
     discovery: Mutex<Option<Discovery>>,
@@ -48,9 +52,10 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Sync {
-    pub fn open(identity_file: &Path) -> Self {
+    pub fn open(identity_file: &Path, links_file: &Path) -> Self {
         Self {
             identity: DeviceIdentity::load_or_create(identity_file),
+            links: Arc::new(LinkStore::open(links_file)),
             server: Mutex::new(None),
             serve_error: Mutex::new(None),
             discovery: Mutex::new(None),
@@ -62,6 +67,11 @@ impl Sync {
             installed: Mutex::new(Vec::new()),
             pulling: AtomicBool::new(false),
         }
+    }
+
+    /// The port this device serves on, once the server is up.
+    pub fn server_port(&self) -> Option<u16> {
+        lock(&self.server).as_ref().map(SyncServer::port)
     }
 
     fn add_peer(&self, peer: PeerDevice) {
@@ -376,7 +386,16 @@ pub fn init(app: &AppHandle) {
         let backup: Arc<tm_sync::server::BackupFn> =
             Arc::new(move || backup_bytes(&handle.state::<AppState>()));
         let local = state.paths.local_library_dir();
-        let started = SyncServer::start(state.sync.identity.clone(), local, backup, None).await;
+        let linking = app
+            .state::<crate::profiles::ProfileState>()
+            .open_profile()
+            .map(|(id, name)| tm_sync::server::Linking {
+                profile_id: id,
+                profile_name: name,
+                links: Arc::clone(&state.sync.links),
+            });
+        let started =
+            SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;
         match started {
             Ok(server) => {
                 let port = server.port();
@@ -405,7 +424,11 @@ fn start_discovery(app: &AppHandle, port: u16) -> Result<Discovery, SyncError> {
     let state = app.state::<AppState>();
     let id = &state.sync.identity;
     let mut d = Discovery::new()?;
-    d.advertise(&id.id, &id.name, port)?;
+    let profile = app
+        .state::<crate::profiles::ProfileState>()
+        .open_profile()
+        .map(|(id, _)| id);
+    d.advertise(&id.id, &id.name, profile.as_deref(), port)?;
     let handle = app.clone();
     d.browse(
         &id.id,

@@ -6,18 +6,19 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use axum::body::Body;
-use axum::extract::{Query, State};
+use axum::extract::{ConnectInfo, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
+use crate::links::{Link, LinkStore};
 use crate::protocol::{
-    resolve_manifest_path, ManifestFile, PingInfo, SyncManifest, DEFAULT_PORT, PAIR_HEADER,
-    PORT_ATTEMPTS,
+    resolve_manifest_path, LinkRequest, LinkResponse, ManifestFile, PingInfo, SyncManifest,
+    DEFAULT_PORT, LINK_HEADER, PAIR_HEADER, PORT_ATTEMPTS,
 };
 use crate::{DeviceIdentity, Result, SyncError};
 
@@ -28,10 +29,23 @@ pub type BackupFn = dyn Fn() -> std::result::Result<Vec<u8>, String> + Send + Sy
 /// A six-digit code is only safe against guessing if guessing is slow.
 const MAX_FAILURES_PER_MINUTE: usize = 10;
 
+/// Largest `POST /link` body read.
+const MAX_LINK_BODY: usize = 4096;
+
+/// The profile this server serves and the devices linked to it. Without it the server speaks
+/// only the six-digit code, as before profiles.
+#[derive(Clone)]
+pub struct Linking {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub links: Arc<LinkStore>,
+}
+
 struct ServerState {
     identity: DeviceIdentity,
     local_root: PathBuf,
     backup: Arc<BackupFn>,
+    linking: Option<Linking>,
     failures: Mutex<Vec<Instant>>,
 }
 
@@ -50,6 +64,17 @@ impl SyncServer {
         backup: Arc<BackupFn>,
         preferred: Option<u16>,
     ) -> Result<Self> {
+        Self::start_with(identity, local_root, backup, preferred, None).await
+    }
+
+    /// [`start`](Self::start), also answering `POST /link` and accepting link keys.
+    pub async fn start_with(
+        identity: DeviceIdentity,
+        local_root: PathBuf,
+        backup: Arc<BackupFn>,
+        preferred: Option<u16>,
+        linking: Option<Linking>,
+    ) -> Result<Self> {
         let first = preferred.unwrap_or(DEFAULT_PORT);
         let listener = bind_from(first).await?;
         let port = listener.local_addr().map_err(SyncError::Io)?.port();
@@ -57,6 +82,7 @@ impl SyncServer {
             identity,
             local_root,
             backup,
+            linking,
             failures: Mutex::new(Vec::new()),
         });
         let app = Router::new()
@@ -64,14 +90,18 @@ impl SyncServer {
             .route("/manifest", get(manifest))
             .route("/backup", get(backup_route))
             .route("/file", get(file))
+            .route("/link", post(link_route))
             .with_state(state);
         let (tx, rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
-            let served = axum::serve(listener, app)
-                .with_graceful_shutdown(async move {
-                    let _ = rx.await;
-                })
-                .await;
+            let served = axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .with_graceful_shutdown(async move {
+                let _ = rx.await;
+            })
+            .await;
             if let Err(e) = served {
                 tracing::warn!("sync server stopped: {e}");
             }
@@ -126,8 +156,18 @@ fn same(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-/// `None` when paired; otherwise the response to send.
+/// `None` when paired by code or by link key; otherwise the response to send.
 fn check(state: &ServerState, headers: &HeaderMap) -> Option<Response> {
+    check_as(state, headers, true).err().map(|r| *r)
+}
+
+/// Who is asking: `Ok(Some(link))` for a link key, `Ok(None)` for the pairing code. A link key
+/// is tried only when `keys` is set. Every wrong code or key counts towards the lockout.
+fn check_as(
+    state: &ServerState,
+    headers: &HeaderMap,
+    keys: bool,
+) -> std::result::Result<Option<Link>, Box<Response>> {
     let now = Instant::now();
     let mut failures = match state.failures.lock() {
         Ok(g) => g,
@@ -135,23 +175,115 @@ fn check(state: &ServerState, headers: &HeaderMap) -> Option<Response> {
     };
     failures.retain(|t| now.duration_since(*t) < Duration::from_secs(60));
     if failures.len() >= MAX_FAILURES_PER_MINUTE {
-        return Some((StatusCode::TOO_MANY_REQUESTS, "too many attempts").into_response());
+        return Err(Box::new(
+            (StatusCode::TOO_MANY_REQUESTS, "too many attempts").into_response(),
+        ));
+    }
+    if let (true, Some(l), Some(key)) = (
+        keys,
+        state.linking.as_ref(),
+        headers.get(LINK_HEADER).and_then(|v| v.to_str().ok()),
+    ) {
+        if let Some(link) = l.links.by_key(key) {
+            return Ok(Some(link));
+        }
+        failures.push(now);
+        return Err(Box::new(
+            (StatusCode::UNAUTHORIZED, "unknown link").into_response(),
+        ));
     }
     let given = headers
         .get(PAIR_HEADER)
         .map(|v| v.as_bytes())
         .unwrap_or_default();
     if same(given, state.identity.pairing_code.as_bytes()) {
-        return None;
+        return Ok(None);
     }
     failures.push(now);
-    Some((StatusCode::UNAUTHORIZED, "unauthorized").into_response())
+    Err(Box::new(
+        (StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    ))
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+        .unwrap_or(0)
+}
+
+/// `POST /link`: with the right pairing code, makes a key for the asking device and keeps the
+/// link. A device of another profile gets 409 and this side's profile, and no key.
+async fn link_route(
+    State(s): State<Arc<ServerState>>,
+    ConnectInfo(from): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    body: Body,
+) -> Response {
+    let Some(linking) = s.linking.clone() else {
+        return (StatusCode::NOT_FOUND, "linking is off").into_response();
+    };
+    if let Err(r) = check_as(&s, &headers, false) {
+        return *r;
+    }
+    let Ok(bytes) = axum::body::to_bytes(body, MAX_LINK_BODY).await else {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "too large").into_response();
+    };
+    let Ok(req) = serde_json::from_slice::<LinkRequest>(&bytes) else {
+        return (StatusCode::BAD_REQUEST, "bad link request").into_response();
+    };
+    if !req.is_valid() || req.device_id == s.identity.id {
+        return (StatusCode::BAD_REQUEST, "bad link request").into_response();
+    }
+    let mut answer = LinkResponse {
+        device_id: s.identity.id.clone(),
+        device_name: s.identity.name.clone(),
+        profile_id: linking.profile_id.clone(),
+        profile_name: linking.profile_name.clone(),
+        key: None,
+    };
+    if req.profile_id != linking.profile_id {
+        return (StatusCode::CONFLICT, Json(answer)).into_response();
+    }
+    let Some(key) = crate::links::new_key() else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "no randomness").into_response();
+    };
+    let port = req.port.filter(|p| *p != 0).unwrap_or(DEFAULT_PORT);
+    let link = Link {
+        peer_device_id: req.device_id,
+        peer_name: req.device_name,
+        profile_id: req.profile_id,
+        platform: req.platform,
+        key: key.clone(),
+        last_address: SocketAddr::new(from.ip(), port).to_string(),
+        linked_at: now_ms(),
+    };
+    let peer = link.peer_device_id.clone();
+    let links = Arc::clone(&linking.links);
+    let saved = tokio::task::spawn_blocking(move || links.put(link)).await;
+    match saved {
+        Ok(Ok(())) => {
+            tracing::info!(peer = %peer, "device linked");
+            answer.key = Some(key);
+            Json(answer).into_response()
+        }
+        Ok(Err(e)) => {
+            tracing::warn!("couldn't save the link: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "couldn't save the link").into_response()
+        }
+        Err(e) => {
+            tracing::warn!("link task failed: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "couldn't save the link").into_response()
+        }
+    }
 }
 
 async fn ping(State(s): State<Arc<ServerState>>) -> Json<PingInfo> {
     Json(PingInfo {
         device_id: s.identity.id.clone(),
         device_name: s.identity.name.clone(),
+        profile_id: s.linking.as_ref().map(|l| l.profile_id.clone()),
+        profile_name: s.linking.as_ref().map(|l| l.profile_name.clone()),
     })
 }
 
