@@ -1,6 +1,7 @@
 // Settings (spec §3.7): theme, rotation, online sources, AniList, storage (data folder, page
 // cache, NAS), sync, updates and about.
 import { CheckCircle2, ChevronRight, Circle, Database, Puzzle, FolderOpen, HardDrive, Info, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
+import { ProfilesSection } from "../Profiles/Profiles";
 import { api } from "../../api/commands";
 import { keys, queryClient, useAniList, useAppInfo, useHelper, useCacheUsage, useSetSettings, useSettings } from "../../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -178,6 +179,9 @@ export function SettingsScreen() {
     <div className={s.screen}>
       <div className={s.col}>
         <div className={s.title}>Settings</div>
+
+        <div className={s.section}>Profiles</div>
+        <ProfilesSection />
 
         <div className={s.section}>Appearance</div>
         <div className={s.cards} role="radiogroup" aria-label="Theme">

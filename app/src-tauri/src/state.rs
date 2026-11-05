@@ -58,10 +58,25 @@ pub struct AppState {
 
 const MB: u64 = 1024 * 1024;
 
+/// Takes the machine-wide lock. A profile switch restarts the app, and the new process can start
+/// before the old one has let go, so a held lock is retried for a few seconds first.
+fn acquire_lock(path: &std::path::Path) -> Result<AppLock, String> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+    loop {
+        match AppLock::acquire(path) {
+            Ok(l) => return Ok(l),
+            Err(tm_core::CoreError::Locked(_)) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+}
+
 impl AppState {
     pub fn open(paths: AppPaths) -> Result<Self, String> {
         std::fs::create_dir_all(paths.data_dir()).map_err(|e| e.to_string())?;
-        let lock = AppLock::acquire(&paths.lock_file()).map_err(|e| e.to_string())?;
+        let lock = acquire_lock(&paths.lock_file())?;
         let db = Db::open(&paths.database_file()).map_err(|e| e.to_string())?;
         let settings = Settings::load(&paths.settings_file());
         let cap_mb = u64::try_from(settings.i64(keys::DISK_CACHE_MB).max(64)).unwrap_or(10240);

@@ -8,6 +8,7 @@ mod helper;
 mod logging;
 mod nas;
 mod online;
+mod profiles;
 mod protocol;
 mod state;
 mod sync;
@@ -17,14 +18,35 @@ mod update;
 use state::AppState;
 
 fn main() {
-    let paths = match tm_core::AppPaths::from_env() {
+    let root = match tm_core::AppPaths::from_env() {
         Ok(p) => p,
         Err(e) => {
             eprintln!("TachiMana: can't find a data folder: {e}");
             std::process::exit(1);
         }
     };
-    logging::init(&paths.logs_dir());
+    logging::init(&root.logs_dir());
+    // Which profile to open: the one saved as active (the data folder itself on first start).
+    let (open, list, paths) = match tm_core::Profiles::load_or_init(root.root()).and_then(|l| {
+        let open = l.active().map(|p| p.id.clone()).unwrap_or_default();
+        let paths = l.paths(root.root(), &open)?;
+        Ok((open, l, paths))
+    }) {
+        Ok(v) => v,
+        Err(e) => {
+            // Never refuse to start over the profile list: open the data folder as before.
+            tracing::error!("profiles unavailable, opening the data folder: {e}");
+            (
+                String::new(),
+                tm_core::Profiles {
+                    active: String::new(),
+                    profiles: Vec::new(),
+                },
+                root,
+            )
+        }
+    };
+    tracing::info!(profile = %open, dir = %paths.data_dir().display(), "opening profile");
     let state = match AppState::open(paths) {
         Ok(s) => s,
         Err(e) => {
@@ -37,6 +59,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(state)
+        .manage(profiles::ProfileState::new(open, list))
         .setup(|app| {
             use tauri::Manager;
             if let Ok(res) = app.path().resource_dir() {
@@ -60,6 +83,11 @@ fn main() {
         .register_asynchronous_uri_scheme_protocol("tm", protocol::handle)
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            profiles::profiles_list,
+            profiles::profile_create,
+            profiles::profile_edit,
+            profiles::profile_switch,
+            profiles::profile_delete,
             commands::library,
             commands::recents,
             commands::categories,

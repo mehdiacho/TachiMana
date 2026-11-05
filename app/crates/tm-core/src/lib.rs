@@ -6,10 +6,12 @@
 
 pub mod lock;
 pub mod paths;
+pub mod profiles;
 pub mod settings;
 
 pub use lock::AppLock;
 pub use paths::AppPaths;
+pub use profiles::{Profile, Profiles};
 pub use settings::Settings;
 
 /// Errors from the core crate.
@@ -27,6 +29,8 @@ pub enum CoreError {
     NoDataDir,
     #[error("another TachiMana instance is already using {0}")]
     Locked(std::path::PathBuf),
+    #[error(transparent)]
+    Profile(#[from] profiles::ProfileError),
 }
 
 pub type Result<T> = std::result::Result<T, CoreError>;

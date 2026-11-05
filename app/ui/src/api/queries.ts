@@ -12,6 +12,7 @@ export const queryClient = new QueryClient({
 
 export const keys = {
   info: ["info"] as const,
+  profiles: ["profiles"] as const,
   library: ["library"] as const,
   categories: ["categories"] as const,
   detail: (id: number) => ["detail", id] as const,
@@ -39,6 +40,7 @@ export const useUpdate = () => useQuery({ queryKey: keys.update, queryFn: api.up
 export const useAniList = () => useQuery({ queryKey: keys.anilist, queryFn: api.anilistAccount, staleTime: Infinity });
 export const useTrack = (mangaId: number) => useQuery({ queryKey: keys.track(mangaId), queryFn: () => api.trackGet(mangaId) });
 export const useSyncStatus = () => useQuery({ queryKey: keys.sync, queryFn: api.syncStatus, staleTime: Infinity });
+export const useProfiles = () => useQuery({ queryKey: keys.profiles, queryFn: api.profilesList, staleTime: Infinity });
 export const useAppInfo = () => useQuery({ queryKey: keys.info, queryFn: api.appInfo });
 export const useLibrary = () => useQuery({ queryKey: keys.library, queryFn: api.library });
 export const useCategories = () => useQuery({ queryKey: keys.categories, queryFn: api.categories });
