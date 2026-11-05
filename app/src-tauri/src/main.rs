@@ -92,6 +92,8 @@ fn main() {
             links::links_info,
             links::link_device,
             links::unlink_device,
+            links::link_refused,
+            links::dismiss_refused,
             commands::library,
             commands::recents,
             commands::categories,

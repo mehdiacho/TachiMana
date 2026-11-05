@@ -215,8 +215,23 @@ Linking, phase 2 desktop half (feat/linking, stacked on feat/profiles, 2026-11-0
 - Not done: the phone side (fork #1), adopting the other side's profile id when they differ (the
   PC now says to link from the other device or switch profile), pushing `seen_at` updates.
 
-Next step: merge feat/profiles (PR #21), release 0.1.5, then the linking PR; then phase 3 (the
-phone's queue on the PC), which needs fork #2 to test against.
+Linking across profiles (feat/profile-join, 2026-11-05), from Mehdi: link even when the profiles
+differ, choosing whose library to keep.
+- `Profiles::adopt_id` gives a profile another device's id and keeps its folder (folders are now
+  any `profiles/<uuid>`, unique, not tied to the id).
+- `link_device(.., keep: "theirs")`: on 409 the PC asks again with the other side's id, then
+  `take_profile` (in place if the library is empty, else a new profile), saves the link and a
+  `join.json` note in that folder, and restarts. On start-up `resume_join` pulls the peer's
+  library with the link key (`sync::pull_from`).
+- The server remembers the last 409 (`Linking.refused`); Sync shows "<phone> tried to link from
+  its own profile" with Keep <phone>'s (needs the phone's code) or Keep this PC's.
+- QR copy from TachiMana #23 (camera or in-app scan, pick the install).
+- Checked with two app copies under Xvfb, one standing in for the phone: an empty PC profile took
+  on the phone's id in place and copied its 6 manga and 25 files; a non-empty one made a new
+  profile "Mihon Temp" and copied there, with Main untouched.
+- Keeping the PC's library is the phone's job: mehdiacho/mihon#9.
+
+Next step: release with this, then phase 3 (the phone's queue on the PC; the fork has #2).
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download

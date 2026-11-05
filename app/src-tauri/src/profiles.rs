@@ -117,6 +117,44 @@ fn change<T>(
     Ok((out, dto(profiles, &guard)))
 }
 
+/// Makes the profile `their_id` (another device's) the active one, and returns its data folder.
+/// With `in_place`, the open profile takes on that id; it must have an empty library, which the
+/// caller checks. Otherwise a new profile is made for it, so nothing already here is touched.
+/// The caller restarts the app.
+pub fn take_profile(
+    app: &AppState,
+    profiles: &ProfileState,
+    their_id: &str,
+    their_name: &str,
+    in_place: bool,
+) -> R<std::path::PathBuf> {
+    let root = app.paths.root().to_path_buf();
+    let open = profiles.open.clone();
+    let (dir, _) = change(app, profiles, |l| {
+        if l.get(their_id).is_some() {
+            return Err(ProfileError::IdTaken.into());
+        }
+        let id = if in_place {
+            open.clone()
+        } else {
+            let color = tm_core::profiles::DEFAULT_COLOR;
+            l.create(their_name, color)
+                .or_else(|_| l.create(&format!("{their_name} (phone)"), color))?
+                .id
+        };
+        l.adopt_id(&id, their_id)?;
+        l.set_active(their_id)?;
+        let paths = l
+            .paths(&root, their_id)
+            .map_err(|e| CmdError::new("io", e.to_string()))?;
+        Ok(paths.data_dir().to_path_buf())
+    })?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| CmdError::new("io", format!("Couldn't make the profile's folder: {e}")))?;
+    tracing::info!(profile = %their_id, in_place, "took on another device's profile");
+    Ok(dir)
+}
+
 #[tauri::command]
 pub fn profiles_list(profiles: State<'_, ProfileState>) -> ProfilesDto {
     dto(&profiles, &profiles.lock())

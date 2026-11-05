@@ -39,6 +39,23 @@ pub struct Linking {
     pub profile_id: String,
     pub profile_name: String,
     pub links: Arc<LinkStore>,
+    /// The last device that asked to link from another profile, so this side can offer to take
+    /// on that profile. Only the newest is kept.
+    pub refused: Arc<Mutex<Option<RefusedLink>>>,
+}
+
+/// A `POST /link` with the right code but another profile.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefusedLink {
+    pub peer_device_id: String,
+    pub peer_name: String,
+    pub profile_id: String,
+    pub profile_name: String,
+    pub platform: String,
+    /// `host:port` the asking device serves on.
+    pub address: String,
+    /// Unix milliseconds.
+    pub at: i64,
 }
 
 struct ServerState {
@@ -242,13 +259,26 @@ async fn link_route(
         profile_name: linking.profile_name.clone(),
         key: None,
     };
+    let port = req.port.filter(|p| *p != 0).unwrap_or(DEFAULT_PORT);
     if req.profile_id != linking.profile_id {
+        let refused = RefusedLink {
+            peer_device_id: req.device_id,
+            peer_name: req.device_name,
+            profile_id: req.profile_id,
+            profile_name: req.profile_name,
+            platform: req.platform,
+            address: SocketAddr::new(from.ip(), port).to_string(),
+            at: now_ms(),
+        };
+        *linking
+            .refused
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(refused);
         return (StatusCode::CONFLICT, Json(answer)).into_response();
     }
     let Some(key) = crate::links::new_key() else {
         return (StatusCode::INTERNAL_SERVER_ERROR, "no randomness").into_response();
     };
-    let port = req.port.filter(|p| *p != 0).unwrap_or(DEFAULT_PORT);
     let link = Link {
         peer_device_id: req.device_id,
         peer_name: req.device_name,
