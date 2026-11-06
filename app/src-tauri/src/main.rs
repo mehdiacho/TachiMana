@@ -9,6 +9,7 @@ mod links;
 mod logging;
 mod nas;
 mod online;
+mod phone_queue;
 mod profiles;
 mod protocol;
 mod state;
@@ -93,6 +94,10 @@ fn main() {
             links::link_device,
             links::unlink_device,
             links::link_refused,
+            phone_queue::phone_queue,
+            phone_queue::phone_queue_resume,
+            phone_queue::phone_queue_set_dest,
+            phone_queue::phone_queue_clear_finished,
             links::dismiss_refused,
             commands::library,
             commands::recents,

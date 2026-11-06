@@ -10,6 +10,7 @@ pub mod discovery;
 pub mod identity;
 pub mod links;
 pub mod protocol;
+pub mod queue;
 pub mod server;
 
 use std::path::Path;

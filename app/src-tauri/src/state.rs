@@ -83,7 +83,11 @@ impl AppState {
         let cache = DiskCache::open(&paths.page_cache_dir(), cap_mb.saturating_mul(MB))
             .map_err(|e| e.to_string())?;
         let nas = crate::nas::Nas::open(&paths);
-        let sync = crate::sync::Sync::open(&paths.identity_file(), &paths.links_file());
+        let sync = crate::sync::Sync::open(
+            &paths.identity_file(),
+            &paths.links_file(),
+            paths.data_dir(),
+        );
         let track = crate::track::Tracking::open(&paths);
         Ok(Self {
             paths,
