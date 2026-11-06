@@ -177,11 +177,16 @@ impl LinkInvite {
 
     /// The address split into host and port; `None` when it isn't `host:port`.
     pub fn host_port(&self) -> Option<(String, u16)> {
-        let (host, port) = self.address.rsplit_once(':')?;
-        let host = host.trim_start_matches('[').trim_end_matches(']');
-        let port: u16 = port.parse().ok()?;
-        (!host.is_empty() && port != 0).then(|| (host.to_owned(), port))
+        split_address(&self.address)
     }
+}
+
+/// `host:port` (or `[v6]:port`) to its parts; `None` without a usable port.
+pub fn split_address(address: &str) -> Option<(String, u16)> {
+    let (host, port) = address.rsplit_once(':')?;
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    let port: u16 = port.parse().ok()?;
+    (!host.is_empty() && port != 0).then(|| (host.to_owned(), port))
 }
 
 /// One local-library file, path relative to the library root, forward slashes.

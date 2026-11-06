@@ -16,6 +16,7 @@ import { useDownloads } from "../../store/downloads";
 import { useUi } from "../../store/ui";
 import b from "../Browse/Browse.module.css";
 import s from "./Downloads.module.css";
+import { PhoneQueues } from "./PhoneQueues";
 
 /** Progress as a ring; an indeterminate ring until the page count is known. */
 export function ProgressRing({ done, total, size = 20 }: { done: number; total: number; size?: number }) {
@@ -246,6 +247,7 @@ export function DownloadsScreen() {
             </div>
           </>
         )}
+        <PhoneQueues />
         <div className={s.section}>On this computer</div>
         <OnDisk onError={setError} />
       </div>

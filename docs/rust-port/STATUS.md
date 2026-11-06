@@ -246,7 +246,25 @@ Merge instead of a new profile (fix/sync-merge, 2026-11-05):
 - Asked the fork (mihon#11): how the NAS password travels, whether the phone changed anything at
   Mehdi's scan, #9's state, and the outbox and release replies.
 
-Next step: release this, then phase 3 (the phone's queue on the PC; the fork has #2 and #3).
+Phase 3, the phone's queue on the PC (feat/phone-queue, 2026-11-06):
+- tm-sync: `queue` module (wire types, `Outbox` in `outbox.json`), client `queue`, `claim`,
+  `release`, `done`, `put_file`, `outbox`; server `GET /outbox?since=` (link key only).
+- App: `phone_queue.rs` (jobs in `phone-jobs.json`, destination per phone). Downloads has a
+  "Linked phones" section: the phone's queue, This PC / NAS / Back to the phone, "Download all
+  here". Finished downloads are routed there (`downloads.rs`), NAS uploads report back
+  (`nas::kick`), failures are released to the phone.
+- Checked: unit tests; `tests/phone_queue.rs` against a stand-in phone; the outbox route in
+  `tests/lan.rs`; and the app under Xvfb against a stand-in phone (Python, wire as in mihon#2/#3).
+  Two chapters already on the PC went to the phone as CBZs named
+  `downloads/Fake Source (EN)/Lantern Online/Chapter 1_86c8db.cbz`, with `sent` done events
+  acked. One that failed to download (no extension) was released. Not yet seen against the real
+  phone.
+- Not done: the NAS outbox file (`.tachimana/outbox/<id>.jsonl`), the destination picker on
+  ordinary downloads, and cancelling a phone job by hand (the phone's 24-hour claim timeout
+  covers it).
+
+Next step: release 0.1.7, have Mehdi try merge + "Download all here" with the real phone, and
+read the fork's answer on mihon#11 (NAS password).
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download

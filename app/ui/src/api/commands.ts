@@ -41,6 +41,9 @@ import type { RepoDto } from "../gen/RepoDto";
 import type { SourceDto } from "../gen/SourceDto";
 import type { UiSettings } from "../gen/UiSettings";
 import type { UiSettingsPatch } from "../gen/UiSettingsPatch";
+import type { Dest } from "../gen/Dest";
+import type { PhoneQueueDto } from "../gen/PhoneQueueDto";
+import type { ResumeDto } from "../gen/ResumeDto";
 
 /** Every command rejects with a CmdError; anything else (IPC failure) is wrapped into one. */
 export function toCmdError(e: unknown): CmdError {
@@ -70,14 +73,20 @@ export const api = {
   linksInfo: () => call<LinksDto>("links_info"),
   /**
    * `address` is `host[:port]` with `code`, or a pasted tachimana://link code (code ignored).
-   * `keep: "theirs"` takes on the other device's profile and library when the profiles differ;
-   * the app then restarts.
+   * `keep` takes on the other device's profile when the profiles differ: `"merge"` brings its
+   * library into this profile, `"new"` into a profile of its own. The app then restarts.
    */
   linkDevice: (address: string, code: string, keep?: "merge" | "new") => call<LinkOutcomeDto>("link_device", { address, code, keep: keep ?? null }),
   /** Takes on the profile of the device that was last refused, with that device's own code. */
   linkRefused: (code: string, keep: "merge" | "new") => call<LinkOutcomeDto>("link_refused", { code, keep }),
   dismissRefused: () => call<void>("dismiss_refused"),
   unlinkDevice: (peerDeviceId: string) => call<LinkDto[]>("unlink_device", { peerDeviceId }),
+  /** A linked phone's download queue, and what this PC is doing for it. */
+  phoneQueue: (peerDeviceId: string) => call<PhoneQueueDto>("phone_queue", { peerDeviceId }),
+  /** Claims the phone's queue and downloads it here, putting each chapter at `dest`. */
+  phoneQueueResume: (peerDeviceId: string, dest: Dest) => call<ResumeDto>("phone_queue_resume", { peerDeviceId, dest }),
+  phoneQueueSetDest: (peerDeviceId: string, dest: Dest) => call<void>("phone_queue_set_dest", { peerDeviceId, dest }),
+  phoneQueueClearFinished: (peerDeviceId: string) => call<void>("phone_queue_clear_finished", { peerDeviceId }),
   library: () => call<LibraryEntryDto[]>("library"),
   recents: () => call<RecentDto[]>("recents"),
   categories: () => call<CategoryDto[]>("categories"),

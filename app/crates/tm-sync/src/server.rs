@@ -20,6 +20,7 @@ use crate::protocol::{
     resolve_manifest_path, LinkRequest, LinkResponse, ManifestFile, PingInfo, SyncManifest,
     DEFAULT_PORT, LINK_HEADER, PAIR_HEADER, PORT_ATTEMPTS,
 };
+use crate::queue::{Outbox, OutboxList};
 use crate::{DeviceIdentity, Result, SyncError};
 
 /// Builds the `.tachibk` bytes on demand (blocking; it reads the database).
@@ -42,6 +43,8 @@ pub struct Linking {
     /// The last device that asked to link from another profile, so this side can offer to take
     /// on that profile. Only the newest is kept.
     pub refused: Arc<Mutex<Option<RefusedLink>>>,
+    /// Done events for the linked devices, served by `GET /outbox`.
+    pub outbox: Arc<Outbox>,
 }
 
 /// A `POST /link` with the right code but another profile.
@@ -108,6 +111,7 @@ impl SyncServer {
             .route("/backup", get(backup_route))
             .route("/file", get(file))
             .route("/link", post(link_route))
+            .route("/outbox", get(outbox_route))
             .with_state(state);
         let (tx, rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -220,6 +224,38 @@ fn check_as(
     Err(Box::new(
         (StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
     ))
+}
+
+#[derive(Deserialize)]
+struct OutboxQuery {
+    since: Option<String>,
+}
+
+/// `GET /outbox?since=<eventId>`: the done events for the asking linked device, after `since`.
+async fn outbox_route(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    Query(q): Query<OutboxQuery>,
+) -> Response {
+    let Some(linking) = s.linking.as_ref() else {
+        return (StatusCode::UNAUTHORIZED, "needs a link key").into_response();
+    };
+    if headers.get(LINK_HEADER).is_none() {
+        return (StatusCode::UNAUTHORIZED, "needs a link key").into_response();
+    }
+    let link = match check_as(&s, &headers, true) {
+        Ok(Some(link)) => link,
+        Ok(None) => return (StatusCode::UNAUTHORIZED, "needs a link key").into_response(),
+        Err(r) => return *r,
+    };
+    let since = q
+        .since
+        .as_deref()
+        .filter(|v| !v.is_empty() && v.len() <= 64);
+    Json(OutboxList {
+        events: linking.outbox.after(&link.peer_device_id, since),
+    })
+    .into_response()
 }
 
 fn now_ms() -> i64 {

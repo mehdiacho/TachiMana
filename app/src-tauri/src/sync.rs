@@ -45,6 +45,8 @@ pub struct Sync {
     /// Installed extensions as last seen from the host, written into backups (tag 900).
     installed: Mutex<Vec<BackupExtension>>,
     pulling: AtomicBool,
+    /// Downloads this PC does for linked phones, and their done events.
+    pub phone: crate::phone_queue::PhoneQueue,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -55,7 +57,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Sync {
-    pub fn open(identity_file: &Path, links_file: &Path) -> Self {
+    pub fn open(identity_file: &Path, links_file: &Path, data_dir: &Path) -> Self {
         Self {
             identity: DeviceIdentity::load_or_create(identity_file),
             links: Arc::new(LinkStore::open(links_file)),
@@ -70,7 +72,13 @@ impl Sync {
             offer: Mutex::new(RestoreOffer::default()),
             installed: Mutex::new(Vec::new()),
             pulling: AtomicBool::new(false),
+            phone: crate::phone_queue::PhoneQueue::open(data_dir),
         }
+    }
+
+    /// The device `id` as mDNS last saw it.
+    pub fn peer(&self, id: &str) -> Option<PeerDevice> {
+        lock(&self.peers).iter().find(|p| p.id == id).cloned()
     }
 
     /// The port this device serves on, once the server is up.
@@ -422,6 +430,7 @@ pub fn init(app: &AppHandle) {
                 profile_name: name,
                 links: Arc::clone(&state.sync.links),
                 refused: Arc::clone(&state.sync.refused),
+                outbox: Arc::clone(&state.sync.phone.outbox),
             });
         let started =
             SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;

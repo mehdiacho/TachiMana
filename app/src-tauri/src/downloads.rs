@@ -127,7 +127,7 @@ pub fn init(app: &AppHandle) {
     });
     let emitter = app.clone();
     let root = state.paths.downloads_root();
-    // Jobs already handed to the NAS upload queue.
+    // Finished jobs already handed on (to the NAS upload queue, or back to a phone).
     let handed: Mutex<std::collections::HashSet<u64>> = Mutex::new(Default::default());
     let dm = DownloadManager::new(
         root.clone(),
@@ -136,12 +136,23 @@ pub fn init(app: &AppHandle) {
         move |jobs| {
             let dto: Vec<DownloadJobDto> = jobs.iter().map(DownloadJobDto::from).collect();
             let _ = emitter.emit("downloads", dto);
-            for j in jobs
-                .iter()
-                .filter(|j| j.status == tm_download::DownloadStatus::Done)
-            {
-                if handed.lock().is_ok_and(|mut h| h.insert(j.id)) {
-                    let c = &j.chapter;
+            for j in jobs.iter().filter(|j| {
+                matches!(
+                    j.status,
+                    tm_download::DownloadStatus::Done | tm_download::DownloadStatus::Failed
+                )
+            }) {
+                if !handed.lock().is_ok_and(|mut h| h.insert(j.id)) {
+                    continue;
+                }
+                let c = &j.chapter;
+                if j.status == tm_download::DownloadStatus::Failed {
+                    crate::phone_queue::failed(&emitter, c, j.error.as_deref());
+                    continue;
+                }
+                let dest = crate::phone_queue::dest_of(&emitter, c);
+                // Going to the phone: it isn't the NAS's copy to make.
+                if dest != Some(crate::phone_queue::Dest::Phone) {
                     let dir = tm_download::layout::chapter_dir(
                         &root,
                         c.source_id,
@@ -154,7 +165,11 @@ pub fn init(app: &AppHandle) {
                         &c.manga_url,
                         &c.chapter_url,
                         dir,
+                        dest == Some(crate::phone_queue::Dest::Nas),
                     );
+                }
+                if dest.is_some() {
+                    crate::phone_queue::downloaded(&emitter, c);
                 }
             }
         },

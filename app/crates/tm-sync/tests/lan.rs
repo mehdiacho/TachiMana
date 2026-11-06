@@ -331,6 +331,9 @@ async fn linking_gives_a_key_that_replaces_the_code() {
     let a = instance(&tmp.path().join("A"), true);
     let links = Arc::new(tm_sync::LinkStore::open(&tmp.path().join("links.json")));
     let refused = Arc::new(std::sync::Mutex::new(None));
+    let outbox = Arc::new(tm_sync::queue::Outbox::open(
+        &tmp.path().join("outbox.json"),
+    ));
     let id = DeviceIdentity {
         id: "A-id".into(),
         name: "Instance A".into(),
@@ -346,6 +349,7 @@ async fn linking_gives_a_key_that_replaces_the_code() {
             profile_name: "Main".into(),
             links: Arc::clone(&links),
             refused: Arc::clone(&refused),
+            outbox: Arc::clone(&outbox),
         }),
     )
     .await
@@ -403,6 +407,29 @@ async fn linking_gives_a_key_that_replaces_the_code() {
     };
     let m = client.fetch_manifest(&peer, &key).await.unwrap();
     assert_eq!(m.device_id, "A-id");
+    // The outbox answers the linked device with its own events, and needs the key.
+    let ev = |id: &str, ch: &str| tm_sync::queue::DoneEvent {
+        chapter: tm_sync::queue::ChapterRef {
+            source_id: 42,
+            manga_url: "/m".into(),
+            chapter_url: ch.into(),
+        },
+        event_id: id.into(),
+        where_: tm_sync::queue::Where::Server,
+        device_id: "A-id".into(),
+        at: 1,
+    };
+    outbox.add("B-id", ev("e1", "/1"));
+    outbox.add("B-id", ev("e2", "/2"));
+    outbox.add("C-id", ev("e3", "/3"));
+    let got = client.outbox(&peer, &key, None).await.unwrap();
+    assert_eq!(got, vec![ev("e1", "/1"), ev("e2", "/2")]);
+    let got = client.outbox(&peer, &key, Some("e1")).await.unwrap();
+    assert_eq!(got, vec![ev("e2", "/2")]);
+    assert!(matches!(
+        client.outbox(&peer, "123456", None).await,
+        Err(SyncError::Unlinked)
+    ));
     // Once A forgets the link, B learns it was unlinked.
     assert!(links.remove("B-id").unwrap());
     let gone = client.fetch_manifest(&peer, &key).await;

@@ -241,51 +241,98 @@ pub async fn fetch_chapter(state: &AppState, manga: &Manga, ch: &Chapter) -> Opt
     }
 }
 
+/// Where a downloaded chapter goes on the NAS, and whether the NAS has it already.
+pub struct NasPlace {
+    /// `<source dir>/<manga dir>/<chapter>.cbz`, the phone's `RemoteMirror` layout.
+    pub segments: Vec<String>,
+    pub found: bool,
+    pub label: String,
+}
+
+/// The NAS place of a chapter in the library. `None` when NAS storage is off, the source has no
+/// known name yet, or the chapter isn't in the library.
+pub fn place_of(
+    state: &AppState,
+    source: i64,
+    manga_url: &str,
+    chapter_url: &str,
+) -> Option<NasPlace> {
+    if !enabled(state) {
+        return None;
+    }
+    let Some(name) = state.nas.source_name(source) else {
+        tracing::info!("no NAS place: source {source} has no known name yet");
+        return None;
+    };
+    let manga = state.db.manga_by_url(manga_url, source).ok()??;
+    let chapters = state.db.chapters(manga.id).ok()?;
+    let ch = chapters.iter().find(|c| c.url == chapter_url)?;
+    let (sd, md) = (
+        names::source_dir_name(&name),
+        names::manga_dir_name(&manga.title),
+    );
+    let cands = names::chapter_file_names(&ch.name, ch.scanlator.as_deref(), &ch.url);
+    let found = matches!(state.nas.index.resolve(&sd, &md, &cands), Lookup::Found(_));
+    let file = cands.into_iter().next()?;
+    Some(NasPlace {
+        segments: vec![sd, md, file],
+        found,
+        label: format!("{} · {}", manga.title, ch.name),
+    })
+}
+
+/// The `<source dir>/<manga dir>/<chapter>.cbz` names of a chapter, NAS or not: the phone keeps
+/// its downloads in the same layout.
+pub fn segments_of(
+    state: &AppState,
+    source: i64,
+    manga_url: &str,
+    chapter_url: &str,
+) -> Option<Vec<String>> {
+    let name = state.nas.source_name(source)?;
+    let manga = state.db.manga_by_url(manga_url, source).ok()??;
+    let chapters = state.db.chapters(manga.id).ok()?;
+    let ch = chapters.iter().find(|c| c.url == chapter_url)?;
+    let file = names::chapter_file_names(&ch.name, ch.scanlator.as_deref(), &ch.url)
+        .into_iter()
+        .next()?;
+    Some(vec![
+        names::source_dir_name(&name),
+        names::manga_dir_name(&manga.title),
+        file,
+    ])
+}
+
 /// Queue the upload of a finished download, unless NAS storage is off or the NAS has it already.
+/// `archive` removes the PC copy once the upload is verified, whatever the role setting says.
 pub fn upload_finished(
     app: &AppHandle,
     source: i64,
     manga_url: &str,
     chapter_url: &str,
     dir: PathBuf,
+    archive: bool,
 ) {
     let state = app.state::<AppState>();
-    if !enabled(&state) {
+    let Some(place) = place_of(&state, source, manga_url, chapter_url) else {
+        return;
+    };
+    if place.found {
         return;
     }
-    let Some(name) = state.nas.source_name(source) else {
-        tracing::info!("not uploading: source {source} has no known name yet");
-        return;
-    };
-    let Ok(Some(manga)) = state.db.manga_by_url(manga_url, source) else {
-        return;
-    };
-    let Ok(chapters) = state.db.chapters(manga.id) else {
-        return;
-    };
-    let Some(ch) = chapters.iter().find(|c| c.url == chapter_url) else {
-        return;
-    };
-    let (sd, md) = (
-        names::source_dir_name(&name),
-        names::manga_dir_name(&manga.title),
-    );
-    let cands = names::chapter_file_names(&ch.name, ch.scanlator.as_deref(), &ch.url);
-    if matches!(state.nas.index.resolve(&sd, &md, &cands), Lookup::Found(_)) {
-        return;
-    }
-    let Some(file) = cands.into_iter().next() else {
-        return;
-    };
-    let label = format!("{} · {}", manga.title, ch.name);
+    let role = if archive { Role::Archive } else { role(&state) };
     if state
         .nas
         .uploads
-        .enqueue(dir, vec![sd, md, file], role(&state), label)
+        .enqueue(dir, place.segments, role, place.label)
     {
         emit(app);
         kick(app);
     }
+}
+
+pub fn is_enabled(state: &AppState) -> bool {
+    enabled(state)
 }
 
 /// Runs queued uploads one after another until none are left.
@@ -298,14 +345,11 @@ pub fn kick(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
         while let Some(dav) = dav(&state) {
-            if state
-                .nas
-                .uploads
-                .run_next(&dav, &state.nas.index)
-                .await
-                .is_none()
-            {
+            let Some(job) = state.nas.uploads.run_next(&dav, &state.nas.index).await else {
                 break;
+            };
+            if job.status == tm_remote::UploadStatus::Done {
+                crate::phone_queue::uploaded(&app, &job.segments);
             }
             emit(&app);
             // An archived chapter left the disk; let the UI drop its downloaded mark.

@@ -68,3 +68,19 @@
   color: var(--tm-color-on-background-med);
   padding: var(--tm-space-md) var(--tm-space-md) var(--tm-space-xs);
 }
+
+/* One linked phone's queue. */
+.phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-sm);
+  padding: var(--tm-space-base);
+  border: 1px solid var(--tm-color-outline);
+  border-radius: 12px;
+  margin-bottom: var(--tm-space-md);
+}
+.dests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-sm);
+}

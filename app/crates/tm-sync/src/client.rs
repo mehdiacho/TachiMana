@@ -9,10 +9,16 @@ use tokio::io::AsyncWriteExt;
 use crate::protocol::{
     LinkRequest, LinkResponse, PeerDevice, PingInfo, SyncManifest, LINK_HEADER, PAIR_HEADER,
 };
+use crate::queue::{
+    ChapterRef, ClaimRequest, ClaimResponse, DoneEvent, DoneRequest, DoneResponse, QueueItem,
+    QueueList, ReleaseRequest, MAX_QUEUE,
+};
 use crate::{Result, SyncError};
 
 /// Largest backup accepted from a peer.
 pub const MAX_BACKUP_BYTES: u64 = 256 * 1024 * 1024;
+/// Largest chapter sent with `PUT /file` (the phone takes at most 1 GiB).
+pub const MAX_PUT_BYTES: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct SyncClient {
@@ -132,6 +138,206 @@ impl SyncClient {
                 "too many wrong codes; wait a minute and try again".into(),
             )),
             s => Err(SyncError::Http(format!("{} answered {s}", peer.address()))),
+        }
+    }
+
+    /// Sends `body` as JSON with the link `key` and reads a JSON answer of at most `cap` bytes.
+    async fn call_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        peer: &PeerDevice,
+        key: &str,
+        path: &str,
+        body: Option<&B>,
+        cap: u64,
+    ) -> Result<T> {
+        let mut req = self
+            .http
+            .request(method, format!("http://{}{path}", peer.address()))
+            .header(LINK_HEADER, key)
+            .timeout(Duration::from_secs(30));
+        if let Some(b) = body {
+            req = req
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(serde_json::to_vec(b).map_err(|e| SyncError::Protocol(e.to_string()))?);
+        }
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| SyncError::Http(format!("{}: {e}", peer.name)))?;
+        match resp.status().as_u16() {
+            200..=299 => {}
+            401 => return Err(SyncError::Unlinked),
+            404 | 405 => {
+                return Err(SyncError::Http(format!(
+                    "{} can't do that yet; update it first",
+                    peer.name
+                )))
+            }
+            s => return Err(SyncError::Http(format!("{} answered {s}", peer.name))),
+        }
+        let bytes = read_capped(resp, cap).await?;
+        serde_json::from_slice(&bytes).map_err(|e| SyncError::Protocol(format!("{path}: {e}")))
+    }
+
+    /// The linked phone's download queue, in order, at most [`MAX_QUEUE`] items.
+    pub async fn queue(&self, peer: &PeerDevice, key: &str) -> Result<Vec<QueueItem>> {
+        let list: QueueList = self
+            .call_json::<(), _>(
+                reqwest::Method::GET,
+                peer,
+                key,
+                "/queue",
+                None,
+                32 * 1024 * 1024,
+            )
+            .await?;
+        Ok(list
+            .items
+            .into_iter()
+            .filter(|i| i.chapter.is_valid())
+            .take(MAX_QUEUE)
+            .collect())
+    }
+
+    /// Claims `items` from the phone's queue for `by` (this PC). Answers what was claimed.
+    pub async fn claim(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        items: Vec<ChapterRef>,
+        by: &str,
+    ) -> Result<Vec<ChapterRef>> {
+        let req = ClaimRequest {
+            items,
+            by: by.to_owned(),
+        };
+        let r: ClaimResponse = self
+            .call_json(
+                reqwest::Method::POST,
+                peer,
+                key,
+                "/queue/claim",
+                Some(&req),
+                32 * 1024 * 1024,
+            )
+            .await?;
+        Ok(r.claimed)
+    }
+
+    /// Gives claimed `items` back to the phone. Only the status matters.
+    pub async fn release(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        items: Vec<ChapterRef>,
+    ) -> Result<()> {
+        let req = ReleaseRequest { items };
+        let _: serde_json::Value = self
+            .call_json(
+                reqwest::Method::POST,
+                peer,
+                key,
+                "/queue/release",
+                Some(&req),
+                32 * 1024 * 1024,
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Sends done events. Answers the ids the phone acked.
+    pub async fn done(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        events: Vec<DoneEvent>,
+    ) -> Result<Vec<String>> {
+        let req = DoneRequest { events };
+        let r: DoneResponse = self
+            .call_json(
+                reqwest::Method::POST,
+                peer,
+                key,
+                "/downloads/done",
+                Some(&req),
+                4 * 1024 * 1024,
+            )
+            .await?;
+        Ok(r.acked)
+    }
+
+    /// `GET /outbox?since=` on a linked PC: its done events for this device after `since`.
+    pub async fn outbox(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        since: Option<&str>,
+    ) -> Result<Vec<DoneEvent>> {
+        let path = match since {
+            Some(s) => format!(
+                "/outbox?since={}",
+                percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC)
+            ),
+            None => "/outbox".to_owned(),
+        };
+        let r: crate::queue::OutboxList = self
+            .call_json::<(), _>(
+                reqwest::Method::GET,
+                peer,
+                key,
+                &path,
+                None,
+                32 * 1024 * 1024,
+            )
+            .await?;
+        Ok(r.events)
+    }
+
+    /// Uploads a chapter archive to the phone's downloads folder, at `path`
+    /// (`downloads/<source>/<manga>/<chapter>.cbz`).
+    pub async fn put_file(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        path: &str,
+        file: &Path,
+    ) -> Result<()> {
+        let meta = tokio::fs::metadata(file).await.map_err(SyncError::Io)?;
+        let len = meta.len();
+        if len == 0 || len > MAX_PUT_BYTES {
+            return Err(SyncError::Protocol(format!("{len} bytes is not a chapter")));
+        }
+        let f = tokio::fs::File::open(file).await.map_err(SyncError::Io)?;
+        let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::new(f));
+        let q: String =
+            percent_encoding::utf8_percent_encode(path, percent_encoding::NON_ALPHANUMERIC)
+                .collect();
+        let resp = self
+            .http
+            .put(format!("http://{}/file?path={q}", peer.address()))
+            .header(LINK_HEADER, key)
+            .header(reqwest::header::CONTENT_LENGTH, len)
+            .body(body)
+            .timeout(Duration::from_secs(600))
+            .send()
+            .await
+            .map_err(|e| SyncError::Http(format!("{}: {e}", peer.name)))?;
+        match resp.status().as_u16() {
+            200..=299 => Ok(()),
+            401 => Err(SyncError::Unlinked),
+            404 => Err(SyncError::Http(format!(
+                "{} doesn't have that chapter in its library",
+                peer.name
+            ))),
+            s => {
+                let why = read_capped(resp, 4096).await.unwrap_or_default();
+                Err(SyncError::Http(format!(
+                    "{} answered {s}: {}",
+                    peer.name,
+                    String::from_utf8_lossy(&why).trim()
+                )))
+            }
         }
     }
 

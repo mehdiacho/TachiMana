@@ -26,6 +26,12 @@ Revision history:
   that already has the phone's id). The NAS settings travel in backups and pulls as the fork's
   `remote_storage_*` preferences, without the password (asked on mihon#11). Extensions already
   installed are no longer offered again.
+- 2026-11-06: phase 3 desktop half built (feat/phone-queue). Settled the two open points from
+  mihon#2: `GET /outbox?since=` answers `{events: [...]}` oldest first, and the events up to
+  `since` are forgotten (the phone has seen them); `POST /queue/release` is only checked for 200.
+  A chapter that was already on the PC before the phone asked stays on the PC whatever the
+  destination. "Send to the phone" and "NAS" don't also mirror the chapter to the NAS or keep it
+  here. Not built yet: the NAS outbox file, and the destination picker on ordinary downloads.
 
 ## What Mehdi asked for
 
