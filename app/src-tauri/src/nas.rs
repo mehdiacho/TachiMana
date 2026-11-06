@@ -329,7 +329,7 @@ fn emit(app: &AppHandle) {
 
 // ---- DTOs and commands ----
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct NasSettingsDto {
@@ -473,6 +473,68 @@ fn apply(s: &mut Settings, p: &NasSettingsPatch) -> R<()> {
         s.set(keys::REMOTE_CACHE_MB, mb.clamp(256, 1024 * 1024));
     }
     Ok(())
+}
+
+/// Takes on the NAS settings a backup or a linked phone carried (everything but the password).
+/// They fill a NAS that isn't set up here, or update the same server; a different server set up
+/// here is kept as it is. Returns whether anything changed.
+pub fn adopt_backup_nas(state: &AppState, nas: &tm_backup::prefs::NasPrefs) -> R<bool> {
+    let mut s = state.settings()?;
+    let here = s.string(keys::REMOTE_HOST);
+    if !here.trim().is_empty() && !here.trim().eq_ignore_ascii_case(nas.host.trim()) {
+        tracing::info!("kept this profile's NAS; the backup names another server");
+        return Ok(false);
+    }
+    let before = s.clone();
+    let url_before = s.remote_collection_url();
+    s.set(keys::REMOTE_HOST, nas.host.as_str());
+    for (v, key) in [
+        (&nas.port, keys::REMOTE_PORT),
+        (&nas.folder, keys::REMOTE_FOLDER),
+        (&nas.username, keys::REMOTE_USERNAME),
+    ] {
+        if let Some(v) = v {
+            s.set(key, v.as_str());
+        }
+    }
+    for (v, key) in [
+        (nas.enabled, keys::REMOTE_ENABLED),
+        (nas.use_https, keys::REMOTE_USE_HTTPS),
+    ] {
+        if let Some(v) = v {
+            s.set(key, v);
+        }
+    }
+    if let Some(mb) = nas.cache_mb {
+        s.set(keys::REMOTE_CACHE_MB, mb.clamp(256, 1024 * 1024));
+    }
+    if settings_dto(&s) == settings_dto(&before) {
+        return Ok(false);
+    }
+    s.save()?;
+    if url_before != s.remote_collection_url() {
+        state.nas.index.invalidate();
+    }
+    tracing::info!("took on the NAS settings from the backup");
+    Ok(true)
+}
+
+/// This profile's NAS settings in the form a backup carries them (no password), when set up.
+pub fn backup_nas(s: &Settings) -> Option<tm_backup::prefs::NasPrefs> {
+    let host = s.string(keys::REMOTE_HOST).trim().to_owned();
+    if host.is_empty() {
+        return None;
+    }
+    let text = |key| Some(s.string(key)).filter(|v| !v.trim().is_empty());
+    Some(tm_backup::prefs::NasPrefs {
+        enabled: Some(s.bool(keys::REMOTE_ENABLED)),
+        host,
+        port: text(keys::REMOTE_PORT),
+        use_https: Some(s.bool(keys::REMOTE_USE_HTTPS)),
+        folder: text(keys::REMOTE_FOLDER),
+        username: text(keys::REMOTE_USERNAME),
+        cache_mb: Some(s.i64(keys::REMOTE_CACHE_MB)),
+    })
 }
 
 #[tauri::command]
@@ -722,5 +784,45 @@ mod tests {
         assert!(!serde_json::to_string(&dto).unwrap().contains("secret"));
         assert_eq!(dto.url, "https://nas.local");
         assert_eq!(source_label("MangaDex", "en"), "MangaDex (EN)");
+    }
+
+    #[test]
+    fn a_backups_nas_fills_an_empty_one_and_never_replaces_another_server() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = AppState::open(AppPaths::at(tmp.path().join("data")).unwrap()).unwrap();
+        let nas = tm_backup::prefs::NasPrefs {
+            enabled: Some(true),
+            host: "nas.local".into(),
+            port: Some("25601".into()),
+            use_https: Some(false),
+            folder: Some("Mihon".into()),
+            username: Some("reader".into()),
+            cache_mb: Some(4352),
+        };
+        assert!(adopt_backup_nas(&state, &nas).unwrap());
+        {
+            let s = state.settings().unwrap();
+            assert!(s.remote_enabled());
+            assert_eq!(s.remote_collection_url(), "http://nas.local:25601/Mihon");
+            assert_eq!(s.string(keys::REMOTE_USERNAME), "reader");
+            assert_eq!(s.i64(keys::REMOTE_CACHE_MB), 4352);
+            // It is saved, and it goes back out in a backup the same way.
+            assert_eq!(
+                backup_nas(&Settings::load(&state.paths.settings_file())),
+                Some(nas.clone())
+            );
+        }
+        // The same again changes nothing.
+        assert!(!adopt_backup_nas(&state, &nas).unwrap());
+        // A password set here survives, and another server is left alone.
+        state.settings().unwrap().set(keys::REMOTE_PASSWORD, "kept");
+        let other = tm_backup::prefs::NasPrefs {
+            host: "elsewhere".into(),
+            ..nas
+        };
+        assert!(!adopt_backup_nas(&state, &other).unwrap());
+        let s = state.settings().unwrap();
+        assert_eq!(s.string(keys::REMOTE_HOST), "nas.local");
+        assert_eq!(s.string(keys::REMOTE_PASSWORD), "kept");
     }
 }

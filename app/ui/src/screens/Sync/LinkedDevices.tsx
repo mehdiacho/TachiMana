@@ -58,27 +58,47 @@ function LinkRow({ link }: { link: LinkDto }) {
   );
 }
 
-/** What "keep theirs" does here, in a sentence. */
-function keepTheirsText(empty: boolean, other: string): string {
-  return empty
-    ? `This profile is empty, so it becomes ${other}'s profile and copies its library. TachiMana restarts to do it.`
-    : `This profile already has a library, so it stays as it is and a new profile is made for ${other}'s library. TachiMana restarts into it.`;
+/** How the other device's library comes into this PC. */
+export type Keep = "merge" | "new";
+
+/** What each choice does, in a sentence. */
+function keepText(keep: Keep, empty: boolean, other: string): string {
+  const text = keepSentence(keep, empty, other);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function keepSentence(keep: Keep, empty: boolean, other: string): string {
+  if (keep === "merge") {
+    return empty
+      ? `This profile is empty, so it becomes ${other}'s profile and copies its library. TachiMana restarts to do it.`
+      : `${other}'s library is merged into this profile: what's missing here is added and what both have is brought up to date. Nothing here is deleted, and your NAS and extensions stay set up. TachiMana restarts to do it.`;
+  }
+  return `This profile stays as it is, and ${other}'s library goes into a profile of its own. TachiMana restarts into it.`;
 }
 
 /** The choice when the two devices are on different profiles. */
-function KeepChoice({ message, other, empty, busy, onTheirs, onCancel }: { message: string; other: string; empty: boolean; busy: boolean; onTheirs: () => void; onCancel: () => void }) {
+function KeepChoice({ message, other, empty, busy, onKeep, onCancel }: { message: string; other: string; empty: boolean; busy: Keep | null; onKeep: (k: Keep) => void; onCancel: () => void }) {
   return (
-    <div className={s.choice} role="alertdialog" aria-label="Choose whose library to keep">
+    <div className={s.choice} role="alertdialog" aria-label={`Choose how to bring in ${other}'s library`}>
       <div className={st.rowDesc}>{message}</div>
       <div className={s.option}>
-        <div className={st.rowTitle}>Keep {other}'s library</div>
-        <div className={st.rowDesc}>{keepTheirsText(empty, other)}</div>
-        <OutlinedButton busy={busy} onClick={onTheirs}>
-          {busy ? "Linking…" : `Keep ${other}'s`}
+        <div className={st.rowTitle}>{empty ? `Use ${other}'s library here` : "Merge into this profile"}</div>
+        <div className={st.rowDesc}>{keepText("merge", empty, other)}</div>
+        <OutlinedButton busy={busy === "merge"} disabled={busy !== null} onClick={() => onKeep("merge")}>
+          {busy === "merge" ? "Linking…" : empty ? "Use it here" : "Merge"}
         </OutlinedButton>
       </div>
+      {!empty && (
+        <div className={s.option}>
+          <div className={st.rowTitle}>Put it in a new profile</div>
+          <div className={st.rowDesc}>{keepText("new", empty, other)}</div>
+          <OutlinedButton busy={busy === "new"} disabled={busy !== null} onClick={() => onKeep("new")}>
+            {busy === "new" ? "Linking…" : "New profile"}
+          </OutlinedButton>
+        </div>
+      )}
       <div className={s.option}>
-        <div className={st.rowTitle}>Keep this PC's library</div>
+        <div className={st.rowTitle}>Keep this PC's library on {other}</div>
         <div className={st.rowDesc}>That replaces {other}'s library, so choose it there: scan this PC's code from {other} and pick "Keep the computer's". Its library is backed up on {other} first.</div>
       </div>
       <TextButton onClick={onCancel}>Cancel</TextButton>
@@ -90,9 +110,11 @@ function LinkForm({ empty }: { empty: boolean }) {
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [other, setOther] = useState<string | null>(null);
+  const [keeping, setKeeping] = useState<Keep | null>(null);
   const pasted = address.trim().startsWith("tachimana://");
   const link = useAction(
-    async (keep?: "theirs") => {
+    async (keep?: Keep) => {
+      setKeeping(keep ?? null);
       try {
         const out = await api.linkDevice(address, code, keep);
         await queryClient.invalidateQueries({ queryKey: keys.links });
@@ -101,6 +123,8 @@ function LinkForm({ empty }: { empty: boolean }) {
       } catch (e) {
         if ((e as CmdError).kind === "otherProfile") setOther((e as CmdError).message);
         throw e;
+      } finally {
+        setKeeping(null);
       }
     },
     { ok: (m) => (m.restarting ? `Linked to ${m.link.peerName}. Restarting into its profile…` : `Linked to ${m.link.peerName}.`) },
@@ -131,7 +155,7 @@ function LinkForm({ empty }: { empty: boolean }) {
         </OutlinedButton>
       </div>
       {other !== null ? (
-        <KeepChoice message={other} other="the other device" empty={empty} busy={link.pending} onTheirs={() => void link.run("theirs")} onCancel={() => (setOther(null), link.setError(null))} />
+        <KeepChoice message={other} other="the other device" empty={empty} busy={link.pending ? keeping : null} onKeep={(k) => void link.run(k)} onCancel={() => (setOther(null), link.setError(null))} />
       ) : (
         link.error && (
           <div className={l.error} role="alert">
@@ -146,8 +170,8 @@ function LinkForm({ empty }: { empty: boolean }) {
 /** A device that scanned this PC's code from another profile and was turned away. */
 function RefusedOffer({ refused, empty }: { refused: NonNullable<LinksDto["refused"]>; empty: boolean }) {
   const [code, setCode] = useState("");
-  const [choosing, setChoosing] = useState(false);
-  const take = useAction(async () => api.linkRefused(code), {
+  const [choosing, setChoosing] = useState<Keep | null>(null);
+  const take = useAction(async (keep: Keep) => api.linkRefused(code, keep), {
     ok: (m) => `Linked to ${m.link.peerName}. Restarting into its profile…`,
   });
   const dismiss = useAction(async () => {
@@ -160,26 +184,27 @@ function RefusedOffer({ refused, empty }: { refused: NonNullable<LinksDto["refus
       <div className={s.deviceName}>
         {who} tried to link from its own profile, “{refused.profileName}”
       </div>
-      {!choosing ? (
+      {choosing === null ? (
         <>
-          <div className={st.rowDesc}>Its library and this PC's are different. Choose whose to keep.</div>
+          <div className={st.rowDesc}>Choose how to bring its library into this PC.</div>
           <div className={st.buttons}>
-            <OutlinedButton onClick={() => setChoosing(true)}>Keep {who}'s</OutlinedButton>
+            <OutlinedButton onClick={() => setChoosing("merge")}>{empty ? "Use it here" : "Merge into this profile"}</OutlinedButton>
+            {!empty && <OutlinedButton onClick={() => setChoosing("new")}>Put it in a new profile</OutlinedButton>}
             <TextButton busy={dismiss.pending} onClick={() => void dismiss.run()}>
-              Keep this PC's
+              Not now
             </TextButton>
           </div>
-          <div className={st.rowDesc}>Keeping this PC's replaces {who}'s library, so finish it on {who}: scan again and pick "Keep the computer's".</div>
+          <div className={st.rowDesc}>To keep this PC's library on {who} instead, scan again on {who} and pick "Keep the computer's".</div>
         </>
       ) : (
         <>
-          <div className={st.rowDesc}>{keepTheirsText(empty, who)} Enter the pairing code shown on {who} (Settings, then LAN sync).</div>
+          <div className={st.rowDesc}>{keepText(choosing, empty, who)} Enter the pairing code shown on {who} (Settings, then LAN sync).</div>
           <div className={s.addRow}>
             <input className={`${l.field} ${s.codeInput}`} value={spacedCode(code)} onChange={(e) => setCode(cleanCode(e.target.value))} placeholder="6-digit code" inputMode="numeric" aria-label={`${who}'s pairing code`} autoComplete="off" autoFocus />
-            <OutlinedButton busy={take.pending} disabled={code.length !== 6} onClick={() => void take.run()}>
-              {take.pending ? "Linking…" : "Link and copy its library"}
+            <OutlinedButton busy={take.pending} disabled={code.length !== 6} onClick={() => void take.run(choosing)}>
+              {take.pending ? "Linking…" : choosing === "merge" ? "Link and merge" : "Link and copy its library"}
             </OutlinedButton>
-            <TextButton onClick={() => setChoosing(false)}>Back</TextButton>
+            <TextButton onClick={() => setChoosing(null)}>Back</TextButton>
           </div>
           {take.error && (
             <div className={l.error} role="alert">

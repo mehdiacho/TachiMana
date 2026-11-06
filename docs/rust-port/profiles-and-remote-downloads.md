@@ -18,6 +18,14 @@ Revision history:
   library is empty, otherwise as a new profile, so nothing is erased) and copy the phone's
   library. Keeping the PC's library is chosen on the phone (mehdiacho/mihon#9). The phone
   camera opens the fork from the QR as it is (TachiMana #23, mihon#8).
+- 2026-11-05: merge instead of a new profile (fix/sync-merge), from Mehdi: a profile restored
+  from the phone's backup was not empty, so linking made a new profile with no NAS settings or
+  extensions, which looked like a wipe. "Keep the phone's" on the PC is now two choices: **merge
+  into this profile** (the default: this profile takes the phone's id and the phone's library is
+  imported into it; nothing here is deleted) or **put it in a new profile** (reusing a profile
+  that already has the phone's id). The NAS settings travel in backups and pulls as the fork's
+  `remote_storage_*` preferences, without the password (asked on mihon#11). Extensions already
+  installed are no longer offered again.
 
 ## What Mehdi asked for
 
@@ -95,15 +103,21 @@ one-off pull, but not for an ongoing link where the PC talks to the phone in the
 **Rules**
 - **A link joins two copies of the same profile.** When the profile ids differ, the user chooses
   whose library to keep, and the side whose library goes takes on the other side's id:
-  - **Keep the other device's.** This side takes on its id. On the PC: in place when this
-    profile's library is empty, otherwise as a new profile (nothing on the PC is erased). The PC
-    then links with the matching id, restarts into that profile (a `join.json` note in its folder)
-    and copies the other device's library over the link. On the phone: it backs up its own
-    library first, then replaces it with the computer's `/backup` (fork issue #9).
+  - **Keep the other device's.** This side takes on its id. On the PC there are two ways:
+    - **Merge into this profile** (the default, and the only one when the library is empty): the
+      open profile takes on the id and keeps its folder, and the other device's library is
+      imported into it. Missing manga and chapters are added, ones both have are updated, and
+      nothing on the PC is deleted. A different PC profile that already had that id gets a new id.
+    - **A new profile**: the open profile is left alone, and the other device's library goes into
+      the profile that already has its id, or a new one.
+
+    Either way the PC links with the matching id, restarts into that profile (a `join.json` note in
+    its folder) and copies the other device's library over the link. On the phone: it backs up its
+    own library first, then replaces it with the computer's `/backup` (fork issue #9).
   - **Keep this device's.** That replaces the other device's library, so it is finished on the
     other device. When a phone's `POST /link` is refused with 409, the PC remembers it (device,
     profile, address) and offers "Keep <phone>'s" with the phone's own pairing code.
-  - Or cancel. Two different libraries are never merged silently.
+  - Or cancel. Two different libraries are never merged without the user choosing it.
 - **One app profile per link.** A phone install links to one PC profile. A PC profile can link to
   several devices.
 - **Either side can unlink.** That deletes the key on that side, and the other side is told the

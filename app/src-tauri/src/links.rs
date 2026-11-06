@@ -226,10 +226,15 @@ fn library_is_empty(state: &AppState) -> R<bool> {
 /// and keeps the key.
 ///
 /// When the two are on different profiles the answer is an `otherProfile` error, unless `keep`
-/// is `"theirs"`: then this PC takes on the other device's profile (in place when this profile's
-/// library is empty, otherwise as a new profile, so nothing here is erased), links, restarts into
-/// it and copies the other device's library. Keeping this PC's library instead is chosen on the
-/// other device, which is the one whose library gets replaced.
+/// says what to do with the other device's library:
+/// - `"merge"` (or the older `"theirs"`): this profile takes on the other device's profile and
+///   its library is merged in. What is missing here is added, what both have is updated, and
+///   nothing here is deleted.
+/// - `"new"`: the other device's library goes into a profile of its own (made if needed), and
+///   this one is left alone.
+///
+/// Either way this PC links, restarts into that profile and copies the other device's library.
+/// Keeping this PC's library instead is chosen on the other device.
 #[tauri::command]
 pub async fn link_device(
     app: AppHandle,
@@ -238,7 +243,12 @@ pub async fn link_device(
     keep: Option<String>,
 ) -> R<LinkOutcomeDto> {
     let (host, port, code) = target(&address, &code)?;
-    let take_theirs = keep.as_deref() == Some("theirs");
+    let mode = match keep.as_deref() {
+        None => None,
+        Some("merge" | "theirs") => Some(true),
+        Some("new") => Some(false),
+        Some(_) => return Err(CmdError::new("invalid", "Unknown choice.")),
+    };
     let Some((profile_id, profile_name)) = app.state::<ProfileState>().open_profile() else {
         return Err(CmdError::new(
             "unavailable",
@@ -261,7 +271,7 @@ pub async fn link_device(
     let mut joining: Option<(String, String)> = None;
     let answer = match client.link(&host, port, &code, &req).await {
         Ok(a) => a,
-        Err(SyncError::OtherProfile(theirs)) if take_theirs => {
+        Err(SyncError::OtherProfile(theirs)) if mode.is_some() => {
             // Ask again as a copy of their profile; the code is the same.
             req.profile_id.clone_from(&theirs.profile_id);
             req.profile_name.clone_from(&theirs.profile_name);
@@ -272,7 +282,7 @@ pub async fn link_device(
             return Err(CmdError::new(
                 "otherProfile",
                 format!(
-                    "{} is on its own profile, \u{201c}{}\u{201d}, with its own library, and this PC is on \u{201c}{profile_name}\u{201d}. Choose whose library to keep.",
+                    "{} is on its own profile, \u{201c}{}\u{201d}, with its own library, and this PC is on \u{201c}{profile_name}\u{201d}. Choose how to bring its library in.",
                     theirs.device_name, theirs.profile_name
                 ),
             ));
@@ -311,19 +321,25 @@ pub async fn link_device(
             restarting: false,
         });
     };
-    join_and_restart(&app, &their_id, &their_name, link)?;
+    join_and_restart(&app, &their_id, &their_name, link, mode.unwrap_or(true))?;
     Ok(LinkOutcomeDto {
         link: dto,
         restarting: true,
     })
 }
 
-/// Takes on `their_id`, keeps `link` in that profile with a note to copy the peer's library,
-/// and restarts into it.
-fn join_and_restart(app: &AppHandle, their_id: &str, their_name: &str, link: Link) -> R<()> {
+/// Takes on `their_id` (in this profile when `merge`, or when its library is empty), keeps
+/// `link` in that profile with a note to copy the peer's library, and restarts into it.
+fn join_and_restart(
+    app: &AppHandle,
+    their_id: &str,
+    their_name: &str,
+    link: Link,
+    merge: bool,
+) -> R<()> {
     let state = app.state::<AppState>();
     let profiles = app.state::<ProfileState>();
-    let in_place = library_is_empty(&state)?;
+    let in_place = merge || library_is_empty(&state)?;
     let marker = JoinMarker {
         peer_device_id: link.peer_device_id.clone(),
         peer_name: link.peer_name.clone(),
@@ -384,9 +400,10 @@ pub fn resume_join(app: &AppHandle) {
 }
 
 /// Takes on the profile of the device that last tried to link from another profile, after it
-/// was refused. Needs that device's own pairing code, since this side has no key for it yet.
+/// was refused, merging or in a profile of its own as `keep` says (see [`link_device`]). Needs
+/// that device's own pairing code, since this side has no key for it yet.
 #[tauri::command]
-pub async fn link_refused(app: AppHandle, code: String) -> R<LinkOutcomeDto> {
+pub async fn link_refused(app: AppHandle, code: String, keep: Option<String>) -> R<LinkOutcomeDto> {
     let refused = app
         .state::<AppState>()
         .sync
@@ -395,7 +412,8 @@ pub async fn link_refused(app: AppHandle, code: String) -> R<LinkOutcomeDto> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone()
         .ok_or_else(|| CmdError::not_found("That device"))?;
-    link_device(app, refused.address, code, Some("theirs".into())).await
+    let keep = keep.unwrap_or_else(|| "merge".into());
+    link_device(app, refused.address, code, Some(keep)).await
 }
 
 /// Forgets the refused attempt (the user chose to keep this PC's library, or closed the offer).

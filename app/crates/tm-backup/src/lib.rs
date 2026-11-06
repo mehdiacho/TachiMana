@@ -55,6 +55,8 @@ pub struct ImportSummary {
     pub trackers: Vec<i64>,
     /// Manga that could not be restored (each rolled back on its own), at most [`MAX_ERRORS`].
     pub errors: Vec<RestoreError>,
+    /// The remote storage (NAS) settings the backup carries, without the password.
+    pub nas: Option<prefs::NasPrefs>,
 }
 
 /// A manga a restore skipped, and why.
@@ -346,7 +348,10 @@ pub fn import_with(
     progress: &mut dyn FnMut(usize, usize, &str),
 ) -> Result<ImportSummary> {
     let now = now_ms();
-    let mut s = ImportSummary::default();
+    let mut s = ImportSummary {
+        nas: prefs::nas_prefs(&backup.backup_preferences),
+        ..ImportSummary::default()
+    };
     let category_by_order = db.write(|c| import_categories(c, backup, &mut s).map_err(into_db))?;
     let total = backup.backup_manga.len();
     let mut done = 0usize;

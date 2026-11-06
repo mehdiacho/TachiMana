@@ -118,9 +118,10 @@ fn change<T>(
 }
 
 /// Makes the profile `their_id` (another device's) the active one, and returns its data folder.
-/// With `in_place`, the open profile takes on that id; it must have an empty library, which the
-/// caller checks. Otherwise a new profile is made for it, so nothing already here is touched.
-/// The caller restarts the app.
+/// With `in_place`, the open profile takes on that id, keeping its library for the other
+/// device's to be merged into; a different profile that already had the id gets a new one (it
+/// stops being that device's). Otherwise the profile that already has the id is used, or a new
+/// profile is made for it, so nothing in the open profile is touched. The caller restarts the app.
 pub fn take_profile(
     app: &AppState,
     profiles: &ProfileState,
@@ -131,18 +132,20 @@ pub fn take_profile(
     let root = app.paths.root().to_path_buf();
     let open = profiles.open.clone();
     let (dir, _) = change(app, profiles, |l| {
-        if l.get(their_id).is_some() {
-            return Err(ProfileError::IdTaken.into());
-        }
-        let id = if in_place {
-            open.clone()
-        } else {
+        let taken = l.get(their_id).is_some() && open != their_id;
+        if in_place {
+            if taken {
+                l.adopt_id(their_id, &tm_core::profiles::new_id())?;
+            }
+            l.adopt_id(&open, their_id)?;
+        } else if !taken && open != their_id {
             let color = tm_core::profiles::DEFAULT_COLOR;
-            l.create(their_name, color)
+            let id = l
+                .create(their_name, color)
                 .or_else(|_| l.create(&format!("{their_name} (phone)"), color))?
-                .id
-        };
-        l.adopt_id(&id, their_id)?;
+                .id;
+            l.adopt_id(&id, their_id)?;
+        }
         l.set_active(their_id)?;
         let paths = l
             .paths(&root, their_id)
@@ -224,4 +227,56 @@ pub fn profile_delete(
     })?;
     tracing::info!(profile = %id, moved = ?moved, "profile deleted");
     Ok(list)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::*;
+
+    const PHONE: &str = "11111111-2222-4333-8444-555555555555";
+
+    /// A root with Main open (a library is not needed: `take_profile` doesn't look) and a second
+    /// profile that already has the phone's id, as an earlier "new profile" join leaves it.
+    fn setup() -> (tempfile::TempDir, AppState, ProfileState, String) {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut list = Profiles::load_or_init(tmp.path()).unwrap();
+        let main = list.active().unwrap().id.clone();
+        let old = list
+            .create("Phone", tm_core::profiles::DEFAULT_COLOR)
+            .unwrap();
+        list.adopt_id(&old.id, PHONE).unwrap();
+        list.save(tmp.path()).unwrap();
+        let state = AppState::open(list.paths(tmp.path(), &main).unwrap()).unwrap();
+        let profiles = ProfileState::new(main.clone(), list);
+        (tmp, state, profiles, main)
+    }
+
+    #[test]
+    fn merging_makes_this_profile_the_phones_and_frees_the_id() {
+        let (tmp, state, profiles, main) = setup();
+        let main_dir = state.paths.data_dir().to_path_buf();
+        let dir = take_profile(&state, &profiles, PHONE, "Phone", true).unwrap();
+        assert_eq!(
+            dir, main_dir,
+            "the open profile keeps its folder and library"
+        );
+        let list = Profiles::load_or_init(tmp.path()).unwrap();
+        assert_eq!(list.active().unwrap().id, PHONE);
+        assert!(list.get(&main).is_none());
+        let old = list.profiles.iter().find(|p| p.name == "Phone").unwrap();
+        assert_ne!(old.id, PHONE, "the earlier copy is no longer the phone's");
+    }
+
+    #[test]
+    fn a_new_profile_reuses_the_one_that_is_already_the_phones() {
+        let (tmp, state, profiles, main) = setup();
+        let main_dir = state.paths.data_dir().to_path_buf();
+        let dir = take_profile(&state, &profiles, PHONE, "Phone", false).unwrap();
+        assert_ne!(dir, main_dir);
+        let list = Profiles::load_or_init(tmp.path()).unwrap();
+        assert_eq!(list.active().unwrap().id, PHONE);
+        assert!(list.get(&main).is_some(), "the open profile is untouched");
+        assert_eq!(list.profiles.len(), 2, "no third profile");
+    }
 }

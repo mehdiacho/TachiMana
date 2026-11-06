@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tm_backup::prefs::NasPrefs;
 use tm_backup::{BackupExtension, BackupExtensionStore, DownloadedChapter, ImportSummary};
 use tm_db::Db;
 use tm_sync::discovery::Discovery;
@@ -119,6 +120,22 @@ struct RestoreOffer {
     source_ids: Vec<i64>,
     downloaded: Vec<DownloadedChapter>,
     anilist: bool,
+}
+
+impl RestoreOffer {
+    /// Forgets the extensions, and the sources, that `installed` already covers, so the offer
+    /// only asks for what is missing.
+    fn drop_installed(&mut self, installed: &[tm_exthost::model::Extension]) {
+        let pkgs: std::collections::HashSet<&str> =
+            installed.iter().map(|e| e.pkg_name.as_str()).collect();
+        let sources: std::collections::HashSet<i64> = installed
+            .iter()
+            .flat_map(|e| e.sources.iter().map(|s| s.id))
+            .collect();
+        self.extensions
+            .retain(|e| !pkgs.contains(e.pkg_name.as_str()));
+        self.source_ids.retain(|id| !sources.contains(id));
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -372,6 +389,14 @@ impl AsRef<Db> for AppDb {
 fn backup_bytes(state: &AppState) -> Result<Vec<u8>, String> {
     let mut b =
         tm_backup::export(&state.db, &state.nas.source_names()).map_err(|e| e.to_string())?;
+    // The NAS settings travel like the phone's own (no password), so a restore there sets it up.
+    if let Some(nas) = state
+        .settings()
+        .ok()
+        .and_then(|s| crate::nas::backup_nas(&s))
+    {
+        tm_backup::prefs::put_nas_prefs(&mut b.backup_preferences, &nas);
+    }
     let installed = lock(&state.sync.installed).clone();
     let dm = state.downloads.get();
     tm_backup::annotate(&mut b, installed, |source, manga, chapter| {
@@ -566,6 +591,7 @@ pub async fn pull_from(app: &AppHandle, peer: PeerDevice, code: String) -> R<Pul
     let out = match result {
         Ok(report) => {
             state.sync.set_offer(&report.summary);
+            after_import(&app, report.summary.nas.as_ref()).await;
             let dto = PullReportDto::from(&report);
             *lock(&state.sync.last_report) = Some(report);
             let _ = app.emit("library-changed", ());
@@ -614,7 +640,7 @@ pub fn export_to(state: &AppState, path: &Path) -> R<()> {
 /// downloading chapters again are offered (see [`RestoreOfferDto`]).
 #[cfg(test)]
 pub fn restore_from(state: &AppState, path: &Path) -> R<RestoreDto> {
-    restore_with(state, path, &mut |_| {}).map(|(dto, _)| dto)
+    restore_with(state, path, &mut |_| {}).map(|(dto, ..)| dto)
 }
 
 /// [`restore_from`], reporting each step to `progress`. Also hands back the AniList sign-in the
@@ -623,7 +649,11 @@ pub fn restore_with(
     state: &AppState,
     path: &Path,
     progress: &mut dyn FnMut(RestoreProgressDto),
-) -> R<(RestoreDto, Option<tm_backup::prefs::TrackerLogin>)> {
+) -> R<(
+    RestoreDto,
+    Option<tm_backup::prefs::TrackerLogin>,
+    Option<NasPrefs>,
+)> {
     let started = std::time::Instant::now();
     let step = |stage: &str, done: usize, total: usize, title: &str| RestoreProgressDto {
         stage: stage.to_owned(),
@@ -679,7 +709,7 @@ pub fn restore_with(
             .collect(),
         tracking: None,
     };
-    Ok((dto, login))
+    Ok((dto, login, summary.nas))
 }
 
 /// Ask where to save, then save a backup there. `None` when the user cancels.
@@ -763,14 +793,44 @@ async fn restore_in_background(app: AppHandle, path: PathBuf) -> R<RestoreDto> {
     })
     .await;
     RESTORING.store(false, Ordering::Release);
-    let (mut out, login) =
+    let (mut out, login, nas) =
         joined.map_err(|e| CmdError::internal(format!("The restore stopped: {e}")))??;
     if let Some(login) = login {
         out.tracking = Some(crate::track::adopt_from_backup(&app, login).await);
     }
+    after_import(&app, nas.as_ref()).await;
     let _ = app.emit("library-changed", ());
     emit(&app);
     Ok(out)
+}
+
+/// What follows a restore or a pull: take on the NAS settings it carried, and drop from the
+/// install offer the extensions this profile already has.
+async fn after_import(app: &AppHandle, nas: Option<&NasPrefs>) {
+    let state = app.state::<AppState>();
+    if let Some(nas) = nas {
+        match crate::nas::adopt_backup_nas(&state, nas) {
+            Ok(true) => crate::nas::kick(app),
+            Ok(false) => {}
+            Err(e) => tracing::warn!("NAS settings from the backup not saved: {}", e.message),
+        }
+    }
+    if !crate::online::host_available(&state) {
+        return;
+    }
+    let exts = match crate::online::client(&state) {
+        Ok(c) => match c.extensions().await {
+            Ok(exts) => exts,
+            Err(e) => {
+                tracing::warn!("couldn't list installed extensions: {e}");
+                return;
+            }
+        },
+        Err(_) => return,
+    };
+    state.sync.set_installed(&exts);
+    lock(&state.sync.offer).drop_installed(&exts);
+    emit(app);
 }
 
 /// The extensions the last restore can install: the backup's own list when it has one (tag
@@ -898,6 +958,28 @@ pub fn restore_dismiss(app: AppHandle, state: State<'_, AppState>) {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
     use super::*;
+
+    #[test]
+    fn the_offer_drops_extensions_and_sources_already_installed() {
+        let ext = |pkg: &str| BackupExtension {
+            pkg_name: pkg.into(),
+            ..Default::default()
+        };
+        let mut o = RestoreOffer {
+            extensions: vec![ext("a"), ext("b")],
+            source_ids: vec![1, 2],
+            ..Default::default()
+        };
+        let installed: Vec<tm_exthost::model::Extension> =
+            serde_json::from_value(serde_json::json!([{
+                "pkgName": "a", "name": "A", "versionName": "1", "versionCode": 1, "lang": "en",
+                "nsfw": false, "sources": [{"id": 1, "name": "A", "lang": "en"}]
+            }]))
+            .unwrap();
+        o.drop_installed(&installed);
+        assert_eq!(o.extensions, vec![ext("b")]);
+        assert_eq!(o.source_ids, vec![2]);
+    }
 
     fn avail(pkg: &str, name: &str, source: i64) -> tm_exthost::model::AvailableExtension {
         tm_exthost::model::AvailableExtension {
@@ -1035,7 +1117,7 @@ mod tests {
         std::fs::write(&file, tm_backup::codec::encode(&backup).unwrap()).unwrap();
 
         let st = AppState::open(tm_core::AppPaths::at(dir.path()).unwrap()).unwrap();
-        let (_, login) = restore_with(&st, &file, &mut |_| {}).unwrap();
+        let (_, login, _) = restore_with(&st, &file, &mut |_| {}).unwrap();
         let login = login.expect("the sign-in is read");
         assert_eq!(
             (login.token.as_str(), login.expires_at),

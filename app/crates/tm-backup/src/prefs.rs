@@ -74,6 +74,154 @@ pub fn private_string(prefs: &[Vec<u8>], key: &str) -> Option<String> {
     })
 }
 
+#[derive(Clone, PartialEq, prost::Message)]
+struct BoolValue {
+    #[prost(bool, tag = "1")]
+    value: bool,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct IntValue {
+    #[prost(int32, tag = "1")]
+    value: i32,
+}
+
+const CLASS_PREFIX: &str = "eu.kanade.tachiyomi.data.backup.models.";
+/// Longest NAS text value taken from a backup; a real host, folder or user name is far shorter.
+const MAX_NAS_FIELD: usize = 1024;
+
+/// One public preference's class name and body, `None` when absent or undecodable.
+fn public_value(prefs: &[Vec<u8>], key: &str) -> Option<RawValue> {
+    prefs.iter().find_map(|raw| {
+        let p = <RawPref as prost::Message>::decode(raw.as_slice()).ok()?;
+        (p.key == key).then_some(p.value).flatten()
+    })
+}
+
+fn pref_string(prefs: &[Vec<u8>], key: &str) -> Option<String> {
+    let v = public_value(prefs, key)?;
+    if !v.class.ends_with("StringPreferenceValue") {
+        return None;
+    }
+    let s = <StringValue as prost::Message>::decode(v.body.as_slice())
+        .ok()?
+        .value;
+    let s = s.trim();
+    (s.len() <= MAX_NAS_FIELD && !s.chars().any(char::is_control)).then(|| s.to_owned())
+}
+
+fn pref_bool(prefs: &[Vec<u8>], key: &str) -> Option<bool> {
+    let v = public_value(prefs, key)?;
+    v.class.ends_with("BooleanPreferenceValue").then_some(())?;
+    <BoolValue as prost::Message>::decode(v.body.as_slice())
+        .ok()
+        .map(|b| b.value)
+}
+
+fn pref_int(prefs: &[Vec<u8>], key: &str) -> Option<i64> {
+    let v = public_value(prefs, key)?;
+    v.class.ends_with("IntPreferenceValue").then_some(())?;
+    <IntValue as prost::Message>::decode(v.body.as_slice())
+        .ok()
+        .map(|b| i64::from(b.value))
+}
+
+fn raw_pref(key: &str, class: &str, body: Vec<u8>) -> Vec<u8> {
+    <RawPref as prost::Message>::encode_to_vec(&RawPref {
+        key: key.to_owned(),
+        value: Some(RawValue {
+            class: format!("{CLASS_PREFIX}{class}"),
+            body,
+        }),
+    })
+}
+
+/// The phone's remote storage (NAS) settings, as Mehdi's Mihon fork writes them among the app
+/// preferences (`remote_storage_*`). The password is not among them: it is never carried here.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct NasPrefs {
+    pub enabled: Option<bool>,
+    pub host: String,
+    /// Kept as text, as both apps store it.
+    pub port: Option<String>,
+    pub use_https: Option<bool>,
+    pub folder: Option<String>,
+    pub username: Option<String>,
+    pub cache_mb: Option<i64>,
+}
+
+/// Preference keys of [`NasPrefs`] in the fork's backups.
+pub mod nas_keys {
+    pub const ENABLED: &str = "remote_storage_enabled";
+    pub const HOST: &str = "remote_storage_host";
+    pub const PORT: &str = "remote_storage_port";
+    pub const HTTPS: &str = "remote_storage_https";
+    pub const FOLDER: &str = "remote_storage_folder";
+    pub const USERNAME: &str = "remote_storage_username";
+    pub const CACHE_MB: &str = "remote_storage_cache_mb";
+    pub const ALL: [&str; 7] = [ENABLED, HOST, PORT, HTTPS, FOLDER, USERNAME, CACHE_MB];
+}
+
+/// The NAS settings in `prefs`, when they name a host.
+pub fn nas_prefs(prefs: &[Vec<u8>]) -> Option<NasPrefs> {
+    let host = pref_string(prefs, nas_keys::HOST).filter(|h| !h.is_empty())?;
+    Some(NasPrefs {
+        enabled: pref_bool(prefs, nas_keys::ENABLED),
+        host,
+        port: pref_string(prefs, nas_keys::PORT)
+            .filter(|p| p.parse::<u32>().is_ok_and(|n| (1..=65_535).contains(&n))),
+        use_https: pref_bool(prefs, nas_keys::HTTPS),
+        folder: pref_string(prefs, nas_keys::FOLDER),
+        username: pref_string(prefs, nas_keys::USERNAME),
+        cache_mb: pref_int(prefs, nas_keys::CACHE_MB).filter(|mb| *mb > 0),
+    })
+}
+
+/// Writes `nas` into `prefs` the way the fork reads them, replacing any NAS keys already there.
+/// The password is never written.
+pub fn put_nas_prefs(prefs: &mut Vec<Vec<u8>>, nas: &NasPrefs) {
+    prefs.retain(|raw| key_of(raw).is_none_or(|k| !nas_keys::ALL.contains(&k.as_str())));
+    let string = |key: &str, v: &str| {
+        raw_pref(
+            key,
+            "StringPreferenceValue",
+            <StringValue as prost::Message>::encode_to_vec(&StringValue {
+                value: v.to_owned(),
+            }),
+        )
+    };
+    let boolean = |key: &str, v: bool| {
+        raw_pref(
+            key,
+            "BooleanPreferenceValue",
+            <BoolValue as prost::Message>::encode_to_vec(&BoolValue { value: v }),
+        )
+    };
+    prefs.push(string(nas_keys::HOST, &nas.host));
+    if let Some(v) = nas.enabled {
+        prefs.push(boolean(nas_keys::ENABLED, v));
+    }
+    if let Some(v) = &nas.port {
+        prefs.push(string(nas_keys::PORT, v));
+    }
+    if let Some(v) = nas.use_https {
+        prefs.push(boolean(nas_keys::HTTPS, v));
+    }
+    if let Some(v) = &nas.folder {
+        prefs.push(string(nas_keys::FOLDER, v));
+    }
+    if let Some(v) = &nas.username {
+        prefs.push(string(nas_keys::USERNAME, v));
+    }
+    if let Some(mb) = nas.cache_mb.and_then(|mb| i32::try_from(mb).ok()) {
+        prefs.push(raw_pref(
+            nas_keys::CACHE_MB,
+            "IntPreferenceValue",
+            <IntValue as prost::Message>::encode_to_vec(&IntValue { value: mb }),
+        ));
+    }
+}
+
 /// A tracker sign-in carried by a backup. Its `Debug` leaves the token out, so it can't reach a log.
 #[derive(Clone, PartialEq, Eq)]
 pub struct TrackerLogin {
@@ -146,6 +294,80 @@ pub(crate) mod tests {
             backup_preferences: prefs,
             ..Default::default()
         }
+    }
+
+    fn pref(key: &str, class: &str, body: Vec<u8>) -> Vec<u8> {
+        raw_pref(key, class, body)
+    }
+
+    #[test]
+    fn reads_the_phones_nas_settings_and_writes_them_back() {
+        let prefs = vec![
+            string_pref("remote_storage_host", " nas.local "),
+            string_pref("remote_storage_port", "25601"),
+            string_pref("remote_storage_folder", "Mihon"),
+            string_pref("remote_storage_username", "reader"),
+            pref(
+                "remote_storage_enabled",
+                "BooleanPreferenceValue",
+                BoolValue { value: true }.encode_to_vec(),
+            ),
+            pref(
+                "remote_storage_https",
+                "BooleanPreferenceValue",
+                BoolValue { value: false }.encode_to_vec(),
+            ),
+            pref(
+                "remote_storage_cache_mb",
+                "IntPreferenceValue",
+                IntValue { value: 4352 }.encode_to_vec(),
+            ),
+            string_pref("display_remote_badge", "x"),
+        ];
+        let nas = nas_prefs(&prefs).unwrap();
+        assert_eq!(
+            nas,
+            NasPrefs {
+                enabled: Some(true),
+                host: "nas.local".into(),
+                port: Some("25601".into()),
+                use_https: Some(false),
+                folder: Some("Mihon".into()),
+                username: Some("reader".into()),
+                cache_mb: Some(4352),
+            }
+        );
+        let mut out = vec![
+            string_pref("remote_storage_host", "old"),
+            string_pref("other", "kept"),
+        ];
+        put_nas_prefs(&mut out, &nas);
+        assert_eq!(nas_prefs(&out), Some(nas));
+        assert_eq!(
+            out.iter()
+                .filter(|r| key_of(r).as_deref() == Some("remote_storage_host"))
+                .count(),
+            1
+        );
+        assert!(out.iter().any(|r| key_of(r).as_deref() == Some("other")));
+    }
+
+    #[test]
+    fn no_nas_settings_without_a_host_or_with_junk() {
+        assert_eq!(nas_prefs(&[]), None);
+        assert_eq!(nas_prefs(&[string_pref("remote_storage_host", "  ")]), None);
+        assert_eq!(nas_prefs(&[vec![0xff, 0x00, 0x12]]), None);
+        // A wrong type or a bad port is left out, not misread.
+        let nas = nas_prefs(&[
+            string_pref("remote_storage_host", "nas"),
+            string_pref("remote_storage_enabled", "true"),
+            string_pref("remote_storage_port", "99999"),
+            string_pref("remote_storage_folder", "a\nb"),
+        ])
+        .unwrap();
+        assert_eq!(nas.enabled, None);
+        assert_eq!(nas.port, None);
+        assert_eq!(nas.folder, None);
     }
 
     #[test]

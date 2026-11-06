@@ -73,9 +73,9 @@ export const api = {
    * `keep: "theirs"` takes on the other device's profile and library when the profiles differ;
    * the app then restarts.
    */
-  linkDevice: (address: string, code: string, keep?: "theirs") => call<LinkOutcomeDto>("link_device", { address, code, keep: keep ?? null }),
+  linkDevice: (address: string, code: string, keep?: "merge" | "new") => call<LinkOutcomeDto>("link_device", { address, code, keep: keep ?? null }),
   /** Takes on the profile of the device that was last refused, with that device's own code. */
-  linkRefused: (code: string) => call<LinkOutcomeDto>("link_refused", { code }),
+  linkRefused: (code: string, keep: "merge" | "new") => call<LinkOutcomeDto>("link_refused", { code, keep }),
   dismissRefused: () => call<void>("dismiss_refused"),
   unlinkDevice: (peerDeviceId: string) => call<LinkDto[]>("unlink_device", { peerDeviceId }),
   library: () => call<LibraryEntryDto[]>("library"),
