@@ -4,7 +4,8 @@ name: App release (Rust)
 # A tag `app-v<version>` (e.g. app-v0.2.0) publishes a release with all of them in the public
 # repository mehdiacho/tachimana-releases; the app's updater and helper download read from there.
 # Running it by hand builds everything as workflow artifacts; give it a version to publish that
-# version too. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
+# version too. When publishing, each build job puts its files straight onto a draft release and
+# the last job publishes it, so a release does not depend on the account's artifact storage. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
 
 on:
   push:
@@ -31,6 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
     steps:
       - id: v
         env:
@@ -41,9 +43,35 @@ jobs:
           else v="0.0.0-dev.${GITHUB_RUN_NUMBER}"; fi
           echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "bad version $v"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
+          # A pushed `app-v*` tag, or a manual run with a version (for when pushing tags is not possible).
+          if { [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_EVENT_NAME}" = push ]; } || { [ "${GITHUB_EVENT_NAME}" = workflow_dispatch ] && [ -n "${INPUT_VERSION}" ]; }; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The draft the build jobs upload to. Published to the public releases repository, which the
+  # app's updater and helper download read without signing in (this repository is private).
+  # RELEASES_TOKEN is a fine-grained token with Contents read/write on that repository only.
+  draft:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          test -n "$GH_TOKEN" || { echo "::error::Add the RELEASES_TOKEN secret (see the comment above)"; exit 1; }
+          gh release view "app-v$VERSION" --repo mehdiacho/tachimana-releases > /dev/null 2>&1 || \
+            gh release create "app-v$VERSION" --repo mehdiacho/tachimana-releases --draft \
+              --title "TachiMana $VERSION" \
+              --notes "Installers for Windows (setup.exe, msi) and Linux (deb, AppImage), and the extension helper zips the app downloads on first use."
 
   ext-host:
-    needs: version
+    needs: [version, draft]
+    if: ${{ !cancelled() && needs.version.result == 'success' && needs.draft.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -80,15 +108,27 @@ jobs:
           port=$(sed -n 's/^TM_EXTHOST_READY port=\([0-9]*\).*/\1/p' out)
           test -n "$port" || { cat err; exit 1; }
           curl -sf -H "Authorization: Bearer $TM_EXTHOST_TOKEN" "http://127.0.0.1:$port/v1/health"
+      - name: Add the files to the draft release
+        if: needs.version.outputs.publish == 'true'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: gh release upload "app-v$VERSION" dist/* --repo mehdiacho/tachimana-releases --clobber
+      # A build that isn't published keeps its files as an artifact for a day. The account's
+      # artifact storage is small, so a full store must not fail the build.
       - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.publish != 'true'
+        continue-on-error: true
         with:
           name: ext-host-${{ matrix.platform }}
           path: dist/*
-          # The account's artifact storage is small; these are only needed until the run ends.
           retention-days: 1
 
   app:
-    needs: version
+    needs: [version, draft]
+    if: ${{ !cancelled() && needs.version.result == 'success' && needs.draft.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -139,36 +179,33 @@ jobs:
           cd ../dist
           for f in *; do sha256sum "$f" > "$f.sha256"; done
           ls -l
+      - name: Add the files to the draft release
+        if: needs.version.outputs.publish == 'true'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: gh release upload "app-v$VERSION" dist/* --repo mehdiacho/tachimana-releases --clobber
+      # A build that isn't published keeps its files as an artifact for a day. The account's
+      # artifact storage is small, so a full store must not fail the build.
       - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.publish != 'true'
+        continue-on-error: true
         with:
           name: app-${{ runner.os }}
           path: dist/*
-          # The account's artifact storage is small; these are only needed until the run ends.
           retention-days: 1
 
   release:
-    # A pushed `app-v*` tag, or a manual run with a version (for when pushing tags is not possible).
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
-    needs: [version, ext-host, app]
+    needs: [version, draft, ext-host, app]
+    if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - run: ls -l dist
-      # Published to the public releases repository, which the app's updater and helper download
-      # read without signing in (this repository is private). RELEASES_TOKEN is a fine-grained
-      # token with Contents read/write on that repository only.
-      - name: Check the release token
+      - name: Publish the release
         env:
-          TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: test -n "$TOKEN" || { echo "::error::Add the RELEASES_TOKEN secret (see the comment above)"; exit 1; }
-      - uses: softprops/action-gh-release@v2
-        with:
-          repository: mehdiacho/tachimana-releases
-          token: ${{ secrets.RELEASES_TOKEN }}
-          tag_name: app-v${{ needs.version.outputs.version }}
-          name: TachiMana ${{ needs.version.outputs.version }}
-          body: Installers for Windows (setup.exe, msi) and Linux (deb, AppImage), and the extension helper zips the app downloads on first use.
-          files: dist/*
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release view "app-v$VERSION" --repo mehdiacho/tachimana-releases --json assets --jq '.assets[].name'
+          gh release edit "app-v$VERSION" --repo mehdiacho/tachimana-releases --draft=false --latest
