@@ -86,7 +86,11 @@ jobs:
 
       - name: Upload the host
         if: matrix.os == 'windows-latest'
+        # A convenience copy; a full artifact store must not fail the check.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ext-host
           path: ext-host/build/ext-host/
+          # The account's artifact storage is small; these are only needed until the run ends.
+          retention-days: 1

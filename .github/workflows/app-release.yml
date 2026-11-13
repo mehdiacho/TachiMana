@@ -84,6 +84,8 @@ jobs:
         with:
           name: ext-host-${{ matrix.platform }}
           path: dist/*
+          # The account's artifact storage is small; these are only needed until the run ends.
+          retention-days: 1
 
   app:
     needs: version
@@ -141,6 +143,8 @@ jobs:
         with:
           name: app-${{ runner.os }}
           path: dist/*
+          # The account's artifact storage is small; these are only needed until the run ends.
+          retention-days: 1
 
   release:
     # A pushed `app-v*` tag, or a manual run with a version (for when pushing tags is not possible).
