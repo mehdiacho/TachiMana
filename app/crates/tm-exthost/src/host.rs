@@ -66,7 +66,12 @@ impl ExtHost {
             return Err(Error::NotInstalled(jar));
         }
         let token = new_token()?;
-        let mut child = Command::new(config.java_path())
+        let mut command = Command::new(config.java_path());
+        // java.exe is a console program: started from a windowed app it opens a terminal of its
+        // own unless told not to (CREATE_NO_WINDOW).
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut command, 0x0800_0000);
+        let mut child = command
             .arg("-jar")
             .arg(&jar)
             .arg("--data-dir")

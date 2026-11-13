@@ -19,13 +19,16 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import xyz.nulldev.androidcompat.webkit.CefHelper
 import xyz.nulldev.androidcompat.webkit.evaluateJavaScript
+import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.util.concurrent.ConcurrentHashMap
+import javax.swing.BorderFactory
 import javax.swing.JFrame
+import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
@@ -63,6 +66,12 @@ class WebViewCloudflareSolver(
             // opening its own browser.
             hostLocks.getOrPut(url.host) { Mutex() }.withLock {
                 if (hasStoredClearance(url)) return@runBlocking true
+                // A host that just failed, or that the browser opened without any challenge, is
+                // left alone for a while: a page of covers would otherwise queue one attempt (and
+                // one window) per image.
+                if (restingUntil[url.host].let { it != null && it > System.currentTimeMillis() }) {
+                    return@runBlocking false
+                }
 
                 val ready =
                     runCatching { CefManager.obtain(config) }
@@ -71,25 +80,39 @@ class WebViewCloudflareSolver(
                 if (!ready) return@runBlocking false
 
                 // Stage 1: headless auto-solve (silent) for the JS proof-of-work challenge.
-                if (attempt(url, headless = true, timeoutMs = HEADLESS_TIMEOUT_MS)) return@runBlocking true
+                var outcome = attempt(url, headless = true, timeoutMs = HEADLESS_TIMEOUT_MS)
 
                 // Stage 2: interactive window for challenges that need a human (Turnstile).
                 val canPrompt = config.interactive && !GraphicsEnvironment.isHeadless()
-                if (canPrompt) {
+                if (outcome == Outcome.FAILED && canPrompt) {
                     logger.info { "Headless solve failed on ${url.host}; opening a window for you to solve the challenge." }
-                    if (attempt(url, headless = false, timeoutMs = INTERACTIVE_TIMEOUT_MS)) return@runBlocking true
+                    outcome = attempt(url, headless = false, timeoutMs = INTERACTIVE_TIMEOUT_MS)
                 }
-                logger.warn { "Cloudflare challenge on ${url.host} not cleared" }
-                false
+                when (outcome) {
+                    Outcome.CLEARED -> true
+                    Outcome.NO_CHALLENGE -> {
+                        // The browser was let in without a challenge, so there is nothing to
+                        // solve. Its user-agent and cookies were adopted; retry once with those,
+                        // and don't come back here for this host if that isn't enough.
+                        logger.info { "No challenge on ${url.host} in the browser; retrying with its user-agent" }
+                        restingUntil[url.host] = System.currentTimeMillis() + REST_MS
+                        true
+                    }
+                    Outcome.FAILED -> {
+                        logger.warn { "Cloudflare challenge on ${url.host} not cleared" }
+                        restingUntil[url.host] = System.currentTimeMillis() + REST_MS
+                        false
+                    }
+                }
             }
         }
     }
 
     /** Load [url] in a browser (off-screen or windowed), poll for clearance, then harvest. */
-    private suspend fun attempt(url: HttpUrl, headless: Boolean, timeoutMs: Long): Boolean {
+    private suspend fun attempt(url: HttpUrl, headless: Boolean, timeoutMs: Long): Outcome {
         val client = withTimeoutOrNull(CLIENT_TIMEOUT_MS) { CefHelper.createClient() } ?: run {
             logger.warn { "CEF client didn't become ready in time" }
-            return false
+            return Outcome.FAILED
         }
         var browser: CefBrowser? = null
         var frame: JFrame? = null
@@ -118,23 +141,30 @@ class WebViewCloudflareSolver(
                 frame = showWindow(url, browser) { if (!userClosed.isCompleted) userClosed.complete(Unit) }
             }
 
-            val cleared =
+            // Polls in a row that found the page loaded with no challenge on it.
+            var plain = 0
+            val outcome =
                 withTimeoutOrNull(timeoutMs) {
                     while (true) {
-                        if (userClosed.isCompleted) return@withTimeoutOrNull hasClearance(url)
+                        if (userClosed.isCompleted) {
+                            return@withTimeoutOrNull if (hasClearance(url)) Outcome.CLEARED else Outcome.FAILED
+                        }
                         if (headless) browser.invalidate()
-                        if (hasClearance(url)) return@withTimeoutOrNull true
+                        if (hasClearance(url)) return@withTimeoutOrNull Outcome.CLEARED
+                        plain = if (isPlainPage(browser)) plain + 1 else 0
+                        if (plain >= PLAIN_POLLS) return@withTimeoutOrNull Outcome.NO_CHALLENGE
                         delay(POLL_INTERVAL_MS)
                     }
                     @Suppress("UNREACHABLE_CODE")
-                    false
-                } ?: false
-            if (!cleared) return false
+                    Outcome.FAILED
+                } ?: Outcome.FAILED
+            if (outcome == Outcome.FAILED) return Outcome.FAILED
 
             harvestUserAgent(browser)
             val injected = harvestCookies(url)
+            if (outcome == Outcome.NO_CHALLENGE) return Outcome.NO_CHALLENGE
             logger.info { "Cloudflare cleared on ${url.host} ($injected cookie(s) adopted)" }
-            return injected > 0
+            return if (injected > 0) Outcome.CLEARED else Outcome.FAILED
         } finally {
             // Interactive: tear the browser + window down together on the EDT (the frame holds the
             // browser's UI component, so closing them on different threads races).
@@ -161,7 +191,14 @@ class WebViewCloudflareSolver(
                 override fun windowClosed(e: WindowEvent?) = onClosed()
             },
         )
-        frame.contentPane.add(browser.uiComponent)
+        val hint =
+            JLabel(
+                "<html>Tick the box or follow the check on the page below. " +
+                    "This window closes by itself once ${url.host} lets TachiMana in.</html>",
+            )
+        hint.border = BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        frame.contentPane.add(hint, BorderLayout.NORTH)
+        frame.contentPane.add(browser.uiComponent, BorderLayout.CENTER)
         frame.preferredSize = Dimension(560, 720)
         SwingUtilities.invokeLater {
             frame.pack()
@@ -170,6 +207,21 @@ class WebViewCloudflareSolver(
             frame.toFront()
         }
         return frame
+    }
+
+    /**
+     * True when the browser has finished loading a page of [browser]'s site that carries no
+     * Cloudflare challenge (an image, or the site itself). False while loading, on a challenge
+     * page, and whenever the page can't be asked.
+     */
+    private suspend fun isPlainPage(browser: CefBrowser): Boolean {
+        if (browser.isLoading) return false
+        val at = browser.getURL().orEmpty()
+        if (!at.startsWith("http")) return false
+        val answer = CompletableDeferred<String?>()
+        val asked = runCatching { browser.evaluateJavaScript(CHALLENGE_PROBE) { answer.complete(it) } }.isSuccess
+        if (!asked) return false
+        return withTimeoutOrNull(COOKIE_VISIT_TIMEOUT_MS) { answer.await() }?.contains("plain") == true
     }
 
     /** Whether the shared OkHttp cookie store already holds a `cf_clearance` for [url]. */
@@ -239,6 +291,17 @@ class WebViewCloudflareSolver(
         override fun getViewRect(browser: CefBrowser): Rectangle = Rectangle(0, 0, VIEW_W, VIEW_H)
     }
 
+    private enum class Outcome {
+        /** A clearance cookie was issued and adopted. */
+        CLEARED,
+
+        /** The page loaded in the browser with no challenge on it. */
+        NO_CHALLENGE,
+        FAILED,
+    }
+
+    private val restingUntil = ConcurrentHashMap<String, Long>()
+
     companion object {
         private val CLEARANCE_COOKIES = setOf("cf_clearance")
         private const val VIEW_W = 1280
@@ -248,5 +311,19 @@ class WebViewCloudflareSolver(
         private const val POLL_INTERVAL_MS = 500L
         private const val COOKIE_VISIT_TIMEOUT_MS = 1_500L
         private const val CLIENT_TIMEOUT_MS = 30_000L
+
+        /** How long a host is left alone after an attempt that didn't end in a clearance. */
+        private const val REST_MS = 10 * 60_000L
+
+        /** Two seconds of a loaded, challenge-free page before it is believed. */
+        private const val PLAIN_POLLS = 4
+
+        /** Answers "challenge" on a Cloudflare interstitial or Turnstile page, else "plain". */
+        private const val CHALLENGE_PROBE =
+            "(function(){try{var t=(document.title||'').toLowerCase();" +
+                "var c=typeof window._cf_chl_opt!=='undefined'||t.indexOf('just a moment')===0||" +
+                "!!document.querySelector('script[src*=\"challenge-platform\"],iframe[src*=\"challenges.cloudflare.com\"]," +
+                "#challenge-form,#challenge-running,#challenge-stage,.cf-turnstile');" +
+                "return c?'challenge':'plain';}catch(e){return 'challenge';}})()"
     }
 }
