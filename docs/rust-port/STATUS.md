@@ -263,7 +263,17 @@ Phase 3, the phone's queue on the PC (feat/phone-queue, 2026-11-06):
   ordinary downloads, and cancelling a phone job by hand (the phone's 24-hour claim timeout
   covers it).
 
-Next step: release 0.1.7, have Mehdi try merge + "Download all here" with the real phone, and
+Fixes from Mehdi's try of 0.1.7 on Windows (2026-11-13, branch `fix/challenge-window`):
+- A terminal opened with the app: `java.exe` (the ext-host) is a console program and was started
+  without `CREATE_NO_WINDOW`. `tm-exthost` now sets it. Not seen on Windows from here.
+- "Solve the <site> challenge" windows opened on cover images and stayed open: the browser was
+  let in without a challenge, so no `cf_clearance` ever came and the window waited out its three
+  minutes, once per image. The solver now notices a loaded page with no challenge on it, adopts
+  the browser's identity and cookies, retries once, and leaves that host alone for ten minutes
+  after any attempt that didn't end in a clearance. The window carries a line saying what to do.
+  Compiled in CI only; whether the retry then gets the image is not known.
+
+Next step: 0.1.7 is out (2026-11-06). Have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
