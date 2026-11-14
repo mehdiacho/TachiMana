@@ -280,6 +280,25 @@ fix is in the ext-host jar, and the installed helper never updated with the app.
 (`helper::update_if_stale`); one installed from a file is left alone. Seen in the container: a
 helper with no version file was replaced by the release's zip at launch.
 
+Usability pass asked by Mehdi 2026-11-14 (mouse and keyboard on a PC), branch `feat/usability`.
+View choices that are only about this computer's layout live in the webview's storage
+(`ui/src/lib/prefs.ts`), not in settings.json.
+- Library categories (`CategoryBar.tsx`): the chip row scrolls with the wheel, by dragging and with
+  arrows at its ends; a menu lists every category with its count; "Sections on one page" shows
+  the library grouped by category with headings that fold (`LibraryRows.tsx`,
+  `librarySections`). A search now looks through the whole library whatever category is picked.
+- Dividers (`components/SplitHandle.tsx`): list | manga in Library and Browse, and details |
+  chapters on the manga page. Drag, arrow keys, double-click to reset. The cover grids fit as
+  many columns as the width allows.
+- Keys and mouse: arrow keys, Home and End through the library; `/` or Ctrl+F to search, Esc
+  clears it; Ctrl+1 to Ctrl+5 for the screens, Ctrl+, for Settings; Alt+Left and the mouse's
+  back button go back. Reader: `[` `]` (and buttons) for the previous and next chapter, F or F11
+  for full screen (no title bar or rail), Esc leaves full screen, then the reader.
+- Right-click a chapter: read, mark read or unread, mark this and earlier read, download or delete.
+- Checked under Xvfb on a synthetic library of 260 manga in 14 categories. Not seen on Windows.
+- Not done, found in the pass: a right-click menu on library entries; selecting several chapters
+  at once; fit and reading mode as menus (they cycle on click); bars that hide in full screen.
+
 Next step: have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).
 Still open from Mehdi 2026-11-03: back up the NAS

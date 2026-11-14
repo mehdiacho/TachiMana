@@ -1,10 +1,12 @@
 // Browse (spec §3.3; behaviour from ui/browse/BrowseScreen.kt): sources and extensions in the
 // master pane, a source's listing in its place once opened, and the manga in the detail pane.
 import { BookOpen, ChevronLeft, PlugZap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBrowseStatus } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
+import { SplitHandle } from "../../components/SplitHandle";
 import { EmptyState, IconButton, Loading } from "../../components/ui";
+import { clamp, isNumber, usePref } from "../../lib/prefs";
 import { useBrowse } from "../../store/browse";
 import l from "../Library/Library.module.css";
 import { MangaDetail } from "../Library/MangaDetail";
@@ -21,6 +23,10 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
   const mangaId = useBrowse((b) => b.mangaId);
   const openManga = useBrowse((b) => b.openManga);
   const [toast, setToast] = useState<string | null>(null);
+  // The same divider, and the same width, as the library.
+  const screenRef = useRef<HTMLDivElement>(null);
+  const [masterW, setMasterW] = usePref("library.masterW", 340, isNumber);
+  const maxMasterW = () => Math.max(260, (screenRef.current?.clientWidth ?? 1200) - 420);
 
   useEffect(() => {
     if (!toast) return;
@@ -43,9 +49,9 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
   const showDetail = !compact || mangaId !== null;
 
   return (
-    <div className={l.screen}>
+    <div className={l.screen} ref={screenRef}>
       {showMaster && (
-        <section className={l.master} data-cls={cls}>
+        <section className={l.master} data-cls={cls} style={compact ? undefined : { width: clamp(masterW, 260, maxMasterW()) }}>
           {source ? (
             <SourceView view={source} cls={cls} onToast={setToast} />
           ) : (
@@ -69,6 +75,9 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
             </>
           )}
         </section>
+      )}
+      {!compact && (
+        <SplitHandle label="Resize the list" value={clamp(masterW, 260, maxMasterW())} min={260} max={maxMasterW} onChange={setMasterW} onReset={() => setMasterW(340)} />
       )}
       {showDetail && (
         <section className={l.detail} data-cls={cls}>
