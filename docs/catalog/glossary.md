@@ -12,13 +12,14 @@ says otherwise. Add a row whenever two words for one thing turn up.
 | Pick / picked | manga or chapters marked for one action on all of them (Ctrl/Shift+click) | "N picked" | long-press selection |
 | Genre | a tag a source gives a manga; the library filters by it | "Genres" filter, pills on the manga page | to be confirmed |
 | Library | one profile's manga and reading state | Library | Library |
-| Profile | a separate library with its own settings | Profile | "profile name" on the LAN sync screen |
-| Link / linked device | two devices that exchanged a key | "Linked devices" | "Linked devices", "Link to computer" |
-| Pairing code | the six digits used once to link | Pairing code | Pairing code |
-| Sync | the linked devices bringing each other up to date | "Sync" screen; today it only copies once | "LAN sync" (a switch, no action) |
-| Leader / follower | in one-way sync, whose changes are sent / who receives | not built | not built |
-| Remote storage | the WebDAV server (a NAS) that holds chapters, and later the sync state | "NAS storage" (to change) | to be confirmed by the phone side |
-| Download queue | chapters waiting to download | Downloads | to be confirmed |
-| On server / On <device> | where a chapter is, other than this device | cloud mark, "On the NAS" | to be confirmed |
+| Profile | a separate library with its own settings | Profile | "Profile name" (LAN sync › Linked devices); each install (Mihon Custom, Mihon Temp) is one profile |
+| Link / linked device | two devices that exchanged a key | "Linked devices" | "Linked devices", "Link to a computer", "Unlink" |
+| Pairing code | the six digits used once to link | Pairing code | "Pairing code", "New pairing code" |
+| Sync | the linked devices bringing each other up to date | "Sync" screen; today it only copies once | "Sync both ways" on a linked device; "Sync starts from:" after linking. "LAN sync" is the settings screen, and its switch reads "Let other devices pull from this phone" |
+| Leader / follower | in one-way sync, whose changes are sent / who receives | not built | "Leader", "Follower" on a linked device; "Who leads?", "This phone leads, <name> follows" |
+| Remote storage | the WebDAV server (a NAS) that holds chapters, and later the sync state | "NAS storage" (to change) | "Remote storage" (settings screen, notification group, and "Remote storage connection" / "Remote storage password" in backup options); "server" in row text ("Server address", "Delete server copy") |
+| Download queue | chapters waiting to download | Downloads | "Download queue" (More › Download queue); "Downloads" is the settings screen |
+| On server / On <device> | where a chapter is, other than this device | cloud mark, "On the NAS" | cloud mark ("Kept on the server"), library filter "On server", badge "Chapters on server"; laptop mark "On <device>"; in the queue "Downloading on <device>" |
 
-Rows marked "to be confirmed" are filled in by the phone-app session from what its screens say.
+The phone column was filled in from the phone's screens on 0.21.3-custom, 2026-11-14 (see [`phone.md`](phone.md)).
+The phone's sync words and its "Remote storage" backup options come from mihon#19.
