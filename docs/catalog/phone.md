@@ -14,6 +14,8 @@ Contents:
 
 - [Where things are](#where-things-are)
 - [LAN sync](#lan-sync)
+- [After linking: the two questions](#after-linking-the-two-questions)
+- [A copy from a computer](#a-copy-from-a-computer)
 - [Link to a computer](#link-to-a-computer) (dialog)
 - [Remote storage](#remote-storage)
 - [Chapter rows on a manga's page](#chapter-rows-on-a-mangas-page)
@@ -49,7 +51,7 @@ the upstream items. Their subtitles are "Mirror downloaded chapters to a WebDAV 
 ## LAN sync
 
 Reached from: More › Settings › LAN sync
-Checked on: 0.21.3-custom, 2026-11-14
+Checked on: 0.21.3-custom, 2026-11-14 (sync from mihon#19)
 Screenshot: screens/phone/lan-sync-linked.png, screens/phone/lan-sync-off.png
 
 | Control (label as written) | Kind | What it does |
@@ -63,8 +65,9 @@ Screenshot: screens/phone/lan-sync-linked.png, screens/phone/lan-sync-off.png
 | **Linked devices** | group | Always shown, even with the switch off. |
 | Profile name | text field | The name this install gives its profile when it links. If it is empty, the field shows the name the install is using already. |
 | Link to a computer | row, tap | Opens [Link to a computer](#link-to-a-computer). Subtitle: "Scan the code TachiMana shows, or type its address and pairing code". |
-| Linked devices | list | One row per linked device. The device's name is the title, and its platform and last known address are the subtitle, joined by " · ". With no links it shows one row: "None yet". |
-| (a linked device's row) | tap | Asks "Unlink <name>?", with the text "It will need the pairing code to link again." The buttons are **Unlink** and **Cancel**. Unlinking forgets the key on the phone only. |
+| Linked devices | list | One row per linked device. The device's name is the title. The subtitle is its platform, last known address and role, joined by " · ". The role reads "Sync both ways", "Leader" (this phone leads) or "Follower" (this phone follows). With no links it shows one row: "None yet". |
+| (a linked device's row) | tap | Opens a dialog titled with the device's name, showing its role, with: **Change…** (asks [the two questions](#after-linking-the-two-questions) again), **Send everything to <name> once**, **Take everything from <name> once**, **Unlink**, and **Close**. |
+| Unlink | button | Asks "Unlink <name>?", with the text "It will need the pairing code to link again." The buttons are **Unlink** and **Cancel**. Unlinking forgets the key on the phone only. |
 | (info) | note | "A linked device talks to this one without the code, using a key made when they linked. The network traffic is plain HTTP, so anyone on this Wi-Fi who can watch it could copy the key." |
 
 By itself:
@@ -81,10 +84,27 @@ By itself:
   computer appears, the same catch-up runs.
 - **A chapter a computer took from the queue and kept for a day** goes back to the phone, which
   downloads it itself.
+- **Sync (`changes/1`), once a device is linked:**
+  - The phone keeps a journal of the person's changes: adding or removing a manga, its categories,
+    creating, moving, renaming or deleting a category, read and unread, bookmarks, reading
+    history, and the reader mode set for a manga. Page progress is written once reading has paused
+    for 15 seconds. Source refreshes and restores aren't journaled.
+  - In the same catch-up as above, it reads each computer's new changes and applies them, then
+    sends its own. It also sends its own about two seconds after each change, while the app runs.
+  - It only does this with a computer whose TachiMana lists `changes/1`.
+  - As a follower, the phone keeps its own changes and sends them once it stops following. As a
+    leader, it ignores changes made on the follower.
+- **"Send everything to <name> once"** asks the computer to add this phone's whole library. The
+  computer asks its person first. A message says "Sent. <name> asks before copying."
+- **"Take everything from <name> once"** adds the computer's whole library to the phone straight
+  away, without asking, since nothing is removed. A message says "Copied from <name>" when it's done.
 
 Not there:
-- **There is no "Sync now" button,** and no sync of any kind. The phone does not send library,
-  reading, category or history changes to a computer, and does not take them from one.
+- **There is no "Sync now" button.** Sync runs when the app comes to the front, when a computer
+  appears on the network, and after each change.
+- **Nothing shows when the phone last synced,** or what it sent or received.
+- **A computer unreachable for over 100 days** may miss changes the phone made. The phone doesn't
+  offer a full copy by itself when that happens.
 - **The phone has no way to start linking from its side to show a code,** the way the computer
   does with "Link a device". A computer links to the phone with the phone's pairing code, or the
   phone links to the computer with the computer's code.
@@ -117,14 +137,13 @@ Screenshot: screens/phone/link-dialog.png, screens/phone/link-other-profile.png
 | Cancel | button | Closes the dialog. |
 
 What happens after **Link**:
-- **It works:** the dialog closes and a message says "Linked to <computer name>".
+- **It works:** a message says "Linked to <computer name>", and the dialog moves on to
+  [the two questions](#after-linking-the-two-questions).
 - **The computer belongs to a different profile, and this install has no library yet:** a dialog
   titled "A different profile" asks "This computer's profile is <name>. Use it for this phone?",
   with **Use it** and **Cancel**.
-  - **Use it** links, and then asks "Restore from the computer?", with the text "Restore the library
-    from <name>'s backup onto this phone?" and the buttons **Restore** and **Not now**.
-  - **Restore** starts an ordinary restore of the computer's backup, and a message says "Restoring
-    from the computer".
+  - **Use it** links, then asks only the second question. The computer's library is then added to
+    the phone, and a message says "Copied from <name>".
 - **The computer belongs to a different profile, and this install already has a library:** a dialog
   titled "A different profile" says "This computer's profile is <name>, and this install already
   has its own library, so they can't be linked. Nothing was changed." The only button is **OK**.
@@ -138,9 +157,68 @@ When it fails (in red under the fields):
 Not there: there is no way to merge two profiles, and none to switch an install with a library over
 to another profile.
 
+## After linking: the two questions
+
+Reached from: right after [Link to a computer](#link-to-a-computer), or a linked device's
+**Change…** on the [LAN sync](#lan-sync) screen.
+Checked on: 0.21.3-custom (mihon#19), 2026-11-14
+Screenshot: screens/phone/sync-start.png, screens/phone/sync-leads.png
+
+**First question**, asked only when this phone already has a library:
+- **Title:** "Start from which library?"
+- **Text:** "<name> and this phone each have a library. Sync starts from:"
+- **Choices:** "This phone's", "<name>'s", "Both, combined" (selected). Under **Change…** there's a
+  fourth choice, "Leave both as they are", which is selected there.
+- **Buttons:** **Next** and **Cancel**.
+
+**Second question:**
+- **Title:** "Who leads?"
+- **Choices:** "Both ways" (selected for a new link; the current role under **Change…**), "This
+  phone leads, <name> follows", "<name> leads, this phone follows".
+- **Note:** "A follower keeps working as usual. Its own changes stay on it until it stops following."
+- **Buttons:** **Done** and **Cancel**. Nothing changes before **Done**.
+
+What **Done** does (it carries on after the dialog closes):
+- It sets the role on both sides. If the computer already has a newer role, that one wins and the
+  phone takes it.
+- **This phone's:** asks the computer to replace its library with the phone's. The computer asks its
+  person, and a message on the phone says "Sent. <name> asks before replacing its library."
+- **<name>'s:** downloads the computer's backup and asks first, in
+  [A copy from a computer](#a-copy-from-a-computer). If the answer is yes, the phone saves a backup
+  of itself, takes every manga out of its library, and restores the computer's.
+- **Both, combined:** adds the computer's library to the phone, then asks the computer to add the
+  phone's. The computer asks its person.
+
+When it fails, a message gives the reason, for example "<name> can't take a copy from this phone
+yet" when that computer's TachiMana doesn't list `roles/1`.
+
+## A copy from a computer
+
+Reached from: opens by itself, over whatever screen is showing, when a computer asks to copy its
+library to the phone, or after "<name>'s" in the first question. When the computer asks, a message
+says "<name> wants to copy its library to this phone. Open Mihon to answer."
+Checked on: 0.21.3-custom (mihon#19), 2026-11-14
+Screenshot: screens/phone/sync-take.png
+
+- **Title:** "Copy from <name>?"
+- **Text**, which gives both libraries' sizes:
+  - The computer asks to add: "<name> wants to add its library (<n> manga) to this phone's (<m>)."
+  - The computer asks to replace: "<name> wants to replace this phone's library (<m> manga) with its
+    own (<n>). A backup of this phone is saved first."
+  - Started on the phone: "Replace this phone's library (<m> manga) with <name>'s (<n>)? A backup of
+    this phone is saved first."
+- **Buttons:** **Copy** (or **Replace** for a replace) and **Decline**. Tapping outside doesn't
+  close it.
+
+Before a replace, the phone saves a backup named `before-replace-<name>-<date and time>.tachibk`
+in its automatic backups folder. It stays there until the person deletes it. If no backup folder is
+set, the replace doesn't happen and a message says "No backup folder set".
+
+Not there: no progress is shown while the copy runs, apart from the restore's own notification.
+
 ## Remote storage
 
-Reached from: More › Settings › Remote storage. A restore that needs the NAS password also opens it
+Reached from: More › Settings › Remote storage. A restore that needs the password also opens it
 from a notification (see [After a restore](#after-a-restore-notifications)).
 Checked on: 0.21.3-custom, 2026-11-14
 Screenshot: screens/phone/remote-storage.png
@@ -156,7 +234,7 @@ Screenshot: screens/phone/remote-storage.png
 | Connect over HTTPS | switch | |
 | Account | text field | User name. Shows "Not set" when empty. |
 | Password | text field | Shows only "Set" or "Not set", never the password. |
-| Restore the NAS password | row, tap | Shown only after a restore left a protected NAS password waiting. Subtitle: "This backup includes the NAS password. Enter the passphrase it was protected with." See [Restore backup](#restore-backup). |
+| Restore the remote storage password | row, tap | Shown only after a restore left a protected password waiting. Subtitle: "This backup includes the remote storage password. Enter the passphrase it was protected with." See [Restore backup](#restore-backup). |
 | Server folder | row, tap | Opens a folder browser on the server, with **Browse** and **New folder**. Shows "Server root" when no folder is set. |
 | Test connection | row, tap | Tries the server. Messages: "Testing…", then "Connected successfully" or "Could not connect: <reason>". The subtitle is a coloured dot and the current state: "Not checked", "Connected", "Slow or unreliable" or "Not reachable". |
 | **Behaviour** | group | |
@@ -365,7 +443,7 @@ in the reader, with its time. Marking a chapter read from a list does not add on
 ## Create backup
 
 Reached from: More › Data and storage › Create backup
-Checked on: 0.21.3-custom, 2026-11-14
+Checked on: 0.21.3-custom, 2026-11-14 ("Remote storage" labels from mihon#19)
 Screenshot: screens/phone/backup-create.png, screens/phone/backup-passphrase.png
 
 A list of checkboxes, then **Create**, which asks where to save the file.
@@ -381,20 +459,22 @@ A list of checkboxes, then **Create**, which asks where to save the file.
 | App settings | on | |
 | Extension stores | on | |
 | Installed extensions | on | fork |
-| NAS connection | on | fork: server address, port, HTTPS, folder, account name and the remote storage choices. Never the password on its own. |
-| NAS password, protected with a passphrase | off | fork; needs NAS connection |
+| Remote storage connection | on | fork: server address, port, HTTPS, folder, account name and the remote storage choices. Never the password on its own. |
+| Remote storage password, protected with a passphrase | off | fork; needs Remote storage connection |
 | Source settings | on | |
-| Include sensitive settings (e.g., tracker login tokens) | off | needs App settings or Source settings. Since mihon#15, never includes the NAS password. |
+| Include sensitive settings (e.g., tracker login tokens) | off | needs App settings or Source settings. Since mihon#15, never includes the remote storage password. |
 
-With "NAS password, protected with a passphrase" ticked, **Create** first asks for a passphrase:
-- **Title:** "Passphrase for the NAS password".
-- **Text:** "You'll need this passphrase to get the NAS password back when you restore this backup.
+With "Remote storage password, protected with a passphrase" ticked, **Create** first asks for a
+passphrase:
+- **Title:** "Passphrase for the remote storage password".
+- **Text:** "You'll need this passphrase to get the remote storage password back when you restore
+  this backup.
   It isn't saved anywhere."
 - **Fields:** "Passphrase" and "Repeat passphrase". **OK** stays disabled until both match and are
   at least 8 characters long.
 - **Errors:** "Use at least 8 characters" and "The passphrases don't match".
 
-If no NAS password is saved, the message "No NAS password is set, so there's none to include"
+If no password is saved, the message "No remote storage password is set, so there's none to include"
 appears and the backup goes ahead without it.
 
 The same screen has upstream's "Automatic backup frequency": "Off", "Every 6 hours", "Daily",
@@ -402,12 +482,13 @@ The same screen has upstream's "Automatic backup frequency": "Off", "Every 6 hou
 as well. Backups may contain sensitive data including any stored passwords; be careful if sharing."
 
 A backup that a linked computer pulls over LAN sync is made with the defaults above. It contains
-no sensitive settings and no NAS password.
+no sensitive settings and no remote storage password.
 
 ## Restore backup
 
-Reached from: More › Data and storage › Restore backup, by opening a `.tachibk` file, or
-from [Link to a computer](#link-to-a-computer) after taking on the computer's profile.
+Reached from: More › Data and storage › Restore backup, or by opening a `.tachibk` file. A copy
+from a linked computer uses the same restore without these screens (see
+[A copy from a computer](#a-copy-from-a-computer)).
 Checked on: 0.21.3-custom, 2026-11-14
 
 Choose a file, then the parts to restore:
@@ -424,7 +505,7 @@ in to tracking services afterwards to use them." Before restoring, it lists "Mis
 
 A restore merges into the library on the phone. It doesn't replace the library or remove anything.
 
-The NAS connection comes back with "App settings". A protected NAS password comes back only after
+The remote storage connection comes back with "App settings". A protected password comes back only after
 its passphrase is entered (see below).
 
 ## After a restore: notifications
@@ -438,9 +519,9 @@ Each of these appears once, after a restore, only when it applies.
 | Extensions from your backup | "<n> extensions your library uses aren't installed here." | **Install all**: installs them, or opens Browse to install them |
 | Downloads from your backup | "<n> chapters were downloaded on the other device. Download them here?" | **All**, **Unread only**, **No** |
 | Sign in to keep tracking | "Your library is linked to <tracker>, which this device isn't signed in to." | opens Settings › Tracking |
-| Restore the NAS password | "This backup includes the NAS password. Enter the passphrase it was protected with." | opens Remote storage |
+| Restore the remote storage password | "This backup includes the remote storage password. Enter the passphrase it was protected with." | opens Remote storage |
 
-Entering the passphrase in Remote storage shows either "NAS password restored" or "That passphrase
+Entering the passphrase in Remote storage shows either "Remote storage password restored" or "That passphrase
 doesn't open it". **Discard** drops the protected password.
 
 Extensions that couldn't be installed are listed in the restore's error log:
