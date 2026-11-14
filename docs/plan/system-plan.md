@@ -276,15 +276,41 @@ App
 B can start at once and runs alongside A. C to F each ship on their own, and each is tested against
 the stand-in peer before it is tried on the real phone.
 
-## 9. Open questions
+## 9. Decisions and open questions
+
+### Decided by Mehdi, 2026-11-14
+
+- **D1: two-way is the default** after linking.
+- **D3: shared storage first, and it is the remote storage both apps already have.** The WebDAV
+  server that holds chapters also holds a sync state. Devices on the same network still talk
+  directly; the remote storage is what they use when they are not, and it can be used on the same
+  network too so that neither device has to be awake for the other. A hosted account comes last.
+- **D4: reading beside the library is not the default.** It is a switch the user turns on; once on,
+  "Start / Continue" opens the reader in the manga pane and the library stays visible.
+- **D2 is waiting on a clarification** he asked for. "Read-only" would have meant the follower
+  cannot add or remove manga or change categories; reading would still be marked there. The
+  proposal stands: the follower works normally and its changes simply stay on it.
+- **A shared feature catalogue and glossary** so neither session describes a screen the other app
+  does not have: [`docs/catalog/`](../catalog/README.md).
+
+### What his checks showed (computer 0.1.12, phone as of 2026-11-14)
+
+- The computer lists the phone as linked, but "last seen at" shows an address and port, not a
+  time. That wording is wrong and is fixed with step B.
+- **The phone has no way to sync.** Its LAN sync screen has a switch, the pairing code, the
+  address, and linked devices with "Link to computer". Nothing there starts a sync, and adding
+  manga or changing a category on the phone reaches the computer by itself: it does not.
+- The phone's library is sorted by "Date added", newest first. The computer calls the same sort
+  "Recently added"; the glossary settles on "Date added".
+- Chapters were not loading on the computer when he tried, so reading there could not be checked.
+  To be investigated before anything else in step B.
+- Checks 7 to 12 not done yet.
+
+### Still open
 
 **For Mehdi (decisions)**
-- **D1.** Default after linking: "Keep both the same" (two-way), as proposed?
-- **D2.** In a one-way mode, should the follower be allowed to change things locally (kept, not
-  sent), as proposed, or should it be read-only for library changes?
-- **D3.** Build the shared-storage carrier before any hosted account service, as proposed? The
-  hosted option is a product decision (cost, sign-up, support) and can wait.
-- **D4.** Reader beside the library: should that be the default on a wide window, or only on request?
+- **D2.** In a one-way mode, may the follower change things locally (kept on it, not sent), as
+  proposed?
 
 **For the phone side (filed as an issue)**
 1. Does the fork keep `last_modified_at` and `version` on manga and chapters up to date, and are
