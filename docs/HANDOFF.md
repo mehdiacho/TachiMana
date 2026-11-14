@@ -26,3 +26,8 @@ Read this first if you are picking up TachiMana work in a fresh session.
 - **Mehdi's real backup** may be in a session scratchpad for testing. It is personal data: never
   commit it or anything derived from it.
 - **Next step:** see "Next step" in STATUS.md.
+
+## Planning in progress (2026-11-14)
+
+Before more sync work, read `docs/plan/system-plan.md` (draft, waiting on Mehdi's answers) and
+`docs/protocol/README.md` (the TachiMana Link Protocol and the form for phone-app work orders).

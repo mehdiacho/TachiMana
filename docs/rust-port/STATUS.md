@@ -312,6 +312,14 @@ View choices that are only about this computer's layout live in the webview's st
 - Not done yet: Browse and Sync in detail (needs a working source in the test rig), retry on a
   failed download from the Downloads screen (the job does not carry the ids).
 
+PLANNING (Mehdi 2026-11-14): he asked to plan the whole system before building more: sync as
+a companion (who leads, one-way or two-way, carriers: direct, shared storage, account), one
+shared download queue, a protocol standard for work handed to the phone app, and a usability
+list. Draft: `docs/plan/system-plan.md` and `docs/protocol/README.md`. It has a checklist for him
+(§3), decisions D1 to D4 (§9) and questions to the phone side (mihon#13). Do not build steps C
+to H of the plan before he has answered; step B (select several manga, manga page that stacks
+when narrow, reader beside the library, library sorts) is his own ask and can go ahead.
+
 Next step: have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).
 Still open from Mehdi 2026-11-03: back up the NAS
