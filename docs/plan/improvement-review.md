@@ -23,7 +23,7 @@ Ranked by how much each one currently holds a person back, then by size.
 | 4 | **Reader settings page, and per-manga reading mode** | Mode, fit and zoom are one global choice. A webtoon and a right-to-left manga need different modes, so the person changes it every time they switch. | M |
 | 5 | **Updates screen ("new chapters")** | The library can be updated, but there is no list of what the update found. | M |
 | 6 | **Download queue controls** | No pause, reorder, retry-all or "how many at once". Also no "download new chapters automatically" and no "delete after reading". | M |
-| 7 | **Make backups, and make them automatically** | The computer can restore a Mihon backup but cannot make one. Mihon makes one on a schedule and keeps the last few. | S |
+| 7 | **Automatic backups** | A backup is only made when you press "Export backup" on the Sync screen. Mihon makes one on a schedule and keeps the last few. | S |
 | 8 | **Remember the window** | Size, position and maximised state are not kept between runs. | S |
 | 9 | **More library filters and sorts, kept per category** | Only "unread" and "downloaded" filters. Missing: started, completed, bookmarked, tracked, by source. | S |
 | 10 | **Command palette (Ctrl+K) and a shortcuts sheet (?)** | A computer app is driven by the keyboard. Shortcuts exist but nothing lists them, and there is no "jump to anything". | M |
@@ -77,13 +77,13 @@ Holds you back
 ### 2.3 Manga page
 
 There now: cover, details, genres that filter the library, tracking, refresh from source, chapter
-list with select, mark read/unread, download, retry, delete, "Download unread", "Mark all read",
+list with select, mark read/unread, "mark this and earlier chapters read", download, retry, delete, "Download
+unread", "Mark all read",
 NAS and bookmark marks, a resizable details pane.
 
 Holds you back
 - Chapter list: no sort (by source order, chapter number, upload date), no filter (unread,
   downloaded, bookmarked), no choice between chapter title and number, no scanlator filter (S).
-- "Mark previous as read" on a chapter is missing; it is the usual way to catch up (S).
 - Download choices stop at "unread". Add next 1, 5, 10, a custom number, and all (S).
 - No notes on a manga, no change of cover, no "open in browser", no "copy link" (S each).
 - No migrate to another source (M), and no "find on other sources" which is the same search.
@@ -168,11 +168,11 @@ Holds you back
 
 ### 2.8 Recents
 
-There now: a list of what was read, newest first, opening the manga.
+There now: a list of what was read, newest first. A click resumes the chapter; a second button
+goes to the manga.
 
 Holds you back
-- No search, no "resume" button that opens the reader at the page, no removal of one entry or
-  of one manga's history, no "clear all" (S).
+- No search, no removal of one entry or of one manga's history, no "clear all" (S).
 - No grouping by day and no reading time (S).
 - This screen and the missing Updates screen belong together, as two tabs or two rail entries
   the way the phone has them (decide with item 5).
@@ -211,11 +211,14 @@ Holds you back
 
 ### 2.12 Data, backup and tracking
 
-There now: restore a Mihon backup, AniList tracking, the NAS (WebDAV) with cache size.
+There now: restore a Mihon backup and export one by hand (both on the Sync screen), AniList
+tracking, the NAS (WebDAV) with cache size.
 
 Holds you back
-- No way to make a backup on the computer, by hand or on a schedule, and so no choice of what
-  one holds (S). Until sync is complete this is the only safety net for the computer's library.
+- No automatic backups, and an exported backup leaves out settings (S). Until sync is complete
+  a backup is the only safety net for the computer's library.
+- Backup lives on the Sync screen, not under Settings › Data and storage where a person looks
+  for it (S).
 - Only AniList. The phone has MyAnimeList, Kitsu, MangaUpdates, Shikimori, Bangumi and the
   self-hosted ones (Komga, Kavita, Suwayomi). MyAnimeList and Kitsu are the two worth adding
   first (M each).
@@ -263,3 +266,6 @@ Each batch is one release or two. Every item that adds a preference also adds an
 ## Revision history
 
 - 2026-11-14: first pass, against 0.1.17.
+- 2026-11-14, later: three corrections found while writing the screen catalogue. The computer can
+  export a backup by hand, has "mark this and earlier chapters read", and Recents resumes a
+  chapter.
