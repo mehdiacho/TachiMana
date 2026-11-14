@@ -298,8 +298,8 @@ the stand-in peer before it is tried on the real phone.
 - The computer lists the phone as linked, but "last seen at" shows an address and port, not a
   time. That wording is wrong and is fixed with step B.
 - **The phone has no way to sync.** Its LAN sync screen has a switch, the pairing code, the
-  address, and linked devices with "Link to computer". Nothing there starts a sync, and adding
-  manga or changing a category on the phone reaches the computer by itself: it does not.
+  address, and linked devices with "Link to computer". Nothing there starts a sync, and manga added
+  or moved to another category on the phone did not reach the computer by themselves.
 - The phone's library is sorted by "Date added", newest first. The computer calls the same sort
   "Recently added"; the glossary settles on "Date added".
 - Chapters were not loading on the computer when he tried, so reading there could not be checked.
