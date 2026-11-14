@@ -49,8 +49,8 @@ Holds you back
 - No way to choose which screen opens first, or to hide a rail entry you never use (S).
 - No shortcuts sheet and no way to change a shortcut (S for the sheet, M for the key map).
 - No command palette (M).
-- No back and forward through where you have been (mouse side buttons, Alt+Left) outside the
-  reader (S).
+- Back (Alt+Left, the mouse's back button) only leaves the reader or the open manga. It does
+  not go back through screens, searches or sources, and there is no forward (S).
 - The rail has no badges: unread updates, downloads running, sync out of step (S).
 
 ### 2.2 Library
@@ -115,8 +115,8 @@ Holds you back
 - Mouse: no choice of what a click on the left or right edge does, no invert, no wheel-turns-page
   in paged modes (S).
 - The key map is fixed (M, same work as the app-wide key map).
-- A second window or a second monitor for the reader is not possible. D4 (read beside the
-  library) is decided but not built (M).
+- A second window or a second monitor for the reader is not possible. Reading beside the
+  library is there (a switch in Settings › Reader and a button in the reader) (M).
 - Keep-awake while reading is not set, so the screen can dim in auto-scroll (S).
 
 ### 2.5 Browse: sources
@@ -205,7 +205,6 @@ Holds you back
 - No accent colour, no pure-black dark, no "follow the system" for light and dark, no schedule (S).
 - No interface size or density (a zoom for the whole app), which matters on a 4K screen or a TV (S).
 - No choice of date format or relative dates ("2 days ago") (S).
-- No tint from the cover on the manga page, which is what gives Mihon's manga page its look (S).
 - The rail cannot be moved, shrunk to icons only or reordered (S).
 - Language of the app itself: English only (L, not proposed now).
 
@@ -267,5 +266,6 @@ Each batch is one release or two. Every item that adds a preference also adds an
 
 - 2026-11-14: first pass, against 0.1.17.
 - 2026-11-14, later: three corrections found while writing the screen catalogue. The computer can
-  export a backup by hand, has "mark this and earlier chapters read", and Recents resumes a
-  chapter.
+  export a backup by hand, has "mark this and earlier chapters read", Recents resumes a
+  chapter, Back exists for the reader and the open manga, and reading beside the library is
+  built. The screens as they are: [`../catalog/computer.md`](../catalog/computer.md).
