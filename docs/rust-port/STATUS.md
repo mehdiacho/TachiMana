@@ -296,8 +296,14 @@ View choices that are only about this computer's layout live in the webview's st
   for full screen (no title bar or rail), Esc leaves full screen, then the reader.
 - Right-click a chapter: read, mark read or unread, mark this and earlier read, download or delete.
 - Checked under Xvfb on a synthetic library of 260 manga in 14 categories. Not seen on Windows.
-- Not done, found in the pass: a right-click menu on library entries; selecting several chapters
-  at once; fit and reading mode as menus (they cycle on click); bars that hide in full screen.
+- Round 2 (branch `feat/usability-2`): right-click a library entry (`EntryMenu.tsx`: open,
+  categories, mark all read, and for online titles download unread, refresh, remove); pick several
+  chapters with Ctrl+click, Shift+click, Ctrl+A or "Select" in the menu, then mark, download or
+  delete them together (a plain click picks too while any are picked; Esc clears); the reader's
+  fit and reading mode are menus with the choices spelled out; in full screen the reader's bars
+  tuck past the edges and return when the mouse reaches the top or bottom edge. Checked under
+  Xvfb the same way; the online-only menu items were not exercised (no source in the test library).
+- Not done yet: a detailed pass over Browse, Downloads, Sync and Settings.
 
 Next step: have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).

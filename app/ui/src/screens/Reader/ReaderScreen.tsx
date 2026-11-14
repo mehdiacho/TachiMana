@@ -1,7 +1,8 @@
 // The reader (spec §3.2; behaviour ported from ui/reader/ReaderScreen.kt). Multi-chapter in both
 // directions: the strip loads the next chapter at the end and the previous one at the top without
 // a jump; paged modes turn across chapter edges.
-import { ArrowLeft, ChevronLeft, ChevronRight, Maximize, Minimize, Minus, Plus } from "lucide-react";
+import * as Menu from "@radix-ui/react-dropdown-menu";
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Maximize, Minimize, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { useLibraryInvalidate, useMangaDetail, useSetSettings, useSettings } from "../../api/queries";
@@ -14,18 +15,48 @@ import {
   isFit,
   MODES,
   modeFromViewer,
-  nextOf,
   progressOf,
   VIEWER,
   ZOOM_STEP,
   type ReaderFit,
   type ReaderMode,
 } from "../../lib/reader";
+import { toast } from "../../store/activity";
 import { useUi } from "../../store/ui";
 import { PagedView } from "./PagedView";
 import { StripView } from "./StripView";
 import { useChapterWindow } from "./useChapters";
 import s from "./Reader.module.css";
+
+// Said once per run, the first time the bars tuck away.
+let saidWhereBarsWent = false;
+
+/** A reader control that opens a list to choose from, with the current choice ticked. */
+function ChoiceMenu<T extends string>({ label, options, value, onChange }: { label: string; options: { id: T; label: string; name: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <button type="button" className={`${s.ctl} ${s.ctlAccent} ${s.ctlMenu}`} title={label} aria-label={`${label}: ${options.find((o) => o.id === value)?.name ?? ""}`}>
+          {options.find((o) => o.id === value)?.label}
+          <ChevronDown size={14} />
+        </button>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content className={s.menu} align="end" sideOffset={4}>
+          <Menu.Label className={s.menuLabel}>{label}</Menu.Label>
+          <Menu.RadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
+            {options.map((o) => (
+              <Menu.RadioItem key={o.id} value={o.id} className={s.menuItem}>
+                <span className={s.menuCheck}>{o.id === value && <Check size={15} />}</span>
+                {o.name}
+              </Menu.RadioItem>
+            ))}
+          </Menu.RadioGroup>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
 
 export interface Position {
   chapter: number;
@@ -118,7 +149,16 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
   const hasPrev = pos.chapter > 0;
   const hasNext = pos.chapter < seq.length - 1;
 
+  useEffect(() => {
+    if (!immersive || saidWhereBarsWent) return;
+    saidWhereBarsWent = true;
+    toast.info("Full screen: move the mouse to the top or bottom edge for the controls. Esc leaves.");
+  }, [immersive]);
+
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // Keys pressed inside an open menu reach here through React, not through the page; they
+    // belong to the menu.
+    if (!e.currentTarget.contains(e.target as Node)) return;
     if (e.key === "Escape") {
       e.preventDefault();
       // Out of full screen first, then out of the reader.
@@ -161,7 +201,7 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
     );
 
   return (
-    <div ref={rootRef} className={s.reader} tabIndex={-1} onKeyDown={onKeyDown} onWheelCapture={onWheel}>
+    <div ref={rootRef} className={s.reader} data-immersive={immersive} tabIndex={-1} onKeyDown={onKeyDown} onWheelCapture={onWheel}>
       <div className={s.top}>
         <IconButton icon={ArrowLeft} label="Back to the manga (Esc)" onClick={close} />
         <div className={s.titles}>
@@ -180,12 +220,8 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
             {coverSolo ? "Cover · solo" : "Cover · pair"}
           </button>
         )}
-        <button type="button" className={`${s.ctl} ${s.ctlAccent}`} title="How pages fit: click for the next one" onClick={() => save.mutate({ readerFit: nextOf(FITS, fit) })}>
-          {FITS.find((f) => f.id === fit)?.label}
-        </button>
-        <button type="button" className={`${s.ctl} ${s.ctlAccent}`} title="Reading mode: click for the next one" onClick={() => changeMode(nextOf(MODES, mode))}>
-          {MODES.find((m) => m.id === mode)?.label}
-        </button>
+        <ChoiceMenu label="How pages fit" options={FITS} value={fit} onChange={(f) => save.mutate({ readerFit: f })} />
+        <ChoiceMenu label="Reading mode" options={MODES} value={mode} onChange={changeMode} />
         <IconButton icon={immersive ? Minimize : Maximize} label={immersive ? "Leave full screen (F or Esc)" : "Full screen (F)"} size={18} onClick={() => setImmersive(!immersive)} />
       </div>
       <div className={s.area}>
