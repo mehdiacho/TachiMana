@@ -64,6 +64,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 
 export const api = {
   appInfo: () => call<AppInfo>("app_info"),
+  /** Shows the data folder or the local manga folder in the file manager. */
+  openFolder: (which: "data" | "local") => call<void>("open_folder", { which }),
   profilesList: () => call<ProfilesDto>("profiles_list"),
   profileCreate: (input: ProfileInput) => call<ProfilesDto>("profile_create", { input }),
   profileEdit: (id: string, input: ProfileInput) => call<ProfilesDto>("profile_edit", { id, input }),

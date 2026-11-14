@@ -87,6 +87,7 @@ fn main() {
         .register_asynchronous_uri_scheme_protocol("tm", protocol::handle)
         .invoke_handler(tauri::generate_handler![
             commands::app_info,
+            commands::open_folder,
             profiles::profiles_list,
             profiles::profile_create,
             profiles::profile_edit,

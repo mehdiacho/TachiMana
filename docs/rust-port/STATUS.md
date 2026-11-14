@@ -303,7 +303,14 @@ View choices that are only about this computer's layout live in the webview's st
   fit and reading mode are menus with the choices spelled out; in full screen the reader's bars
   tuck past the edges and return when the mouse reaches the top or bottom edge. Checked under
   Xvfb the same way; the online-only menu items were not exercised (no source in the test library).
-- Not done yet: a detailed pass over Browse, Downloads, Sync and Settings.
+- Round 3 (branch `feat/usability-3`): Recents grouped by day with a right-click menu (continue,
+  go to the manga); Settings lists its sections beside the page on a wide window and the data
+  and local folders have "Open folder" (`open_folder` command); the name above a manga's
+  downloaded chapters leads to the manga; the webview's own right-click menu (Back, Reload,
+  Inspect) no longer shows outside text fields in a release build (kept in dev, so that part was
+  not seen running). The Cloudflare setting now says a window opens, which is what happens.
+- Not done yet: Browse and Sync in detail (needs a working source in the test rig), retry on a
+  failed download from the Downloads screen (the job does not carry the ids).
 
 Next step: have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).

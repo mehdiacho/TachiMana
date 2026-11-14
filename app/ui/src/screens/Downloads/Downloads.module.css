@@ -84,3 +84,11 @@
   flex-wrap: wrap;
   gap: var(--tm-space-sm);
 }
+.groupLink {
+  display: block;
+  text-align: left;
+  border-radius: var(--tm-radius-md);
+}
+.groupLink:hover {
+  color: var(--tm-color-accent);
+}

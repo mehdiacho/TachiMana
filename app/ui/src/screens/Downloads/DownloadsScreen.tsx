@@ -97,6 +97,8 @@ function OnDisk({ onError }: { onError: (m: string | null) => void }) {
   const disk = useOnDisk();
   const qc = useQueryClient();
   const openReader = useUi((u) => u.openReader);
+  const select = useUi((u) => u.select);
+  const setScreen = useUi((u) => u.setScreen);
   const [busy, setBusy] = useState<string | null>(null);
   const groups = useMemo(() => {
     const m = new Map<string, DownloadedChapterDto[]>();
@@ -132,7 +134,24 @@ function OnDisk({ onError }: { onError: (m: string | null) => void }) {
     <div role="list" aria-label="Downloaded chapters">
       {groups.map(([title, items]) => (
         <div key={title} role="group" aria-label={title}>
-          <div className={s.group}>{title}</div>
+          {(() => {
+            const id = items.find((d) => d.mangaId !== null)?.mangaId ?? null;
+            return id === null ? (
+              <div className={s.group}>{title}</div>
+            ) : (
+              <button
+                type="button"
+                className={`${s.group} ${s.groupLink}`}
+                title="Go to the manga"
+                onClick={() => {
+                  select(id);
+                  setScreen("library");
+                }}
+              >
+                {title}
+              </button>
+            );
+          })()}
           {items.map((d) => {
             const known = d.mangaId !== null && d.chapterId !== null;
             const key = `${d.mangaId}:${d.chapterId}:${d.chapterName}`;

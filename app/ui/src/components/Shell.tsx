@@ -190,6 +190,20 @@ export function Shell({ children }: { children: (cls: WidthClass) => ReactNode }
     };
   });
 
+  // The webview's own right-click menu (Back, Reload, Inspect) means nothing in this app. It is
+  // kept only where text is typed or selected, for copy and paste. The app's own menus stop the
+  // event before it gets here.
+  useEffect(() => {
+    const onMenu = (e: MouseEvent) => {
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      const typing = el !== null && (el.isContentEditable || /^(INPUT|TEXTAREA)$/.test(el.tagName));
+      const selecting = (window.getSelection()?.toString() ?? "") !== "";
+      if (!typing && !selecting && !import.meta.env.DEV) e.preventDefault();
+    };
+    window.addEventListener("contextmenu", onMenu);
+    return () => window.removeEventListener("contextmenu", onMenu);
+  }, []);
+
   // One root that only changes its transform, so rotating never remounts the current screen.
   const w = rotated ? vp.h : vp.w;
   const h = rotated ? vp.w : vp.h;

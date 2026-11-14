@@ -30,6 +30,23 @@ pub fn app_info(state: State<'_, AppState>) -> AppInfo {
     }
 }
 
+/// Shows one of the app's folders in the system's file manager: `"data"` or `"local"`.
+#[tauri::command]
+pub fn open_folder(app: tauri::AppHandle, state: State<'_, AppState>, which: String) -> R<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = match which.as_str() {
+        "data" => state.paths.data_dir().to_path_buf(),
+        "local" => state.paths.local_library_dir(),
+        _ => return Err(CmdError::new("invalid", "unknown folder")),
+    };
+    if !dir.is_dir() {
+        return Err(CmdError::new("invalid", "That folder does not exist yet."));
+    }
+    app.opener()
+        .open_path(dir.to_string_lossy().into_owned(), None::<&str>)
+        .map_err(|e| CmdError::internal(format!("Couldn't open the folder: {e}")))
+}
+
 /// Each manga's end first, then a join back: one pass over the chapters. A correlated subquery
 /// (re-scanning a manga's chapters for every one of its chapters) took 7 s, 45 s in a debug
 /// build, on a 172,000-chapter library.

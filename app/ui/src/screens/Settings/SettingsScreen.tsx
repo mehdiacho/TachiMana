@@ -23,6 +23,17 @@ export const THEMES = [
   { id: "INK_VERMILION", name: "Ink & Vermilion", bg: "#141112", surface: "#1D191A", accent: "#C14033", fg: "#F2EDE7" },
 ] as const;
 
+const SECTIONS = [
+  { id: "profiles", name: "Profiles" },
+  { id: "appearance", name: "Appearance" },
+  { id: "rotation", name: "Rotation" },
+  { id: "online-sources", name: "Online sources" },
+  { id: "tracking", name: "Tracking" },
+  { id: "storage", name: "Storage" },
+  { id: "sync", name: "Sync" },
+  { id: "about", name: "About" },
+];
+
 function fmtBytes(n: number): string {
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
@@ -175,15 +186,25 @@ export function SettingsScreen() {
     },
     { ok: () => "Page cache cleared.", toastError: true },
   );
+  const openFolder = useAction(api.openFolder, { toastError: true });
+  const jump = (id: string) => document.getElementById(`settings-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
     <div className={s.screen}>
+      {/* On a wide window the sections are listed beside the page, to jump to. */}
+      <nav className={s.index} aria-label="Settings sections">
+        {SECTIONS.map((x) => (
+          <button key={x.id} type="button" className={s.indexItem} onClick={() => jump(x.id)}>
+            {x.name}
+          </button>
+        ))}
+      </nav>
       <div className={s.col}>
         <div className={s.title}>Settings</div>
 
-        <div className={s.section}>Profiles</div>
+        <div className={s.section} id="settings-profiles">Profiles</div>
         <ProfilesSection />
 
-        <div className={s.section}>Appearance</div>
+        <div className={s.section} id="settings-appearance">Appearance</div>
         <div className={s.cards} role="radiogroup" aria-label="Theme">
           {THEMES.map((t) => {
             const active = st?.theme === t.id;
@@ -207,7 +228,7 @@ export function SettingsScreen() {
           })}
         </div>
 
-        <div className={s.section}>Rotation</div>
+        <div className={s.section} id="settings-rotation">Rotation</div>
         <div className={s.row}>
           <RotateCw size={20} className={s.rowIcon} />
           <div className={s.rowText}>
@@ -225,13 +246,13 @@ export function SettingsScreen() {
           />
         </div>
 
-        <div className={s.section}>Online sources</div>
+        <div className={s.section} id="settings-online-sources">Online sources</div>
         <div className={s.row}>
           <ShieldCheck size={20} className={s.rowIcon} />
           <div className={s.rowText}>
             <span className={s.rowTitle}>Cloudflare bypass</span>
             <span className={s.rowDesc}>
-              When a source is behind a Cloudflare check, solve it in a hidden browser window. Off by default.
+              When a source is behind a Cloudflare check, a small browser window opens to pass it and closes by itself. Off by default.
             </span>
           </div>
           <Toggle
@@ -243,16 +264,19 @@ export function SettingsScreen() {
 
         <HelperRow />
 
-        <div className={s.section}>Tracking</div>
+        <div className={s.section} id="settings-tracking">Tracking</div>
         <AniListRow />
 
-        <div className={s.section}>Storage</div>
+        <div className={s.section} id="settings-storage">Storage</div>
         <div className={s.row}>
           <Database size={20} className={s.rowIcon} />
           <div className={s.rowText}>
             <span className={s.rowTitle}>Data folder</span>
             <span className={s.rowDesc}>{info.data?.dataDir ?? <Skeleton width={260} height={12} />}</span>
           </div>
+          <TextButton busy={openFolder.pending} onClick={() => void openFolder.run("data")}>
+            Open folder
+          </TextButton>
         </div>
         <div className={s.row}>
           <FolderOpen size={20} className={s.rowIcon} />
@@ -260,6 +284,9 @@ export function SettingsScreen() {
             <span className={s.rowTitle}>Local manga folder</span>
             <span className={s.rowDesc}>{info.data?.localDir ?? <Skeleton width={260} height={12} />}</span>
           </div>
+          <TextButton busy={openFolder.pending} onClick={() => void openFolder.run("local")}>
+            Open folder
+          </TextButton>
         </div>
         <div className={s.row}>
           <HardDrive size={20} className={s.rowIcon} />
@@ -294,7 +321,7 @@ export function SettingsScreen() {
         </div>
         <NasSection />
 
-        <div className={s.section}>Sync</div>
+        <div className={s.section} id="settings-sync">Sync</div>
         <button type="button" className={`${s.row} ${s.navRow}`} onClick={() => setScreen("sync")}>
           <RefreshCw size={20} className={s.rowIcon} />
           <div className={s.rowText}>
@@ -304,7 +331,7 @@ export function SettingsScreen() {
           <ChevronRight size={20} className={s.rowIcon} />
         </button>
 
-        <div className={s.section}>About</div>
+        <div className={s.section} id="settings-about">About</div>
         <UpdateRow version={info.data?.version ?? ""} readOnly={info.data?.readOnly ?? false} />
       </div>
     </div>
