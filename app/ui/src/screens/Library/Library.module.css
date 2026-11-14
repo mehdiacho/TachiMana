@@ -10,8 +10,8 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  border-right: var(--tm-hairline) solid var(--tm-color-divider);
   min-height: 0;
+  min-width: 0;
 }
 .master[data-cls="EXPANDED"] {
   width: var(--tm-master-w-expanded);
@@ -45,19 +45,135 @@
   background: transparent;
   font: var(--tm-type-body);
 }
+.searchClear {
+  flex: none;
+  display: inline-flex;
+  padding: var(--tm-space-xs);
+  border-radius: var(--tm-radius-pill);
+  color: var(--tm-color-on-background-med);
+}
+.searchClear:hover {
+  background: var(--tm-color-hover);
+}
 .search input::placeholder {
   color: var(--tm-color-on-background-med);
 }
 
+.catBar {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-xs);
+  padding: 0 var(--tm-space-sm) var(--tm-space-sm) var(--tm-space-lg);
+  flex: none;
+  position: relative;
+  min-width: 0;
+}
 .chips {
   display: flex;
   gap: var(--tm-space-sm);
-  padding: 0 var(--tm-space-lg) var(--tm-space-sm);
   overflow-x: auto;
-  flex: none;
+  flex: 1;
+  min-width: 0;
+  scrollbar-width: none;
 }
 .chips::-webkit-scrollbar {
   height: 0;
+}
+.chips > * {
+  flex: none;
+}
+/* The arrows sit over the ends of the row and fade the chips beneath them. */
+.catEdge {
+  position: absolute;
+  top: 0;
+  height: var(--tm-chip-h);
+  width: 34px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--tm-color-on-background);
+  z-index: 1;
+}
+.catEdge[data-side="left"] {
+  left: var(--tm-space-lg);
+  justify-content: flex-start;
+  background: linear-gradient(to right, var(--tm-color-background) 55%, transparent);
+}
+.catEdge[data-side="right"] {
+  right: calc(var(--tm-space-sm) + 32px + var(--tm-space-xs));
+  justify-content: flex-end;
+  background: linear-gradient(to left, var(--tm-color-background) 55%, transparent);
+}
+.catEdge:hover {
+  color: var(--tm-color-accent);
+}
+.catMenuBtn {
+  flex: none;
+  width: 32px;
+  height: var(--tm-chip-h);
+  border-radius: var(--tm-radius-chip);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tm-color-on-background-med);
+  background: var(--tm-color-surface);
+}
+.catMenuBtn:hover {
+  filter: brightness(1.08);
+}
+.catGroupedNote {
+  flex: 1;
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-med);
+  line-height: var(--tm-chip-h);
+}
+.menuScroll {
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+}
+.menuGrow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menuCount {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-med);
+}
+.menuSep {
+  height: var(--tm-hairline);
+  background: var(--tm-color-divider);
+  margin: var(--tm-space-sm) 0;
+}
+
+.sectionHead {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-sm);
+  padding: 0 var(--tm-space-md);
+  border-radius: var(--tm-radius-md);
+  text-align: left;
+  color: var(--tm-color-on-background-med);
+}
+.sectionHead:hover {
+  background: var(--tm-color-hover);
+}
+.sectionName {
+  font: var(--tm-type-label);
+  text-transform: var(--tm-label-transform);
+  letter-spacing: var(--tm-label-tracking);
+  color: var(--tm-color-on-background);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sectionCount {
+  font: var(--tm-type-caption);
 }
 
 .header {
@@ -172,9 +288,8 @@
   top: 0;
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(var(--cols), 1fr);
-  gap: var(--tm-space-md);
-  padding: 0 var(--tm-space-xs);
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: 8px;
 }
 .cell {
   position: relative;
@@ -188,6 +303,15 @@
 .cell:hover,
 .cell[data-selected="true"] {
   outline-color: var(--tm-color-accent);
+}
+/* The cover fills the cell, so the ring for the open manga is drawn over it. */
+.cell[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 3px solid var(--tm-color-accent);
+  pointer-events: none;
 }
 .cellCover {
   position: absolute;
@@ -328,7 +452,6 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-left: var(--tm-hairline) solid var(--tm-color-divider);
   position: relative;
 }
 .detail[data-cls="COMPACT"] .chapters {

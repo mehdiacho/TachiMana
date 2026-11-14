@@ -1,7 +1,6 @@
 // Library (spec §3.1; behaviour from ui/library/LibraryScreen.kt): master list or grid with
 // search, category chips, sort and filters; detail with info and chapters.
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
@@ -14,21 +13,22 @@ import {
   List,
   RefreshCw,
   Search,
-  Tags,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { useAppInfo, useCategories, useLibrary, useLibraryInvalidate, useSetSettings, useSettings } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
-import { Chip, Cover, EmptyState, ErrorState, IconButton, SkeletonGrid, SkeletonRows, Spinner, UnreadBadge } from "../../components/ui";
+import { SplitHandle } from "../../components/SplitHandle";
+import { Chip, EmptyState, ErrorState, IconButton, SkeletonGrid, SkeletonRows, Spinner } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
-import type { LibraryEntryDto } from "../../gen/LibraryEntryDto";
 import {
   applyLibraryView,
   noMatchesLine,
   categoryCounts,
   DEFAULT_VIEW,
   isSort,
+  librarySections,
   nextSort,
   SORTS,
   UNCATEGORIZED,
@@ -37,96 +37,21 @@ import {
 } from "../../lib/libraryView";
 import { summary, useLibraryUpdate } from "../../store/libraryUpdate";
 import { useUi } from "../../store/ui";
+import { clamp, isBoolean, isNumber, isNumberList, usePref } from "../../lib/prefs";
+import { CategoryBar, type CategoryChoice } from "./CategoryBar";
 import { CategoryEditor } from "./CategoryEditor";
+import { LibraryRows } from "./LibraryRows";
 import { MangaDetail } from "./MangaDetail";
 import s from "./Library.module.css";
 
-const ROW_H = 69;
+/** The list pane's width before anyone drags the divider, and its limits. */
+const MASTER_W = 340;
+const MASTER_MIN = 260;
+/** Room always left for the manga's own page. */
+const DETAIL_MIN = 420;
 
 // The local folder is scanned once per session when the library first opens (like the Kotlin app).
 let autoScanned = false;
-
-function ListRows({ entries, selected, onSelect }: { entries: LibraryEntryDto[]; selected: number | null; onSelect: (id: number) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const v = useVirtualizer({ count: entries.length, getScrollElement: () => ref.current, estimateSize: () => ROW_H, overscan: 8 });
-  return (
-    <div ref={ref} className={s.scroller} role="listbox" aria-label="Library">
-      <div style={{ height: v.getTotalSize(), position: "relative" }}>
-        {v.getVirtualItems().map((it) => {
-          const e = entries[it.index];
-          if (!e) return null;
-          return (
-            <button
-              key={e.manga.id}
-              type="button"
-              role="option"
-              aria-selected={selected === e.manga.id}
-              className={s.row}
-              data-selected={selected === e.manga.id}
-              style={{ transform: `translateY(${it.start}px)`, height: ROW_H }}
-              onClick={() => onSelect(e.manga.id)}
-            >
-              <Cover mangaId={e.manga.id} version={e.manga.coverVersion} title={e.manga.title} width={40} height={57} />
-              <span className={s.rowText}>
-                <span className={s.rowTitle}>{e.manga.title}</span>
-                <span className={s.rowSub}>{e.latestChapter ?? e.manga.author ?? (e.manga.isLocal ? "Local" : "")}</span>
-              </span>
-              <span className={s.rowBadges}>
-                <UnreadBadge count={e.unread} />
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function GridRows({ entries, selected, onSelect, cols }: { entries: LibraryEntryDto[]; selected: number | null; onSelect: (id: number) => void; cols: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(300);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const rows = Math.ceil(entries.length / cols);
-  const gap = 8;
-  const cellW = (width - 16 - gap * (cols - 1)) / cols;
-  const rowH = Math.max(60, cellW * 1.5 + gap);
-  const v = useVirtualizer({ count: rows, getScrollElement: () => ref.current, estimateSize: () => rowH, overscan: 3 });
-  useEffect(() => v.measure(), [rowH, v]);
-  return (
-    <div ref={ref} className={s.scroller} role="listbox" aria-label="Library">
-      <div style={{ height: v.getTotalSize(), position: "relative" }}>
-        {v.getVirtualItems().map((it) => (
-          <div key={it.index} className={s.gridRow} style={{ transform: `translateY(${it.start}px)`, ["--cols" as string]: cols }}>
-            {entries.slice(it.index * cols, it.index * cols + cols).map((e) => (
-              <button
-                key={e.manga.id}
-                type="button"
-                role="option"
-                aria-selected={selected === e.manga.id}
-                className={s.cell}
-                data-selected={selected === e.manga.id}
-                onClick={() => onSelect(e.manga.id)}
-                title={e.manga.title}
-              >
-                <Cover className={s.cellCover} mangaId={e.manga.id} version={e.manga.coverVersion} title={e.manga.title} />
-                <span className={s.cellBadges}>
-                  <UnreadBadge count={e.unread} />
-                </span>
-                <span className={s.cellTitle}>{e.manga.title}</span>
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function SortMenu({ view, onSort }: { view: LibraryView; onSort: (s: LibrarySort) => void }) {
   const label = SORTS.find((x) => x.id === view.sort)?.label ?? "Title";
@@ -175,6 +100,11 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
   const [toast, setToast] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const [masterW, setMasterW] = usePref("library.masterW", MASTER_W, isNumber);
+  const [grouped, setGrouped] = usePref("library.grouped", false, isBoolean);
+  const [foldedIds, setFoldedIds] = usePref<number[]>("library.folded", [], isNumberList);
+  const folded = useMemo(() => new Set(foldedIds), [foldedIds]);
   const update = useLibraryUpdate((u) => u.progress);
   const finished = useLibraryUpdate((u) => u.finished);
   const startUpdate = useLibraryUpdate((u) => u.start);
@@ -200,6 +130,18 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
   const grid = st?.libraryGrid ?? false;
   const entries = useMemo(() => applyLibraryView(lib.data ?? [], view), [lib.data, view.categoryId, view.query, view.sort, view.descending, view.unreadOnly, view.downloadedOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   const counts = useMemo(() => categoryCounts(lib.data ?? []), [lib.data]);
+  const searching = query.trim() !== "";
+  const sections = useMemo(
+    () => (grouped ? librarySections(lib.data ?? [], cats.data ?? [], view) : null),
+    [grouped, lib.data, cats.data, view.query, view.sort, view.descending, view.unreadOnly, view.downloadedOnly], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const choices = useMemo<CategoryChoice[]>(() => {
+    const list: CategoryChoice[] = [{ id: null, name: "All", count: counts.get(null) ?? 0 }];
+    for (const c of cats.data ?? []) list.push({ id: c.id, name: c.name, count: counts.get(c.id) ?? 0 });
+    if ((counts.get(UNCATEGORIZED) ?? 0) > 0 && (cats.data ?? []).length > 0)
+      list.push({ id: UNCATEGORIZED, name: "Uncategorised", count: counts.get(UNCATEGORIZED) ?? 0 });
+    return list;
+  }, [cats.data, counts]);
 
   // A deleted category must not leave the list filtered by a ghost.
   useEffect(() => {
@@ -208,9 +150,12 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.altKey && (e.key === "f" || e.key === "F")) {
+      const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+      // Ctrl+F, or "/" when not typing somewhere, goes to the search box.
+      if ((e.ctrlKey && !e.altKey && (e.key === "f" || e.key === "F")) || (e.key === "/" && !typing && !e.ctrlKey && !e.altKey && !e.metaKey)) {
         e.preventDefault();
         searchRef.current?.focus();
+        searchRef.current?.select();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -255,8 +200,15 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
   const compact = cls === "COMPACT";
   const showMaster = !compact || selected === null;
   const showDetail = !compact || selected !== null;
-  const catName =
-    categoryId === null ? "All" : categoryId === UNCATEGORIZED ? "Uncategorised" : (cats.data?.find((c) => c.id === categoryId)?.name ?? "All");
+  const catName = searching
+    ? "Search results"
+    : grouped || categoryId === null
+      ? "All"
+      : categoryId === UNCATEGORIZED
+        ? "Uncategorised"
+        : (cats.data?.find((c) => c.id === categoryId)?.name ?? "All");
+  const shown = sections ? new Set(sections.flatMap((x) => x.entries.map((e) => e.manga.id))).size : entries.length;
+  const maxMasterW = () => Math.max(MASTER_MIN, (screenRef.current?.clientWidth ?? 1200) - DETAIL_MIN);
 
   let body;
   if (lib.isLoading) body = grid ? <SkeletonGrid /> : <SkeletonRows />;
@@ -274,39 +226,49 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
         }
       />
     );
-  else if (entries.length === 0) body = <EmptyState icon={Search} title={noMatchesLine(view)} />;
-  else if (grid) body = <GridRows entries={entries} selected={selected} onSelect={select} cols={cls === "EXPANDED" ? 3 : compact ? 4 : 3} />;
-  else body = <ListRows entries={entries} selected={selected} onSelect={select} />;
+  else if (shown === 0) body = <EmptyState icon={Search} title={noMatchesLine(grouped ? { ...view, categoryId: null } : view)} />;
+  else
+    body = (
+      <LibraryRows
+        sections={sections}
+        entries={entries}
+        grid={grid}
+        selected={selected}
+        onSelect={select}
+        folded={folded}
+        onFold={(id, f) => setFoldedIds(f ? [...foldedIds.filter((x) => x !== id), id] : foldedIds.filter((x) => x !== id))}
+      />
+    );
 
   return (
-    <div className={s.screen}>
+    <div className={s.screen} ref={screenRef}>
       {showMaster && (
-        <section className={s.master} data-cls={cls}>
+        <section className={s.master} data-cls={cls} style={compact ? undefined : { width: clamp(masterW, MASTER_MIN, maxMasterW()) }}>
           <label className={s.search}>
             <Search size={20} />
-            <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search library" aria-label="Search library" />
-          </label>
-          <div className={s.chips} role="toolbar" aria-label="Categories">
-            <Chip active={categoryId === null} count={counts.get(null) ?? 0} onClick={() => setCategoryId(null)}>
-              All
-            </Chip>
-            {(cats.data ?? []).map((c) => (
-              <Chip key={c.id} active={categoryId === c.id} count={counts.get(c.id) ?? 0} onClick={() => setCategoryId(c.id)}>
-                {c.name}
-              </Chip>
-            ))}
-            {(counts.get(UNCATEGORIZED) ?? 0) > 0 && (cats.data ?? []).length > 0 && (
-              <Chip active={categoryId === UNCATEGORIZED} count={counts.get(UNCATEGORIZED)} onClick={() => setCategoryId(UNCATEGORIZED)}>
-                Uncategorised
-              </Chip>
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && query) {
+                  e.preventDefault();
+                  setQuery("");
+                }
+              }}
+              placeholder="Search the whole library"
+              aria-label="Search the whole library"
+            />
+            {query && (
+              <button type="button" className={s.searchClear} aria-label="Clear the search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}>
+                <X size={16} />
+              </button>
             )}
-            <Chip onClick={() => setEditor(true)} aria-label="Edit categories">
-              <Tags size={15} />
-            </Chip>
-          </div>
+          </label>
+          <CategoryBar choices={choices} active={searching ? null : categoryId} onPick={(id) => { setQuery(""); setCategoryId(id); }} grouped={grouped} onGrouped={setGrouped} onEdit={() => setEditor(true)} />
           <div className={s.header}>
             <span className={s.headerTitle}>{catName}</span>
-            <span className={s.headerCount}>{entries.length}</span>
+            <span className={s.headerCount}>{shown}</span>
             <span className={s.grow} />
             <div className={s.viewToggle} role="group" aria-label="View">
               <button type="button" aria-label="Grid" data-active={grid} onClick={() => save.mutate({ libraryGrid: true })}>
@@ -353,6 +315,16 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
           </div>
           {body}
         </section>
+      )}
+      {!compact && (
+        <SplitHandle
+          label="Resize the library list"
+          value={clamp(masterW, MASTER_MIN, maxMasterW())}
+          min={MASTER_MIN}
+          max={maxMasterW}
+          onChange={setMasterW}
+          onReset={() => setMasterW(MASTER_W)}
+        />
       )}
       {showDetail && (
         <section className={s.detail} data-cls={cls}>

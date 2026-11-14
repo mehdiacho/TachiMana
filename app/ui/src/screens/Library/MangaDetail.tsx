@@ -1,4 +1,5 @@
 // Manga detail (spec §3.1 detail region): info column and chapter list.
+import * as Ctx from "@radix-ui/react-context-menu";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Cloud, Download, Heart, Play, RefreshCw, Tags, TrendingUp } from "lucide-react";
@@ -7,6 +8,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, useCategories, useLibraryInvalidate, useMangaDetail, useSources, useTrack } from "../../api/queries";
 import type { WidthClass } from "../../components/Shell";
+import { SplitHandle } from "../../components/SplitHandle";
+import { clamp, isNumber, usePref } from "../../lib/prefs";
 import { Cover, ErrorState, IconButton, OutlinedButton, PrimaryButton, Skeleton, SkeletonRows, TextButton } from "../../components/ui";
 import { errorText } from "../../hooks/useAction";
 import { toast } from "../../store/activity";
@@ -34,6 +37,9 @@ function TrackButton({ mangaId, title }: { mangaId: number; title: string }) {
     </>
   );
 }
+
+/** The narrowest the details column gets. */
+const INFO_MIN = 260;
 
 const STATUS = ["Unknown", "Ongoing", "Completed", "Licensed", "Publishing finished", "Cancelled", "On hiatus"];
 
@@ -123,7 +129,20 @@ interface Downloads {
   onDelete: (c: ChapterDto) => void;
 }
 
-function ChapterList({ chapters, onOpen, onToggleRead, downloads }: { chapters: ChapterDto[]; onOpen: (c: ChapterDto) => void; onToggleRead: (c: ChapterDto) => void; downloads: Downloads | null }) {
+function ChapterList({
+  chapters,
+  onOpen,
+  onToggleRead,
+  onReadThrough,
+  downloads,
+}: {
+  chapters: ChapterDto[];
+  onOpen: (c: ChapterDto) => void;
+  onToggleRead: (c: ChapterDto) => void;
+  /** Marks the chapter at `index` and every chapter listed below it (the earlier ones) read. */
+  onReadThrough: (index: number) => void;
+  downloads: Downloads | null;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({ count: chapters.length, getScrollElement: () => ref.current, estimateSize: () => 53, overscan: 10 });
   return (
@@ -135,6 +154,8 @@ function ChapterList({ chapters, onOpen, onToggleRead, downloads }: { chapters: 
           const st = chapterStatus(c);
           return (
             <div key={c.id} style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${it.start}px)` }}>
+              <Ctx.Root>
+              <Ctx.Trigger asChild>
               <div className={s.chapter} data-read={c.read}>
                 <button type="button" className={s.chapterText} style={{ textAlign: "left" }} onClick={() => onOpen(c)}>
                   <span className={s.chapterTitle}>{c.name}</span>
@@ -150,6 +171,26 @@ function ChapterList({ chapters, onOpen, onToggleRead, downloads }: { chapters: 
                 {downloads && <DownloadControl c={c} job={downloads.jobFor(c)} pending={downloads.pending(c)} onDownload={() => downloads.onDownload(c)} onDelete={() => downloads.onDelete(c)} />}
                 <IconButton icon={c.read ? CircleCheck : Circle} label={c.read ? "Mark unread" : "Mark read"} size={18} active={c.read} onClick={() => onToggleRead(c)} />
               </div>
+              </Ctx.Trigger>
+              <Ctx.Portal>
+                <Ctx.Content className={s.menu}>
+                  <Ctx.Item className={s.menuItem} onSelect={() => onOpen(c)}>
+                    Read {c.name}
+                  </Ctx.Item>
+                  <Ctx.Item className={s.menuItem} onSelect={() => onToggleRead(c)}>
+                    {c.read ? "Mark unread" : "Mark read"}
+                  </Ctx.Item>
+                  <Ctx.Item className={s.menuItem} onSelect={() => onReadThrough(it.index)}>
+                    Mark this and earlier chapters read
+                  </Ctx.Item>
+                  {downloads && !downloads.jobFor(c) && (
+                    <Ctx.Item className={s.menuItem} onSelect={() => (c.downloaded ? downloads.onDelete(c) : downloads.onDownload(c))}>
+                      {c.downloaded ? "Delete the download" : "Download"}
+                    </Ctx.Item>
+                  )}
+                </Ctx.Content>
+              </Ctx.Portal>
+              </Ctx.Root>
             </div>
           );
         })}
@@ -248,6 +289,11 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setError(null), [mangaId]);
+  const infoRef = useRef<HTMLDivElement>(null);
+  const defaultInfoW = cls === "EXPANDED" ? 400 : 340;
+  const [infoW, setInfoW] = usePref("library.infoW", 0, isNumber);
+  // The chapter list always keeps this much room.
+  const maxInfoW = () => Math.max(INFO_MIN, (infoRef.current?.parentElement?.clientWidth ?? 900) - 300);
   const online = d.data ? !d.data.manga.isLocal : false;
   const jobs = useDownloads((x) => x.jobs);
   const byChapter = useMemo(() => jobsByChapter(jobs), [jobs]);
@@ -303,8 +349,12 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
       invalidate();
     }
   };
-  const markAllRead = async () => {
-    const todo = chapters.filter((c) => !c.read);
+  const markAllRead = (from = 0) => markManyRead(chapters.slice(from).filter((c) => !c.read));
+  const markManyRead = async (todo: ChapterDto[]) => {
+    if (todo.length === 0) {
+      toast.info("Those chapters are already read.");
+      return;
+    }
     setMarkingAll(true);
     markRead(new Set(todo.map((c) => c.id)), true);
     try {
@@ -359,7 +409,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
   return (
     <>
       <div className={s.tint} />
-      <div className={s.info}>
+      <div className={s.info} ref={infoRef} style={cls === "COMPACT" || infoW <= 0 ? undefined : { width: clamp(infoW, INFO_MIN, maxInfoW()) }}>
         <div className={s.infoHead}>
           <Cover className={s.detailCover} mangaId={manga.id} version={manga.coverVersion} title={manga.title} />
           <div className={s.infoText}>
@@ -401,6 +451,16 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
           </PrimaryButton>
         )}
       </div>
+      {cls !== "COMPACT" && (
+        <SplitHandle
+          label="Resize the manga's details"
+          value={clamp(infoW > 0 ? infoW : defaultInfoW, INFO_MIN, maxInfoW())}
+          min={INFO_MIN}
+          max={maxInfoW}
+          onChange={setInfoW}
+          onReset={() => setInfoW(0)}
+        />
+      )}
       <div className={s.chapters} data-cls={cls}>
         <div className={s.chaptersHead}>
           <span className={s.chaptersTitle}>
@@ -416,7 +476,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
             {manga.isLocal ? "No chapters found. Check the manga's folder and rescan." : "The source lists no chapters for this title yet."}
           </div>
         ) : (
-          <ChapterList chapters={chapters} onOpen={open} onToggleRead={(c) => void toggleRead(c)} downloads={downloads} />
+          <ChapterList chapters={chapters} onOpen={open} onToggleRead={(c) => void toggleRead(c)} onReadThrough={(i) => void markAllRead(i)} downloads={downloads} />
         )}
       </div>
     </>

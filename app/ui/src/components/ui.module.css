@@ -296,3 +296,35 @@
     transform: none;
   }
 }
+
+/* ---- divider between panes ---- */
+.split {
+  flex: none;
+  width: 9px;
+  margin: 0 -4px;
+  position: relative;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.split::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: var(--tm-hairline);
+  background: var(--tm-color-divider);
+  transition:
+    background var(--tm-motion-fast) ease,
+    width var(--tm-motion-fast) ease,
+    left var(--tm-motion-fast) ease;
+}
+.split:hover::after,
+.split:active::after,
+.split:focus-visible::after {
+  left: 3px;
+  width: 3px;
+  background: var(--tm-color-accent);
+}

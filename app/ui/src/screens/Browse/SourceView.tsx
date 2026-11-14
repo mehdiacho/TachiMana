@@ -13,6 +13,7 @@ import type { OnlineMangaDto } from "../../gen/OnlineMangaDto";
 import { appendPage } from "../../lib/browse";
 import { onlineCoverUrl } from "../../lib/tmUrl";
 import { useBrowse, type SourceView as View } from "../../store/browse";
+import { gridColumns } from "../Library/LibraryRows";
 import l from "../Library/Library.module.css";
 import s from "./Browse.module.css";
 import { SourceSettingsDialog } from "./SourceSettingsDialog";
@@ -79,7 +80,6 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
       <ResultGrid
         mangas={mangas}
         sourceId={view.sourceId}
-        cols={cls === "COMPACT" ? 2 : 3}
         selectedUrl={opening}
         selectedId={selected}
         onOpen={(m) => void open(m)}
@@ -137,7 +137,6 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
 function ResultGrid({
   mangas,
   sourceId,
-  cols,
   selectedUrl,
   selectedId,
   onOpen,
@@ -146,7 +145,6 @@ function ResultGrid({
 }: {
   mangas: OnlineMangaDto[];
   sourceId: string;
-  cols: number;
   selectedUrl: string | null;
   selectedId: number | null;
   onOpen: (m: OnlineMangaDto) => void;
@@ -162,6 +160,8 @@ function ResultGrid({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // As many covers across as the pane's width allows, like the library grid.
+  const cols = gridColumns(width - 16);
   const rows = Math.ceil(mangas.length / cols);
   const gap = 8;
   const cellW = (width - 16 - gap * (cols - 1)) / cols;

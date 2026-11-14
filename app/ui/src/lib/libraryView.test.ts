@@ -1,7 +1,7 @@
 // Cases from desktop/src/main/kotlin/tachimana/library/CategorySelfTest.kt.
 import { describe, expect, it } from "vitest";
 import type { LibraryEntryDto } from "../gen/LibraryEntryDto";
-import { applyLibraryView, categoryCounts, DEFAULT_VIEW, nextSort, noMatchesLine, UNCATEGORIZED } from "./libraryView";
+import { applyLibraryView, categoryCounts, DEFAULT_VIEW, librarySections, nextSort, noMatchesLine, UNCATEGORIZED } from "./libraryView";
 
 const READING = 1;
 const ON_HOLD = 2;
@@ -56,6 +56,11 @@ describe("applyLibraryView", () => {
     expect(titles({ query: "bet" })).toEqual(["Beta"]);
     expect(titles({ query: "author of gamma" })).toEqual(["Gamma"]);
   });
+  it("a search looks through every category, whichever is picked", () => {
+    expect(titles({ categoryId: ON_HOLD, query: "bet" })).toEqual(["Beta"]);
+    expect(titles({ categoryId: ON_HOLD, query: "  " })).toEqual(["Alpha"]);
+    expect(applyLibraryView(entries, { ...DEFAULT_VIEW, categoryId: ON_HOLD, query: "bet" }, true)).toEqual([]);
+  });
   it("sorts by unread descending", () =>
     expect(titles({ sort: "UNREAD", descending: true })).toEqual(["Beta", "Gamma", "Alpha"]));
   it("sorts by date added descending", () =>
@@ -96,4 +101,21 @@ describe("noMatchesLine", () => {
     expect(v({ categoryId: UNCATEGORIZED })).toBe("Every manga is in a category.");
     expect(v({ categoryId: 3 })).toBe("This category is empty.");
   });
+});
+
+describe("librarySections", () => {
+  const cats = [
+    { id: READING, name: "Reading" },
+    { id: ON_HOLD, name: "On hold" },
+    { id: 9, name: "Empty" },
+  ];
+  const names = (v: Partial<typeof DEFAULT_VIEW>) =>
+    librarySections(entries, cats, { ...DEFAULT_VIEW, ...v }).map((x) => `${x.name}:${x.entries.map((e) => e.manga.title).join(",")}`);
+  it("lists each category in order, Uncategorised last, without the empty ones", () =>
+    expect(names({})).toEqual(["Reading:Alpha,Beta", "On hold:Alpha", "Uncategorised:Gamma"]));
+  it("filters every section and ignores the picked category", () =>
+    expect(names({ categoryId: ON_HOLD, unreadOnly: true })).toEqual(["Reading:Beta", "Uncategorised:Gamma"]));
+  it("searches inside each section", () => expect(names({ query: "alp" })).toEqual(["Reading:Alpha", "On hold:Alpha"]));
+  it("is one section called All when there are no categories", () =>
+    expect(librarySections(entries, [], DEFAULT_VIEW).map((x) => x.name)).toEqual(["All"]));
 });
