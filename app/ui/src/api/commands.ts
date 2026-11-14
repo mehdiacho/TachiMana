@@ -4,6 +4,7 @@ import type { AppInfo } from "../gen/AppInfo";
 import type { ProfileInput } from "../gen/ProfileInput";
 import type { ProfilesDto } from "../gen/ProfilesDto";
 import type { LinkDto } from "../gen/LinkDto";
+import type { RoundDto } from "../gen/RoundDto";
 import type { LinkOutcomeDto } from "../gen/LinkOutcomeDto";
 import type { LinksDto } from "../gen/LinksDto";
 import type { CacheUsageDto } from "../gen/CacheUsageDto";
@@ -83,6 +84,11 @@ export const api = {
   linkRefused: (code: string, keep: "merge" | "new") => call<LinkOutcomeDto>("link_refused", { code, keep }),
   dismissRefused: () => call<void>("dismiss_refused"),
   unlinkDevice: (peerDeviceId: string) => call<LinkDto[]>("unlink_device", { peerDeviceId }),
+  /** Who leads on a link; answers the mode that holds (the other device's, if it changed it later). */
+  linkSetMode: (peerDeviceId: string, mode: LinkDto["mode"]) => call<LinkDto["mode"]>("link_set_mode", { peerDeviceId, mode }),
+  /** Pull from and push to every linked device now (changes/1). */
+  changesSyncNow: () => call<RoundDto | null>("changes_sync_now"),
+  changesLast: () => call<RoundDto | null>("changes_last"),
   /** A linked phone's download queue, and what this PC is doing for it. */
   phoneQueue: (peerDeviceId: string) => call<PhoneQueueDto>("phone_queue", { peerDeviceId }),
   /** Claims the phone's queue and downloads it here, putting each chapter at `dest`. */

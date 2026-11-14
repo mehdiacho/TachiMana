@@ -12,4 +12,8 @@ linkedAt: number,
 /**
  * Last heard from or seen on the network, Unix milliseconds; 0 when not since linking.
  */
-lastSeen: number, };
+lastSeen: number, 
+/**
+ * Who leads: `"both"`, `"iLead"` (this device) or `"theyLead"`.
+ */
+mode: "both" | "iLead" | "theyLead", };

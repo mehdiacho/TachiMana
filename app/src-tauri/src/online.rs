@@ -464,6 +464,7 @@ pub async fn manga_refresh(state: State<'_, AppState>, id: i64) -> R<RefreshDto>
 pub fn library_set_favorite(state: State<'_, AppState>, id: i64, favorite: bool) -> R<MangaDto> {
     manga_or_404(&state, id)?;
     state.db.set_favorite(id, favorite)?;
+    crate::changes::library(&state, id);
     Ok(MangaDto::from(&manga_or_404(&state, id)?))
 }
 

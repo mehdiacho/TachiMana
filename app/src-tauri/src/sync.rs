@@ -47,6 +47,8 @@ pub struct Sync {
     pulling: AtomicBool,
     /// Downloads this PC does for linked phones, and their done events.
     pub phone: crate::phone_queue::PhoneQueue,
+    /// The change journal and the background sync with linked devices (`changes/1`).
+    pub changes: crate::changes::ChangeLog,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -58,8 +60,10 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 impl Sync {
     pub fn open(identity_file: &Path, links_file: &Path, data_dir: &Path) -> Self {
+        let identity = DeviceIdentity::load_or_create(identity_file);
+        let changes = crate::changes::ChangeLog::open(data_dir, &identity.id);
         Self {
-            identity: DeviceIdentity::load_or_create(identity_file),
+            identity,
             links: Arc::new(LinkStore::open(links_file)),
             refused: Arc::new(Mutex::new(None)),
             server: Mutex::new(None),
@@ -73,6 +77,7 @@ impl Sync {
             installed: Mutex::new(Vec::new()),
             pulling: AtomicBool::new(false),
             phone: crate::phone_queue::PhoneQueue::open(data_dir),
+            changes,
         }
     }
 
@@ -90,6 +95,9 @@ impl Sync {
         // A linked device announcing itself counts as seen, at the address it announced.
         self.links
             .seen_at(&peer.id, &crate::links::address_of(&peer.host, peer.port));
+        if self.links.by_peer(&peer.id).is_some() {
+            self.changes.nudge();
+        }
         let mut peers = lock(&self.peers);
         peers.retain(|p| p.id != peer.id);
         peers.push(peer);
@@ -434,7 +442,7 @@ pub fn init(app: &AppHandle) {
                 links: Arc::clone(&state.sync.links),
                 refused: Arc::clone(&state.sync.refused),
                 outbox: Arc::clone(&state.sync.phone.outbox),
-                changes: None,
+                changes: crate::changes::server_changes(&app),
             });
         let started =
             SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;
@@ -444,6 +452,7 @@ pub fn init(app: &AppHandle) {
                 *lock(&state.sync.server) = Some(server);
                 // A profile that just took on another device's: copy that device's library.
                 crate::links::resume_join(&app);
+                crate::changes::start(&app);
                 match start_discovery(&app, port) {
                     Ok(d) => *lock(&state.sync.discovery) = Some(d),
                     Err(e) => {

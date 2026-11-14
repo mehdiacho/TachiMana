@@ -1,14 +1,15 @@
 // Linked devices (docs/rust-port/profiles-and-remote-downloads.md §2): this profile's link code as
 // a QR code and as text, linking to another device, and the list with Unlink. A linked device
 // talks to this one without the six-digit code.
-import { Laptop, Link2, Smartphone, Unlink } from "lucide-react";
+import { Laptop, Link2, RefreshCw, Smartphone, Unlink } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
-import { keys, queryClient, useLinks } from "../../api/queries";
+import { keys, queryClient, useChangesLast, useLinks } from "../../api/queries";
 import { OutlinedButton, Skeleton, TextButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { LinkDto } from "../../gen/LinkDto";
 import type { LinksDto } from "../../gen/LinksDto";
+import type { RoundDto } from "../../gen/RoundDto";
 import { useAction } from "../../hooks/useAction";
 import { relativeDate } from "../../lib/chapters";
 import { cleanCode, spacedCode } from "../../lib/sync";
@@ -26,6 +27,85 @@ export function linkLine(link: LinkDto, now = Date.now()): string {
   const seen = Number(link.lastSeen);
   const when = seen > 0 ? `last seen ${relativeDate(seen, now)}` : "not seen since linking";
   return `Linked ${since(Number(link.linkedAt))} · ${when}${link.lastAddress ? ` at ${link.lastAddress}` : ""}`;
+}
+
+type Mode = LinkDto["mode"];
+
+/** The choices for who leads, worded for this PC and the other device. */
+export function modeChoices(other: string): { mode: Mode; label: string }[] {
+  return [
+    { mode: "both", label: "Both ways" },
+    { mode: "iLead", label: `This PC leads, ${other} follows` },
+    { mode: "theyLead", label: `${other} leads, this PC follows` },
+  ];
+}
+
+/** What the chosen mode means, in a sentence. */
+export function modeText(mode: Mode, other: string): string {
+  if (mode === "iLead") return `Changes made here reach ${other}. Changes made on ${other} stay there.`;
+  if (mode === "theyLead") return `Changes made on ${other} reach this PC. Changes made here stay here.`;
+  return `Reading, library and categories stay the same on both, whichever one you use.`;
+}
+
+/** "Last synced 2 min ago: 4 changes in, 1 out." */
+export function roundLine(r: RoundDto | null | undefined, now = Date.now()): string {
+  if (!r) return "Changes travel by themselves while both are on the same network.";
+  const what = r.received === 0 && r.sent === 0 ? "nothing new" : `${r.received} ${r.received === 1 ? "change" : "changes"} in, ${r.sent} out`;
+  const missed = r.missed.length > 0 ? ` Couldn't reach ${r.missed.join(", ")}.` : "";
+  return `Last synced ${relativeDate(Number(r.at), now)}: ${what}.${missed}`;
+}
+
+function ModeChoice({ link }: { link: LinkDto }) {
+  const [mode, setMode] = useState<Mode>(link.mode);
+  const save = useAction(
+    async (want: Mode) => {
+      setMode(want);
+      const held = await api.linkSetMode(link.peerDeviceId, want);
+      setMode(held);
+      await queryClient.invalidateQueries({ queryKey: keys.links });
+      return held;
+    },
+    { ok: (held) => (held === "both" ? `${link.peerName} and this PC now stay in step both ways.` : held === "iLead" ? `${link.peerName} now follows this PC.` : `This PC now follows ${link.peerName}.`), toastError: true },
+  );
+  return (
+    <label className={st.rowDesc}>
+      Keep in step:{" "}
+      <select className={st.select} aria-label={`Who leads, this PC or ${link.peerName}`} value={mode} disabled={save.pending} onChange={(e) => void save.run(e.target.value as Mode)}>
+        {modeChoices(link.peerName).map((c) => (
+          <option key={c.mode} value={c.mode}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <span className={s.modeNote}>{modeText(mode, link.peerName)}</span>
+    </label>
+  );
+}
+
+function SyncNow() {
+  const last = useChangesLast();
+  const now = useAction(
+    async () => {
+      const r = await api.changesSyncNow();
+      if (r) queryClient.setQueryData(keys.changesLast, r);
+      return r;
+    },
+    { ok: (r) => (r ? roundLine(r) : "A sync is already running."), toastError: true },
+  );
+  return (
+    <div className={st.row}>
+      <RefreshCw size={20} className={st.rowIcon} />
+      <div className={st.rowText}>
+        <span className={st.rowTitle}>Changes</span>
+        <span className={st.rowDesc}>{roundLine(last.data)}</span>
+      </div>
+      <div className={st.buttons}>
+        <OutlinedButton busy={now.pending} onClick={() => void now.run()}>
+          {now.pending ? "Syncing…" : "Sync now"}
+        </OutlinedButton>
+      </div>
+    </div>
+  );
 }
 
 function LinkRow({ link }: { link: LinkDto }) {
@@ -47,6 +127,7 @@ function LinkRow({ link }: { link: LinkDto }) {
         <span className={st.rowDesc}>
           {confirm ? "It will need the pairing code again to link." : linkLine(link)}
         </span>
+        {!confirm && <ModeChoice link={link} />}
       </div>
       <div className={st.buttons}>
         {confirm ? (
@@ -270,6 +351,7 @@ export function LinkedDevices() {
           d.links.map((k) => <LinkRow key={k.peerDeviceId} link={k} />)
         )}
       </div>
+      {d.links.length > 0 && <SyncNow />}
       <div className={st.fieldLabel}>Link to another device</div>
       <LinkForm empty={d.empty} />
     </>

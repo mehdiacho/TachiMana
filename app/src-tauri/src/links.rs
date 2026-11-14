@@ -31,6 +31,9 @@ pub struct LinkDto {
     /// Last heard from or seen on the network, Unix milliseconds; 0 when not since linking.
     #[ts(type = "number")]
     pub last_seen: i64,
+    /// Who leads: `"both"`, `"iLead"` (this device) or `"theyLead"`.
+    #[ts(type = "\"both\" | \"iLead\" | \"theyLead\"")]
+    pub mode: String,
 }
 
 impl From<&Link> for LinkDto {
@@ -42,6 +45,7 @@ impl From<&Link> for LinkDto {
             last_address: l.last_address.clone(),
             linked_at: l.linked_at,
             last_seen: l.last_seen,
+            mode: crate::changes::mode_name(l.mode).to_owned(),
         }
     }
 }
