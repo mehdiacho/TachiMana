@@ -224,6 +224,8 @@ two apps can be built differently inside but always understand each other. It is
 
 ### 7.2 Proposed, computer
 
+The fuller, ranked list is now [`improvement-review.md`](improvement-review.md) (2026-11-14).
+
 Library
 - Sort by last read, latest chapter, chapter count and date fetched; remember the sort per
   category; "same order as the phone" comes with sync.
