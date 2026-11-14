@@ -3,4 +3,4 @@
 /**
  * A partial update: only the fields present are written.
  */
-export type UiSettingsPatch = { theme?: string, readerFit?: string, readerZoom?: number, readerCoverSolo?: boolean, libraryGrid?: boolean, librarySort?: string, librarySortDescending?: boolean, libraryUnreadOnly?: boolean, libraryDownloadedOnly?: boolean, diskCacheMb?: number, rotated?: boolean, cloudflareBypassEnabled?: boolean, };
+export type UiSettingsPatch = { theme?: string, readerFit?: string, readerZoom?: number, readerCoverSolo?: boolean, libraryGrid?: boolean, librarySort?: string, librarySortDescending?: boolean, libraryUnreadOnly?: boolean, libraryDownloadedOnly?: boolean, diskCacheMb?: number, rotated?: boolean, cloudflareBypassEnabled?: boolean, showNsfwSources?: boolean, };

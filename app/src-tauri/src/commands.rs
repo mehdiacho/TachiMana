@@ -418,6 +418,7 @@ fn ui_settings(s: &tm_core::Settings) -> UiSettings {
         disk_cache_mb: s.i64(keys::DISK_CACHE_MB),
         rotated: s.bool(keys::ROTATED),
         cloudflare_bypass_enabled: s.bool(keys::CLOUDFLARE_BYPASS_ENABLED),
+        show_nsfw_sources: s.bool(keys::SHOW_NSFW_SOURCES),
     }
 }
 
@@ -478,6 +479,7 @@ pub fn settings_set(state: State<'_, AppState>, patch: UiSettingsPatch) -> R<UiS
             patch.cloudflare_bypass_enabled,
             keys::CLOUDFLARE_BYPASS_ENABLED,
         ),
+        (patch.show_nsfw_sources, keys::SHOW_NSFW_SOURCES),
     ];
     for (v, key) in bools {
         if let Some(v) = v {

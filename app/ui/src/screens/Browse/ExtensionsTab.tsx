@@ -3,7 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, Library, PackagePlus, RefreshCw, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
-import { useBrowseInvalidate, useCatalog, useRepos, useSources } from "../../api/queries";
+import { useBrowseInvalidate, useCatalog, useRepos, useSettings, useSources } from "../../api/queries";
 import { Chip, EmptyState, ErrorState, IconButton, Loading, OutlinedButton, PrimaryButton, SkeletonRows, TextButton } from "../../components/ui";
 import { toast } from "../../store/activity";
 import type { CatalogEntryDto } from "../../gen/CatalogEntryDto";
@@ -47,7 +47,10 @@ export function ExtensionsTab() {
   const [reposOpen, setReposOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [lang, setLang] = useState<string | null>(null);
-  const [showNsfw, setShowNsfw] = useState(false);
+  // The chip starts from the "Show NSFW sources" setting and can be flipped for this visit.
+  const settings = useSettings();
+  const [nsfwChip, setShowNsfw] = useState<boolean | null>(null);
+  const showNsfw = nsfwChip ?? settings.data?.showNsfwSources ?? true;
   const [busy, setBusy] = useState<ReadonlyMap<string, Op>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
