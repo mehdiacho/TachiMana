@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modeChoices, modeText, roundLine } from "./LinkedDevices";
+import { askText, copyChoices, modeChoices, modeText, roundLine } from "./LinkedDevices";
 
 describe("who leads", () => {
   it("names both devices in the choices", () => {
@@ -23,5 +23,18 @@ describe("the last round", () => {
   });
   it("explains itself before the first round", () => {
     expect(roundLine(null, now)).toMatch(/by themselves/);
+  });
+});
+
+describe("copy once", () => {
+  it("offers both directions, merging or replacing", () => {
+    const c = copyChoices("Pixel");
+    expect(c.map((x) => `${x.dir}-${x.how}`)).toEqual(["take-merge", "take-replace", "send-merge", "send-replace"]);
+    expect(c[1]?.text).toContain("backup file first");
+  });
+  it("names both counts when asked to replace", () => {
+    const ask = { requestId: "r", peerDeviceId: "p", peerName: "Pixel", how: "replace" as const, libraryCount: 212 };
+    expect(askText(ask)).toContain("replace this PC's 212 manga");
+    expect(askText({ ...ask, how: "merge" })).toContain("Nothing here is removed");
   });
 });

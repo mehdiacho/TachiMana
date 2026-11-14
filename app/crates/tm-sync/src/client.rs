@@ -188,6 +188,37 @@ impl SyncClient {
         }
     }
 
+    /// `POST /roles/take`: asks a linked device to take this one's library once. `Ok(false)` when
+    /// it has no `roles/1` take. The answer comes later as a take done event in its outbox.
+    pub async fn ask_take(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        how: crate::roles::How,
+        request_id: &str,
+    ) -> Result<bool> {
+        let body = crate::roles::TakeWire {
+            how,
+            request_id: request_id.to_owned(),
+        };
+        let resp = self
+            .http
+            .post(format!("http://{}/roles/take", peer.address()))
+            .header(LINK_HEADER, key)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(serde_json::to_vec(&body).map_err(|e| SyncError::Protocol(e.to_string()))?)
+            .timeout(Duration::from_secs(15))
+            .send()
+            .await
+            .map_err(|e| SyncError::Http(format!("{}: {e}", peer.name)))?;
+        match resp.status().as_u16() {
+            200..=299 => Ok(true),
+            404 | 405 => Ok(false),
+            401 => Err(SyncError::Unlinked),
+            s => Err(SyncError::Http(format!("{} answered {s}", peer.name))),
+        }
+    }
+
     /// `code` is either the six-digit pairing code or a link key (43 characters); the header
     /// follows from which it is.
     async fn get(&self, peer: &PeerDevice, code: &str, path: &str) -> Result<reqwest::Response> {

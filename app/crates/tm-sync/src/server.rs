@@ -47,7 +47,23 @@ pub struct Linking {
     pub outbox: Arc<Outbox>,
     /// The change journal and how to apply an entry (`changes/1`); `None` serves neither.
     pub changes: Option<Changes>,
+    /// Asked to take a linked device's library once (`POST /roles/take`); `None` answers 404.
+    /// It must return at once: the person confirms, the copy runs, and the result goes into the
+    /// outbox as a take done event.
+    pub take: Option<Arc<TakeFn>>,
+    /// Called when the linked device changed who leads with `PUT /roles` (the link as it is now),
+    /// so the person can be told.
+    pub roles_changed: Option<Arc<RolesChangedFn>>,
 }
+
+/// Told the link as it is after the linked device changed who leads.
+pub type RolesChangedFn = dyn Fn(&Link) + Send + Sync;
+
+/// Starts a one-off copy from the linked device `link`: `(link, how, request id)`.
+pub type TakeFn = dyn Fn(&Link, crate::roles::How, String) + Send + Sync;
+
+/// Request ids of one-off copies kept, so a repeat is answered and not run twice.
+const MAX_TAKE_IDS: usize = 256;
 
 /// Applies a received entry's winning value to the library (blocking; it writes the database).
 pub type ApplyFn = dyn Fn(&crate::journal::Entry, &serde_json::Value) + Send + Sync;
@@ -84,6 +100,8 @@ struct ServerState {
     backup: Arc<BackupFn>,
     linking: Option<Linking>,
     failures: Mutex<Vec<Instant>>,
+    /// Request ids of `POST /roles/take` already started, oldest first.
+    takes: Mutex<std::collections::VecDeque<String>>,
 }
 
 /// A running server. Dropping it stops it.
@@ -121,6 +139,7 @@ impl SyncServer {
             backup,
             linking,
             failures: Mutex::new(Vec::new()),
+            takes: Mutex::new(std::collections::VecDeque::new()),
         });
         let app = Router::new()
             .route("/ping", get(ping))
@@ -131,6 +150,7 @@ impl SyncServer {
             .route("/outbox", get(outbox_route))
             .route("/changes", get(changes_get).post(changes_post))
             .route("/roles", get(roles_get).put(roles_put))
+            .route("/roles/take", post(roles_take))
             .with_state(state);
         let (tx, rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -442,6 +462,9 @@ async fn roles_put(
                 mode_at: l.mode_at,
             });
             if changed {
+                if let Some(f) = linking.roles_changed.as_ref() {
+                    f(&l);
+                }
                 (StatusCode::OK, body).into_response()
             } else {
                 (StatusCode::CONFLICT, body).into_response()
@@ -451,6 +474,63 @@ async fn roles_put(
         Ok(Err(e)) => error_body(StatusCode::INTERNAL_SERVER_ERROR, "save", &e.to_string()),
         Err(e) => error_body(StatusCode::INTERNAL_SERVER_ERROR, "save", &e.to_string()),
     }
+}
+
+/// `POST /roles/take`: the linked device asks this one to take its library once. Answers 202 at
+/// once; the person here confirms, and the result arrives later in the outbox.
+async fn roles_take(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Response {
+    let (linking, link) = match linked(&s, &headers) {
+        Ok(x) => x,
+        Err(r) => return *r,
+    };
+    let Some(take) = linking.take.as_ref() else {
+        return (StatusCode::NOT_FOUND, "no roles/take here").into_response();
+    };
+    if body.len() > MAX_LINK_BODY {
+        return error_body(StatusCode::PAYLOAD_TOO_LARGE, "too-large", "");
+    }
+    let Ok(want) = serde_json::from_slice::<crate::roles::TakeWire>(&body) else {
+        return error_body(
+            StatusCode::BAD_REQUEST,
+            "bad-body",
+            "expected how (merge or replace) and requestId",
+        );
+    };
+    let id = want.request_id.trim().to_owned();
+    if id.is_empty() || id.len() > 64 {
+        return error_body(
+            StatusCode::BAD_REQUEST,
+            "bad-request-id",
+            "1 to 64 characters",
+        );
+    }
+    let fresh = {
+        let mut seen = s
+            .takes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if seen.contains(&id) {
+            false
+        } else {
+            seen.push_back(id.clone());
+            while seen.len() > MAX_TAKE_IDS {
+                seen.pop_front();
+            }
+            true
+        }
+    };
+    if fresh {
+        take(&link, want.how, id.clone());
+    }
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({"requestId": id})),
+    )
+        .into_response()
 }
 
 /// `GET /outbox?since=<eventId>`: the done events for the asking linked device, after `since`.
@@ -548,6 +628,7 @@ async fn link_route(
         last_seen: now_ms(),
         mode: crate::roles::Mode::Both,
         mode_at: 0,
+        auto_merge: false,
     };
     let peer = link.peer_device_id.clone();
     let links = Arc::clone(&linking.links);

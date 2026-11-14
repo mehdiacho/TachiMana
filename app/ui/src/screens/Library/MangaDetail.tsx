@@ -4,7 +4,7 @@
 import * as Ctx from "@radix-ui/react-context-menu";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Cloud, Download, Heart, Play, RefreshCw, Tags, TrendingUp, X } from "lucide-react";
+import { ArrowDownToLine, Bookmark, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Cloud, Download, Heart, Play, RefreshCw, Tags, TrendingUp, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
@@ -135,6 +135,7 @@ function ChapterList({
   chapters,
   onOpen,
   onToggleRead,
+  onToggleBookmark,
   onReadThrough,
   downloads,
   picked,
@@ -144,6 +145,7 @@ function ChapterList({
   chapters: ChapterDto[];
   onOpen: (c: ChapterDto) => void;
   onToggleRead: (c: ChapterDto) => void;
+  onToggleBookmark: (c: ChapterDto) => void;
   /** Marks the chapter at `index` and every chapter listed below it (the earlier ones) read. */
   onReadThrough: (index: number) => void;
   downloads: Downloads | null;
@@ -192,6 +194,11 @@ function ChapterList({
                     {[st.text, c.scanlator].filter(Boolean).join(" · ")}
                   </span>
                 </button>
+                {c.bookmark && (
+                  <span className={s.onNas} title="Bookmarked" aria-label="Bookmarked">
+                    <Bookmark size={16} />
+                  </span>
+                )}
                 {c.onNas && (
                   <span className={s.onNas} title="On the NAS" aria-label="On the NAS">
                     <Cloud size={16} />
@@ -208,6 +215,9 @@ function ChapterList({
                   </Ctx.Item>
                   <Ctx.Item className={s.menuItem} onSelect={() => onToggleRead(c)}>
                     {c.read ? "Mark unread" : "Mark read"}
+                  </Ctx.Item>
+                  <Ctx.Item className={s.menuItem} onSelect={() => onToggleBookmark(c)}>
+                    {c.bookmark ? "Remove the bookmark" : "Bookmark"}
                   </Ctx.Item>
                   <Ctx.Item className={s.menuItem} onSelect={() => onReadThrough(it.index)}>
                     Mark this and earlier chapters read
@@ -389,6 +399,19 @@ export function MangaDetail({ mangaId, cls, stacked }: { mangaId: number; cls: W
       await api.setChapterRead(c.id, !c.read);
     } catch (e) {
       markRead(new Set([c.id]), c.read);
+      fail(e);
+    } finally {
+      invalidate();
+    }
+  };
+  const toggleBookmark = async (c: ChapterDto) => {
+    const set = (bookmark: boolean) =>
+      qc.setQueryData<MangaDetailDto>(keys.detail(mangaId), (old) => (old ? { ...old, chapters: old.chapters.map((x) => (x.id === c.id ? { ...x, bookmark } : x)) } : old));
+    set(!c.bookmark);
+    try {
+      await api.setChapterBookmark(c.id, !c.bookmark);
+    } catch (e) {
+      set(c.bookmark);
       fail(e);
     } finally {
       invalidate();
@@ -605,6 +628,7 @@ export function MangaDetail({ mangaId, cls, stacked }: { mangaId: number; cls: W
             chapters={chapters}
             onOpen={open}
             onToggleRead={(c) => void toggleRead(c)}
+            onToggleBookmark={(c) => void toggleBookmark(c)}
             onReadThrough={(i) => void markAllRead(i)}
             downloads={downloads}
             picked={picked}

@@ -312,6 +312,7 @@ fn finish(app: &AppHandle, job: &Job, where_: Where) {
             where_,
             device_id: state.sync.identity.id.clone(),
             at: now_ms(),
+            take: None,
         },
     );
     flush(app, &job.peer);
@@ -387,6 +388,7 @@ fn finish_quiet(state: &AppState, job: &Job, where_: Where) {
             where_,
             device_id: state.sync.identity.id.clone(),
             at: now_ms(),
+            take: None,
         },
     );
 }

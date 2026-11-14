@@ -351,6 +351,8 @@ async fn linking_gives_a_key_that_replaces_the_code() {
             refused: Arc::clone(&refused),
             outbox: Arc::clone(&outbox),
             changes: None,
+            take: None,
+            roles_changed: None,
         }),
     )
     .await
@@ -419,6 +421,7 @@ async fn linking_gives_a_key_that_replaces_the_code() {
         where_: tm_sync::queue::Where::Server,
         device_id: "A-id".into(),
         at: 1,
+        take: None,
     };
     outbox.add("B-id", ev("e1", "/1"));
     outbox.add("B-id", ev("e2", "/2"));
@@ -469,6 +472,8 @@ async fn changes_and_roles_travel_over_the_link() {
     let journal = Arc::new(Journal::open(&tmp.path().join("journal.db"), "A-id").unwrap());
     let applied: Arc<Mutex<Vec<(String, serde_json::Value)>>> = Arc::default();
     let seen = Arc::clone(&applied);
+    let takes: Arc<Mutex<Vec<(String, tm_sync::roles::How, String)>>> = Arc::default();
+    let asked = Arc::clone(&takes);
     let server = SyncServer::start_with(
         DeviceIdentity {
             id: "A-id".into(),
@@ -493,6 +498,13 @@ async fn changes_and_roles_travel_over_the_link() {
                 }),
                 changed: Arc::new(|| {}),
             }),
+            take: Some(Arc::new(move |l: &tm_sync::Link, how, id: String| {
+                asked
+                    .lock()
+                    .unwrap()
+                    .push((l.peer_device_id.clone(), how, id));
+            })),
+            roles_changed: None,
         }),
     )
     .await
@@ -570,6 +582,28 @@ async fn changes_and_roles_travel_over_the_link() {
         .await
         .unwrap();
     assert_eq!(r, Some((Mode::TheyLead, 5_000)));
+
+    // "Send everything once": started once per request id, a repeat is answered but not run.
+    use tm_sync::roles::How;
+    assert!(client
+        .ask_take(&peer, &key, How::Replace, "r1")
+        .await
+        .unwrap());
+    assert!(client
+        .ask_take(&peer, &key, How::Replace, "r1")
+        .await
+        .unwrap());
+    assert!(client
+        .ask_take(&peer, &key, How::Merge, "r2")
+        .await
+        .unwrap());
+    assert_eq!(
+        *takes.lock().unwrap(),
+        vec![
+            ("B-id".to_owned(), How::Replace, "r1".to_owned()),
+            ("B-id".to_owned(), How::Merge, "r2".to_owned()),
+        ]
+    );
 
     // Without a key nothing is served.
     let none = client

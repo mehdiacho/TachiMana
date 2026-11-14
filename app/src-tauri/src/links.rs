@@ -318,6 +318,7 @@ pub async fn link_device(
         last_seen: now_ms(),
         mode: tm_sync::roles::Mode::Both,
         mode_at: 0,
+        auto_merge: false,
     };
     let dto = LinkDto::from(&link);
     let Some((their_id, their_name)) = joining else {
