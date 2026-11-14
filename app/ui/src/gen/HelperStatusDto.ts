@@ -8,4 +8,9 @@ source: string, folder: string,
 /**
  * A helper zip is published for this computer, so Download can work.
  */
-canDownload: boolean, busy: boolean, };
+canDownload: boolean, busy: boolean, 
+/**
+ * The app version an installed helper was downloaded for; `file` when it came from a zip the
+ * user picked; empty when unknown (installed before 0.1.9) or not installed.
+ */
+version: string, };

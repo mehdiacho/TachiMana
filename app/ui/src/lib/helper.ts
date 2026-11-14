@@ -6,7 +6,11 @@ export function helperLine(h: HelperStatusDto): string {
     case "missing":
       return "Not installed. Browse and online reading need it: download it, or install a tachimana-ext-host zip from a file.";
     case "installed":
-      return `Installed in ${h.folder}. Runs only while Browse or online reading needs it.`;
+      return `${
+        h.version === "file" ? "Installed from a file" : h.version ? `Version ${h.version}, installed` : "Installed"
+      } in ${h.folder}. Runs only while Browse or online reading needs it, and updates itself with the app${
+        h.version === "file" ? " only when you reinstall it" : ""
+      }.`;
     case "bundled":
       return "Came with the app. Runs only while Browse or online reading needs it.";
     case "custom":
