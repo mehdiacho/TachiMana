@@ -140,11 +140,12 @@ direction is later switched or a "send everything once" is used, they are.
 
 ### 4.3 How it works underneath
 
-- **Every syncable row carries "last changed at" and a version number.** Sync asks the other side
-  "what changed since the last thing I got from you?" and gets only that. The payload is the same
-  shape as a backup, cut down to the changed manga and chapters, plus a list of removals. Upstream
-  Mihon's database and backup format already carry `lastModifiedAt` and `version` on manga and
-  chapters; whether the fork keeps them correct is question 1 to the phone side.
+- **Each device keeps a journal of the changes a person makes** (what, which manga or chapter,
+  the new value, when) and hands the other device the entries after the last one it has. The
+  phone no longer keeps per-row modified times (upstream Mihon removed them; answer in
+  TachiMana#35), so comparing timestamps is not an option. Specified in
+  [`changes/1`](../protocol/capabilities/changes-1.md); who leads is
+  [`roles/1`](../protocol/capabilities/roles-1.md).
 - **The first sync after linking is still a full copy**, as today, so nothing depends on history
   that was never recorded.
 - **Removals are kept as small "this was removed at …" records** for 90 days so an old device does
