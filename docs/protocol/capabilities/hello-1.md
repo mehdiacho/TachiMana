@@ -1,6 +1,8 @@
 # `hello/1`: who a device is and what it implements
 
-State: **built on the computer (0.1.18).** The phone's half is a work order on `mehdiacho/mihon`.
+State: **built on both sides, not yet seen working together.** The computer has it from 0.1.18.
+The phone has it from 0.21.3-custom (TachiMana#43) and already refuses to sync changes with a
+computer that has no `/hello`, so a computer older than 0.1.18 does not sync with that phone build.
 
 ## Purpose
 
@@ -35,7 +37,8 @@ already say.
 
 1. A device lists a capability when it implements its own side of it as that capability's page
    describes, whether that side serves the routes, calls them, or both.
-2. A device lists only what works now. The computer leaves out `changes/1` while it has no
+2. A device that answers `/hello` has `hello/1`, whether or not it lists it (the phone does not).
+   A device lists only what works now. The computer leaves out `changes/1` while it has no
    journal, and lists only `hello/1` and `pull/1` while linking is off.
 3. **Use only what both sides list.** Before offering a feature that needs a capability, check
    the other device's list. When it is missing, hide the feature or say in plain words what the

@@ -44,8 +44,12 @@ Then settings as pages with search and the NSFW source switch and mark (0.1.17, 
 **What to build next on the computer** is ranked in `docs/plan/improvement-review.md` (a review of
 every screen against Mihon, 2026-11-14). It waits on Mehdi's ranking. `hello/1` and the stand-in peer
 are built on the computer (branch `feat/hello`, STATUS.md "HELLO AND THE STAND-IN PEER"); the
-phone's half of `hello/1` is a work order on the fork. Still not written:
-`docs/catalog/computer.md`.
+phone already serves `/hello`. Still not written: `docs/catalog/computer.md`.
+
+**The phone's half of change sync and who-leads is built** (0.21.3-custom, mihon#19; its notes are
+TachiMana#43 and #44, still open for the computer to read and answer). That phone build only
+syncs with a computer whose `/hello` lists `changes/1`, so it needs computer 0.1.18 or later.
+The two have not been seen syncing together yet: that is the next thing to try with Mehdi.
 
 Before more sync work, read `docs/plan/system-plan.md` (draft) and
 `docs/protocol/README.md` (the TachiMana Link Protocol and the form for phone-app work orders).

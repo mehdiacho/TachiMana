@@ -76,9 +76,9 @@ specified in [`../rust-port/profiles-and-remote-downloads.md`](../rust-port/prof
 | `queue/1` | existing | `GET /queue`, `POST /queue/claim`, `POST /queue/release`: one device downloads another's queue |
 | `done/1` | existing | `POST /downloads/done`, `GET /outbox`: "this chapter is now on the server / on me / sent to you" |
 | `file/1` | existing | `PUT /file`: receive a finished chapter |
-| `hello/1` | computer side built (0.1.18), [page](capabilities/hello-1.md); phone side is a work order | §3 |
-| `changes/1` | proposed; computer side built except the questions after scanning, [page](capabilities/changes-1.md) | each device's change journal, served after a cursor and pushed; removals; the rules for who wins |
-| `roles/1` | proposed; computer side built except the questions after scanning, [page](capabilities/roles-1.md) | who leads, one-way or two-way, switch, one-off "send everything / take everything", the questions after scanning |
+| `hello/1` | built on both sides (computer 0.1.18, phone 0.21.3-custom), not yet seen together, [page](capabilities/hello-1.md) | §3 |
+| `changes/1` | built on both sides (phone 0.21.3-custom, TachiMana#43), not yet seen together; on the computer the questions after scanning are missing, [page](capabilities/changes-1.md) | each device's change journal, served after a cursor and pushed; removals; the rules for who wins |
+| `roles/1` | built on both sides (phone 0.21.3-custom, TachiMana#44), not yet seen together; on the computer the questions after scanning are missing, [page](capabilities/roles-1.md) | who leads, one-way or two-way, switch, one-off "send everything / take everything", the questions after scanning |
 | `live/1` | proposed | a channel held open for queue changes and download progress |
 | `queue/2` | proposed | one shared queue with "who downloads" and "where it ends up" per item; move a queue |
 | `relay-storage/1` | proposed | the same messages as files in a shared folder (NAS, WebDAV), for devices that are never online together |

@@ -143,11 +143,12 @@ async fn check(args: &[String]) -> Fallible<u32> {
         return Ok(failed);
     };
     report(&mut failed, true, "the device answers /hello or /ping");
-    let has_hello = hello.capabilities.iter().any(|c| c == "hello/1");
+    // The fallback for an app without /hello names no app; a real answer does.
+    let has_hello = !hello.app.name.is_empty();
     report(
         &mut failed,
         has_hello,
-        "/hello answers and lists hello/1 (an app without it is treated as link/2, pull/1)",
+        "/hello answers and names its app (an app without it is treated as link/2, pull/1)",
     );
     report(
         &mut failed,
