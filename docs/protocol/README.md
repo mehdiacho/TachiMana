@@ -76,8 +76,8 @@ specified in [`../rust-port/profiles-and-remote-downloads.md`](../rust-port/prof
 | `done/1` | existing | `POST /downloads/done`, `GET /outbox`: "this chapter is now on the server / on me / sent to you" |
 | `file/1` | existing | `PUT /file`: receive a finished chapter |
 | `hello/1` | proposed | §3 |
-| `changes/1` | proposed | what changed since a cursor, both directions; removals; the rules for who wins |
-| `roles/1` | proposed | who leads, one-way or two-way, switch, one-off "send everything / take everything" |
+| `changes/1` | proposed; computer side built, [page](capabilities/changes-1.md) | each device's change journal, served after a cursor and pushed; removals; the rules for who wins |
+| `roles/1` | proposed; computer side built except `roles/take`, [page](capabilities/roles-1.md) | who leads, one-way or two-way, switch, one-off "send everything / take everything", the questions after scanning |
 | `live/1` | proposed | a channel held open for queue changes and download progress |
 | `queue/2` | proposed | one shared queue with "who downloads" and "where it ends up" per item; move a queue |
 | `relay-storage/1` | proposed | the same messages as files in a shared folder (NAS, WebDAV), for devices that are never online together |

@@ -20,4 +20,8 @@ downloaded: number, downloadedUnread: number,
 /**
  * AniList rows came back but this install is not signed in.
  */
-anilistSignIn: boolean, };
+anilistSignIn: boolean, 
+/**
+ * The backup carries the NAS password sealed with a passphrase; ask for it to unlock it.
+ */
+nasPasswordSealed: boolean, };

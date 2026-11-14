@@ -47,6 +47,8 @@ pub struct Sync {
     pulling: AtomicBool,
     /// Downloads this PC does for linked phones, and their done events.
     pub phone: crate::phone_queue::PhoneQueue,
+    /// The change journal and the background sync with linked devices (`changes/1`).
+    pub changes: crate::changes::ChangeLog,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -58,8 +60,10 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 impl Sync {
     pub fn open(identity_file: &Path, links_file: &Path, data_dir: &Path) -> Self {
+        let identity = DeviceIdentity::load_or_create(identity_file);
+        let changes = crate::changes::ChangeLog::open(data_dir, &identity.id);
         Self {
-            identity: DeviceIdentity::load_or_create(identity_file),
+            identity,
             links: Arc::new(LinkStore::open(links_file)),
             refused: Arc::new(Mutex::new(None)),
             server: Mutex::new(None),
@@ -73,6 +77,7 @@ impl Sync {
             installed: Mutex::new(Vec::new()),
             pulling: AtomicBool::new(false),
             phone: crate::phone_queue::PhoneQueue::open(data_dir),
+            changes,
         }
     }
 
@@ -90,6 +95,9 @@ impl Sync {
         // A linked device announcing itself counts as seen, at the address it announced.
         self.links
             .seen_at(&peer.id, &crate::links::address_of(&peer.host, peer.port));
+        if self.links.by_peer(&peer.id).is_some() {
+            self.changes.nudge();
+        }
         let mut peers = lock(&self.peers);
         peers.retain(|p| p.id != peer.id);
         peers.push(peer);
@@ -103,6 +111,11 @@ impl Sync {
             source_ids: s.source_ids.clone(),
             downloaded: s.downloaded.clone(),
             anilist: s.trackers.contains(&tm_db::ANILIST_SYNC_ID),
+            nas_sealed: s
+                .nas
+                .as_ref()
+                .zip(s.nas_sealed_password.clone())
+                .map(|(n, b)| (n.host.clone(), b)),
         };
     }
 
@@ -131,6 +144,8 @@ struct RestoreOffer {
     source_ids: Vec<i64>,
     downloaded: Vec<DownloadedChapter>,
     anilist: bool,
+    /// The NAS password the phone sealed with a passphrase, and the server it is for.
+    nas_sealed: Option<(String, Vec<u8>)>,
 }
 
 impl RestoreOffer {
@@ -321,6 +336,8 @@ pub struct RestoreOfferDto {
     pub downloaded_unread: u32,
     /// AniList rows came back but this install is not signed in.
     pub anilist_sign_in: bool,
+    /// The backup carries the NAS password sealed with a passphrase; ask for it to unlock it.
+    pub nas_password_sealed: bool,
 }
 
 /// The extensions a restore can install, and the repos that could not be read to find them.
@@ -377,6 +394,7 @@ fn offer_of(state: &AppState) -> RestoreOfferDto {
         downloaded: n(o.downloaded.len()),
         downloaded_unread: n(o.downloaded.iter().filter(|d| !d.read).count()),
         anilist_sign_in: o.anilist && state.track.auth.session().is_none(),
+        nas_password_sealed: o.nas_sealed.is_some(),
     }
 }
 
@@ -434,6 +452,7 @@ pub fn init(app: &AppHandle) {
                 links: Arc::clone(&state.sync.links),
                 refused: Arc::clone(&state.sync.refused),
                 outbox: Arc::clone(&state.sync.phone.outbox),
+                changes: crate::changes::server_changes(&app),
             });
         let started =
             SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;
@@ -443,6 +462,7 @@ pub fn init(app: &AppHandle) {
                 *lock(&state.sync.server) = Some(server);
                 // A profile that just took on another device's: copy that device's library.
                 crate::links::resume_join(&app);
+                crate::changes::start(&app);
                 match start_discovery(&app, port) {
                     Ok(d) => *lock(&state.sync.discovery) = Some(d),
                     Err(e) => {
@@ -957,6 +977,51 @@ pub fn restore_redownload(app: AppHandle, state: State<'_, AppState>, unread_onl
     }
     emit(&app);
     Ok(queued)
+}
+
+/// Unlocks the NAS password a phone backup sealed with the person's passphrase and saves it for
+/// this profile's NAS, when that is the server the backup names. The passphrase is not kept.
+#[tauri::command]
+pub async fn restore_nas_password(app: AppHandle, passphrase: String) -> R<()> {
+    let state = app.state::<AppState>();
+    let Some((host, blob)) = lock(&state.sync.offer).nas_sealed.clone() else {
+        return Err(CmdError::new(
+            "notFound",
+            "There is no NAS password to unlock any more.",
+        ));
+    };
+    let here = state
+        .settings()?
+        .string(tm_core::settings::keys::REMOTE_HOST)
+        .trim()
+        .to_owned();
+    if !here.eq_ignore_ascii_case(host.trim()) {
+        return Err(CmdError::new(
+            "invalid",
+            format!("This profile's NAS is another server ({here}), so the password for {host} was not set."),
+        ));
+    }
+    let password =
+        tauri::async_runtime::spawn_blocking(move || tm_backup::seal::unseal(&blob, &passphrase))
+            .await
+            .map_err(|e| CmdError::internal(e.to_string()))?
+            .map_err(|e| match e {
+                tm_backup::seal::SealError::WrongPassphrase => CmdError::new(
+                    "invalid",
+                    "That passphrase doesn't unlock the NAS password. It's the one you typed on the phone when making the backup.",
+                ),
+                other => CmdError::new("invalid", other.to_string()),
+            })?;
+    {
+        let mut s = state.settings()?;
+        s.set(tm_core::settings::keys::REMOTE_PASSWORD, password.as_str());
+        s.save()?;
+    }
+    state.nas.index.invalidate();
+    lock(&state.sync.offer).nas_sealed = None;
+    tracing::info!("unlocked the NAS password from the backup");
+    emit(&app);
+    Ok(())
 }
 
 /// Put away what is left of the restore offer.

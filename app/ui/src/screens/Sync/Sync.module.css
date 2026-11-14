@@ -152,3 +152,9 @@
   border-radius: var(--tm-radius-md, 8px);
   border: 1px solid var(--tm-color-outline, rgba(127, 127, 127, 0.3));
 }
+
+/* What the chosen "keep in step" mode means, under the choice. */
+.modeNote {
+  display: block;
+  margin-top: 2px;
+}

@@ -15,6 +15,21 @@ use crate::queue::{
 };
 use crate::{Result, SyncError};
 
+/// Largest `GET /changes` answer read.
+pub const MAX_CHANGES_BYTES: u64 = 32 * 1024 * 1024;
+
+/// What `GET /changes` gave.
+#[derive(Debug)]
+pub enum Pulled {
+    Page(crate::journal::ChangesPage),
+    /// The peer has no `changes/1` (an app from before it).
+    NotSupported,
+    /// The cursor is older than what the peer keeps; merge in full, then go on from `oldest`.
+    TooOld {
+        oldest: i64,
+    },
+}
+
 /// Largest backup accepted from a peer.
 pub const MAX_BACKUP_BYTES: u64 = 256 * 1024 * 1024;
 /// Largest chapter sent with `PUT /file` (the phone takes at most 1 GiB).
@@ -62,6 +77,115 @@ impl SyncClient {
             name: info.device_name,
             ..peer
         })
+    }
+
+    /// `GET /changes?after=<after>` on a linked device (`changes/1`).
+    pub async fn changes_after(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        after: i64,
+        limit: usize,
+    ) -> Result<Pulled> {
+        let resp = self
+            .http
+            .get(format!(
+                "http://{}/changes?after={after}&limit={limit}",
+                peer.address()
+            ))
+            .header(LINK_HEADER, key)
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+            .map_err(|e| SyncError::Http(format!("{}: {e}", peer.name)))?;
+        match resp.status().as_u16() {
+            200 => {
+                let bytes = read_capped(resp, MAX_CHANGES_BYTES).await?;
+                serde_json::from_slice(&bytes)
+                    .map(Pulled::Page)
+                    .map_err(|e| SyncError::Protocol(format!("/changes: {e}")))
+            }
+            404 | 405 => Ok(Pulled::NotSupported),
+            401 => Err(SyncError::Unlinked),
+            410 => {
+                let bytes = read_capped(resp, 4096).await.unwrap_or_default();
+                let oldest = serde_json::from_slice::<serde_json::Value>(&bytes)
+                    .ok()
+                    .and_then(|v| v.get("oldest").and_then(serde_json::Value::as_i64))
+                    .unwrap_or(0);
+                Ok(Pulled::TooOld { oldest })
+            }
+            s => Err(SyncError::Http(format!("{} answered {s}", peer.name))),
+        }
+    }
+
+    /// `POST /changes`: hands a linked device entries to take now. `Ok(None)` when it has no
+    /// `changes/1`.
+    pub async fn push_changes(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        device_id: &str,
+        changes: &[crate::journal::Entry],
+    ) -> Result<Option<usize>> {
+        let body = serde_json::json!({"deviceId": device_id, "changes": changes});
+        match self
+            .call_json::<_, serde_json::Value>(
+                reqwest::Method::POST,
+                peer,
+                key,
+                "/changes",
+                Some(&body),
+                4096,
+            )
+            .await
+        {
+            Ok(v) => Ok(Some(
+                v.get("applied")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|n| usize::try_from(n).ok())
+                    .unwrap_or(0),
+            )),
+            Err(SyncError::Http(m)) if m.contains("can't do that yet") => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// `PUT /roles`: tells a linked device who leads now. Answers the mode that holds afterwards
+    /// (the other side's, when its change was newer), seen from this device; `None` when the
+    /// device has no `roles/1`.
+    pub async fn put_roles(
+        &self,
+        peer: &PeerDevice,
+        key: &str,
+        mode: crate::roles::Mode,
+        at: i64,
+    ) -> Result<Option<(crate::roles::Mode, i64)>> {
+        let body = crate::roles::RolesWire {
+            mode: mode.as_caller().into(),
+            mode_at: at,
+        };
+        let resp = self
+            .http
+            .put(format!("http://{}/roles", peer.address()))
+            .header(LINK_HEADER, key)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(serde_json::to_vec(&body).map_err(|e| SyncError::Protocol(e.to_string()))?)
+            .timeout(Duration::from_secs(15))
+            .send()
+            .await
+            .map_err(|e| SyncError::Http(format!("{}: {e}", peer.name)))?;
+        match resp.status().as_u16() {
+            200 | 409 => {
+                let bytes = read_capped(resp, 4096).await?;
+                let w: crate::roles::RolesWire = serde_json::from_slice(&bytes)
+                    .map_err(|e| SyncError::Protocol(format!("/roles: {e}")))?;
+                Ok(crate::roles::Mode::from_answer(&w.mode).map(|m| (m, w.mode_at)))
+            }
+            404 | 405 => Ok(None),
+            401 => Err(SyncError::Unlinked),
+            s => Err(SyncError::Http(format!("{} answered {s}", peer.name))),
+        }
     }
 
     /// `code` is either the six-digit pairing code or a link key (43 characters); the header

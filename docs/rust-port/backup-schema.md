@@ -21,6 +21,22 @@ The new tags start at 900. That is clear of Mihon's own tags (1–106 on Backup,
 message Backup {
   // existing tags 1, 2, 101, 104, 105, 106 unchanged
   repeated BackupExtension backupExtensions = 900;
+  // Written by the phone fork only (TachiMana#35); the computer reads it on restore, never writes it.
+  optional RemoteStorage remoteStorage = 901;
+}
+
+// The NAS connection. The computer reads fields 1-6 leniently (a field whose type it does not
+// expect is skipped) and ignores the rest.
+message RemoteStorage {
+  string host = 1;
+  int32 port = 2;
+  bool useHttps = 3;
+  string folder = 4;
+  string username = 5;
+  bytes encryptedPassword = 6;   // "TMP1" | salt(16) | nonce(12) | AES-256-GCM ciphertext+tag,
+                                 // key = Argon2id(passphrase, salt, m=64 MiB, t=3, p=1, 32 bytes)
+  int64 stateTakenAt = 7;
+  // 8 files, 9 role (MIRROR or ARCHIVE): not used by the computer yet
 }
 
 message BackupExtension {

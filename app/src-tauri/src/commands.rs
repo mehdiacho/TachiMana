@@ -166,29 +166,56 @@ fn clean_name(name: &str) -> R<String> {
 #[tauri::command]
 pub fn category_create(state: State<'_, AppState>, name: String) -> R<Option<i64>> {
     let n = clean_name(&name)?;
-    Ok(state.db.create_category(&n)?)
+    let id = state.db.create_category(&n)?;
+    if id.is_some() {
+        crate::changes::category_order(&state, id);
+    }
+    Ok(id)
 }
 
 #[tauri::command]
 pub fn category_rename(state: State<'_, AppState>, id: i64, name: String) -> R<()> {
     let n = clean_name(&name)?;
-    Ok(state.db.rename_category(id, &n)?)
+    let old = category_name(&state, id)?;
+    state.db.rename_category(id, &n)?;
+    if let Some(old) = old {
+        crate::changes::category_renamed(&state, &old, &n);
+    }
+    Ok(())
+}
+
+fn category_name(state: &AppState, id: i64) -> R<Option<String>> {
+    Ok(state
+        .db
+        .categories()?
+        .into_iter()
+        .find(|c| c.id == id)
+        .map(|c| c.name))
 }
 
 #[tauri::command]
 pub fn category_delete(state: State<'_, AppState>, id: i64) -> R<()> {
-    Ok(state.db.delete_category(id)?)
+    let name = category_name(&state, id)?;
+    state.db.delete_category(id)?;
+    if let Some(name) = name {
+        crate::changes::category_deleted(&state, &name);
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub fn category_move(state: State<'_, AppState>, id: i64, up: bool) -> R<()> {
-    Ok(state.db.move_category(id, up)?)
+    state.db.move_category(id, up)?;
+    crate::changes::category_order(&state, None);
+    Ok(())
 }
 
 #[tauri::command]
 pub fn manga_set_categories(state: State<'_, AppState>, manga_id: i64, ids: Vec<i64>) -> R<()> {
     let set: BTreeSet<i64> = ids.into_iter().collect();
-    Ok(state.db.set_manga_categories(manga_id, &set)?)
+    state.db.set_manga_categories(manga_id, &set)?;
+    crate::changes::manga_categories(&state, manga_id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -234,7 +261,9 @@ pub fn set_viewer(state: State<'_, AppState>, manga_id: i64, viewer: i64) -> R<(
     if !matches!(viewer, 0 | 1 | 2 | 5 | 6) {
         return Err(CmdError::new("invalid", "Unknown reading mode."));
     }
-    Ok(state.db.set_viewer(manga_id, viewer)?)
+    state.db.set_viewer(manga_id, viewer)?;
+    crate::changes::viewer(&state, manga_id);
+    Ok(())
 }
 
 pub fn chapter_or_404(state: &AppState, id: i64) -> R<Chapter> {
@@ -350,6 +379,9 @@ pub fn save_progress(
         .db
         .mark_progress(chapter_id, page, left, finished || ch.read)?;
     state.db.record_history(chapter_id)?;
+    // A page turn is a change of `lastPageRead`; the journal takes one entry per save.
+    crate::changes::chapter_read(&state, chapter_id);
+    crate::changes::history(&state, chapter_id);
     // Like the Kotlin app: a finished chapter raises AniList's progress (no-op when untracked).
     if finished {
         crate::track::push_finished(&app, ch.manga_id, ch.chapter_number);
@@ -359,7 +391,9 @@ pub fn save_progress(
 
 #[tauri::command]
 pub fn set_chapter_read(state: State<'_, AppState>, chapter_id: i64, read: bool) -> R<()> {
-    Ok(state.db.set_read(chapter_id, read)?)
+    state.db.set_read(chapter_id, read)?;
+    crate::changes::chapter_read(&state, chapter_id);
+    Ok(())
 }
 
 fn ui_settings(s: &tm_core::Settings) -> UiSettings {

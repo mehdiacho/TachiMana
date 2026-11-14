@@ -38,6 +38,10 @@ pub struct Backup {
     /// Schema: `docs/rust-port/backup-schema.md`.
     #[prost(message, repeated, tag = "900")]
     pub backup_extensions: Vec<BackupExtension>,
+    /// Mehdi's Mihon fork: the NAS connection (`remoteStorage`), kept as the raw message and
+    /// read by [`crate::prefs::nas_section`]. The computer never writes it.
+    #[prost(bytes = "vec", optional, tag = "901")]
+    pub remote_storage: Option<Vec<u8>>,
 }
 
 #[derive(Clone, PartialEq, Message)]

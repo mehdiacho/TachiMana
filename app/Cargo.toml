@@ -23,3 +23,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
 tracing = "0.1"
 tempfile = "3"
+
+# The NAS password unseal (Argon2id, 64 MiB) takes seconds unoptimised.
+[profile.dev.package.argon2]
+opt-level = 3

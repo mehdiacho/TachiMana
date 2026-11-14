@@ -8,9 +8,11 @@
 pub mod client;
 pub mod discovery;
 pub mod identity;
+pub mod journal;
 pub mod links;
 pub mod protocol;
 pub mod queue;
+pub mod roles;
 pub mod server;
 
 use std::path::Path;

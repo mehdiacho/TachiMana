@@ -1,6 +1,7 @@
 //! TachiMana desktop: Tauri shell over the `tm-*` crates.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod changes;
 mod commands;
 mod downloads;
 mod dto;
@@ -86,6 +87,10 @@ fn main() {
         })
         .register_asynchronous_uri_scheme_protocol("tm", protocol::handle)
         .invoke_handler(tauri::generate_handler![
+            changes::changes_sync_now,
+            sync::restore_nas_password,
+            changes::changes_last,
+            changes::link_set_mode,
             commands::app_info,
             commands::open_folder,
             profiles::profiles_list,

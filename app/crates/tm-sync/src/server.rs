@@ -45,7 +45,24 @@ pub struct Linking {
     pub refused: Arc<Mutex<Option<RefusedLink>>>,
     /// Done events for the linked devices, served by `GET /outbox`.
     pub outbox: Arc<Outbox>,
+    /// The change journal and how to apply an entry (`changes/1`); `None` serves neither.
+    pub changes: Option<Changes>,
 }
+
+/// Applies a received entry's winning value to the library (blocking; it writes the database).
+pub type ApplyFn = dyn Fn(&crate::journal::Entry, &serde_json::Value) + Send + Sync;
+
+/// What `GET /changes` and `POST /changes` work on.
+#[derive(Clone)]
+pub struct Changes {
+    pub journal: Arc<crate::journal::Journal>,
+    pub apply: Arc<ApplyFn>,
+    /// Called after a `POST /changes` applied something, so the UI can refresh.
+    pub changed: Arc<dyn Fn() + Send + Sync>,
+}
+
+/// Largest `POST /changes` body read.
+const MAX_CHANGES_BODY: usize = 16 * 1024 * 1024;
 
 /// A `POST /link` with the right code but another profile.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,6 +129,8 @@ impl SyncServer {
             .route("/file", get(file))
             .route("/link", post(link_route))
             .route("/outbox", get(outbox_route))
+            .route("/changes", get(changes_get).post(changes_post))
+            .route("/roles", get(roles_get).put(roles_put))
             .with_state(state);
         let (tx, rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -233,6 +252,207 @@ struct OutboxQuery {
     since: Option<String>,
 }
 
+/// The link a request's key belongs to; `Err` is the answer to send instead.
+fn linked(
+    s: &Arc<ServerState>,
+    headers: &HeaderMap,
+) -> std::result::Result<(Linking, Link), Box<Response>> {
+    let Some(linking) = s.linking.clone() else {
+        return Err(Box::new(
+            (StatusCode::UNAUTHORIZED, "needs a link key").into_response(),
+        ));
+    };
+    if headers.get(LINK_HEADER).is_none() {
+        return Err(Box::new(
+            (StatusCode::UNAUTHORIZED, "needs a link key").into_response(),
+        ));
+    }
+    match check_as(s, headers, true) {
+        Ok(Some(link)) => Ok((linking, link)),
+        Ok(None) => Err(Box::new(
+            (StatusCode::UNAUTHORIZED, "needs a link key").into_response(),
+        )),
+        Err(r) => Err(r),
+    }
+}
+
+fn error_body(status: StatusCode, code: &str, message: &str) -> Response {
+    (
+        status,
+        Json(serde_json::json!({"error": code, "message": message})),
+    )
+        .into_response()
+}
+
+#[derive(Deserialize)]
+struct ChangesQuery {
+    after: Option<i64>,
+    limit: Option<usize>,
+}
+
+/// `GET /changes?after=<seq>&limit=<n>`: this device's journal after the caller's cursor, without
+/// the caller's own entries (`changes/1`).
+async fn changes_get(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    Query(q): Query<ChangesQuery>,
+) -> Response {
+    let (linking, link) = match linked(&s, &headers) {
+        Ok(x) => x,
+        Err(r) => return *r,
+    };
+    let Some(ch) = linking.changes else {
+        return (StatusCode::NOT_FOUND, "no changes/1 here").into_response();
+    };
+    let after = q.after.unwrap_or(0).max(0);
+    let limit = q.limit.unwrap_or(crate::journal::DEFAULT_LIMIT);
+    let peer = link.peer_device_id.clone();
+    let page = tokio::task::spawn_blocking(move || ch.journal.after(after, &peer, limit)).await;
+    match page {
+        Ok(Ok(mut p)) => {
+            // A device that leads gets nothing from its follower's side of the link: the
+            // follower's changes stay on it (D2). Its cursor still moves.
+            if !link.mode.sends_mine() {
+                p.changes.clear();
+            }
+            Json(p).into_response()
+        }
+        Ok(Err(crate::journal::JournalError::CursorTooOld { oldest })) => (
+            StatusCode::GONE,
+            Json(serde_json::json!({"error": "cursor-too-old", "oldest": oldest})),
+        )
+            .into_response(),
+        Ok(Err(e)) => error_body(StatusCode::INTERNAL_SERVER_ERROR, "journal", &e.to_string()),
+        Err(e) => error_body(StatusCode::INTERNAL_SERVER_ERROR, "journal", &e.to_string()),
+    }
+}
+
+#[derive(Deserialize)]
+struct ChangesBody {
+    changes: Vec<crate::journal::Entry>,
+}
+
+/// `POST /changes`: entries the caller made or applied, to take now (`changes/1`).
+async fn changes_post(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Response {
+    let (linking, link) = match linked(&s, &headers) {
+        Ok(x) => x,
+        Err(r) => return *r,
+    };
+    let Some(ch) = linking.changes else {
+        return (StatusCode::NOT_FOUND, "no changes/1 here").into_response();
+    };
+    if body.len() > MAX_CHANGES_BODY {
+        return error_body(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "too-large",
+            "send fewer entries at once",
+        );
+    }
+    let parsed: ChangesBody = match serde_json::from_slice(&body) {
+        Ok(b) => b,
+        Err(e) => return error_body(StatusCode::BAD_REQUEST, "bad-body", &e.to_string()),
+    };
+    if parsed.changes.len() > crate::journal::MAX_LIMIT {
+        return error_body(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "too-large",
+            "at most 2000 entries",
+        );
+    }
+    let total = parsed.changes.len();
+    // This device leads: the follower's changes are not taken (D2).
+    if !link.mode.takes_theirs() {
+        return Json(serde_json::json!({"applied": 0, "ignored": total})).into_response();
+    }
+    let done = tokio::task::spawn_blocking(move || {
+        let mut applied = 0usize;
+        for e in &parsed.changes {
+            match ch.journal.receive(e) {
+                Ok(Some(v)) => {
+                    (ch.apply)(e, &v);
+                    applied += 1;
+                }
+                Ok(None) => {}
+                Err(err) => tracing::warn!("journal: {err}"),
+            }
+        }
+        if applied > 0 {
+            (ch.changed)();
+        }
+        applied
+    })
+    .await
+    .unwrap_or(0);
+    Json(serde_json::json!({"applied": done, "ignored": total.saturating_sub(done)}))
+        .into_response()
+}
+
+/// `GET /roles`: who leads on this link, named from this side as the server (`roles/1`).
+async fn roles_get(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Response {
+    let (_, link) = match linked(&s, &headers) {
+        Ok(x) => x,
+        Err(r) => return *r,
+    };
+    Json(crate::roles::RolesWire {
+        mode: link.mode.as_server().into(),
+        mode_at: link.mode_at,
+    })
+    .into_response()
+}
+
+/// `PUT /roles`: the caller changed who leads; kept when it is newer than what is stored.
+async fn roles_put(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Response {
+    let (linking, link) = match linked(&s, &headers) {
+        Ok(x) => x,
+        Err(r) => return *r,
+    };
+    if body.len() > MAX_LINK_BODY {
+        return error_body(StatusCode::PAYLOAD_TOO_LARGE, "too-large", "");
+    }
+    let Ok(want) = serde_json::from_slice::<crate::roles::RolesWire>(&body) else {
+        return error_body(
+            StatusCode::BAD_REQUEST,
+            "bad-body",
+            "expected mode and modeAt",
+        );
+    };
+    let Some(mode) = crate::roles::Mode::from_request(&want.mode) else {
+        return error_body(
+            StatusCode::BAD_REQUEST,
+            "bad-mode",
+            "mode is both, callerLeads or serverLeads",
+        );
+    };
+    let links = Arc::clone(&linking.links);
+    let peer = link.peer_device_id.clone();
+    let at = want.mode_at;
+    let saved = tokio::task::spawn_blocking(move || links.set_mode(&peer, mode, at)).await;
+    match saved {
+        Ok(Ok(Some((l, changed)))) => {
+            let body = Json(crate::roles::RolesWire {
+                mode: l.mode.as_server().into(),
+                mode_at: l.mode_at,
+            });
+            if changed {
+                (StatusCode::OK, body).into_response()
+            } else {
+                (StatusCode::CONFLICT, body).into_response()
+            }
+        }
+        Ok(Ok(None)) => (StatusCode::UNAUTHORIZED, "unknown link").into_response(),
+        Ok(Err(e)) => error_body(StatusCode::INTERNAL_SERVER_ERROR, "save", &e.to_string()),
+        Err(e) => error_body(StatusCode::INTERNAL_SERVER_ERROR, "save", &e.to_string()),
+    }
+}
+
 /// `GET /outbox?since=<eventId>`: the done events for the asking linked device, after `since`.
 async fn outbox_route(
     State(s): State<Arc<ServerState>>,
@@ -326,6 +546,8 @@ async fn link_route(
         last_address: SocketAddr::new(from.ip(), port).to_string(),
         linked_at: now_ms(),
         last_seen: now_ms(),
+        mode: crate::roles::Mode::Both,
+        mode_at: 0,
     };
     let peer = link.peer_device_id.clone();
     let links = Arc::clone(&linking.links);

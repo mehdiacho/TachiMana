@@ -29,6 +29,13 @@ pub struct Link {
     /// linking). Saved at most once a minute, so it is that coarse.
     #[serde(default)]
     pub last_seen: i64,
+    /// Who leads (`roles/1`), from this device's point of view. Links made before roles are
+    /// two-way.
+    #[serde(default)]
+    pub mode: crate::roles::Mode,
+    /// When `mode` was last changed, on the device that changed it (0 = never).
+    #[serde(default)]
+    pub mode_at: i64,
 }
 
 impl std::fmt::Debug for Link {
@@ -41,6 +48,7 @@ impl std::fmt::Debug for Link {
             .field("key", &"<redacted>")
             .field("last_address", &self.last_address)
             .field("last_seen", &self.last_seen)
+            .field("mode", &self.mode)
             .finish()
     }
 }
@@ -155,6 +163,31 @@ impl LinkStore {
         }
     }
 
+    /// Sets who leads on the link to `peer_device_id` when `at` is later than the stored change.
+    /// Returns the link as it is afterwards, with `true` when it changed; `None` when there is no
+    /// such link.
+    pub fn set_mode(
+        &self,
+        peer_device_id: &str,
+        mode: crate::roles::Mode,
+        at: i64,
+    ) -> std::io::Result<Option<(Link, bool)>> {
+        let mut g = self.lock();
+        let mut next = g.clone();
+        let Some(l) = next.iter_mut().find(|l| l.peer_device_id == peer_device_id) else {
+            return Ok(None);
+        };
+        if at <= l.mode_at {
+            return Ok(Some((l.clone(), false)));
+        }
+        l.mode = mode;
+        l.mode_at = at;
+        let out = l.clone();
+        save(&self.file, &next)?;
+        *g = next;
+        Ok(Some((out, true)))
+    }
+
     /// Forgets the link to `peer_device_id`. `false` when there was none.
     pub fn remove(&self, peer_device_id: &str) -> std::io::Result<bool> {
         let mut g = self.lock();
@@ -234,6 +267,8 @@ mod tests {
             last_address: "10.0.0.2:27193".into(),
             linked_at: 1,
             last_seen: 0,
+            mode: crate::roles::Mode::Both,
+            mode_at: 0,
         }
     }
 
@@ -324,5 +359,26 @@ mod tests {
         )
         .unwrap();
         assert_eq!(LinkStore::open(&f).by_peer("p").unwrap().last_seen, 0);
+    }
+
+    #[test]
+    fn a_newer_mode_replaces_an_older_one_and_is_saved() {
+        use crate::roles::Mode;
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("links.json");
+        let s = LinkStore::open(&f);
+        s.put(link("phone", &new_key().unwrap())).unwrap();
+        let (l, changed) = s.set_mode("phone", Mode::TheyLead, 50).unwrap().unwrap();
+        assert!(changed && l.mode == Mode::TheyLead);
+        let (l, changed) = s.set_mode("phone", Mode::Both, 40).unwrap().unwrap();
+        assert!(
+            !changed && l.mode == Mode::TheyLead,
+            "an older change loses"
+        );
+        assert_eq!(
+            LinkStore::open(&f).by_peer("phone").unwrap().mode,
+            Mode::TheyLead
+        );
+        assert!(s.set_mode("nobody", Mode::Both, 99).unwrap().is_none());
     }
 }

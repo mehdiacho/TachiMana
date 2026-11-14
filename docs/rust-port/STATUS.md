@@ -1,5 +1,5 @@
 # Rust port status
-Updated: 2026-11-03 by Claude (implementing; the planned agent was unavailable)
+Updated: 2026-11-14 by Claude (sync step C: change journal, who leads, NAS password from phone backups)
 Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). 0.1.2 released (restore progress). Now: UI states everywhere and an in-place updater (feat/ui-states), then 0.1.3. The Kotlin app stays until Mehdi has tried the Windows installer
 
 Done:
@@ -333,8 +333,35 @@ Checked under Xvfb on the synthetic library with genres added; online-only bulk 
 last-seen were not exercised (no source or linked phone in the rig). The chapter fix (PR 34)
 shipped as 0.1.13.
 
-Next step: have Mehdi try merge + "Download all here" with the real phone, and
-read the fork's answer on mihon#11 (NAS password).
+SYNC STEP C (branch `feat/changes-roles`, after the phone side's answers in TachiMana#35 and
+mihon#15): `changes/1` and `roles/1` are specified in `docs/protocol/capabilities/` with test
+files. The computer side is built:
+- `tm-sync`: `journal.rs` (a SQLite journal per profile, `journal.db`: entries, the value held
+  per target, cursors per linked device; the who-wins rules run the test files), `roles.rs`, the
+  routes `GET/POST /changes` and `GET/PUT /roles`, and the client calls.
+- `src-tauri/src/changes.rs`: every change made here is journalled where it happens (library
+  heart, categories and their order, rename, delete, read marks and page, history, reading mode);
+  entries from linked devices are applied to the library; a background loop pushes about 2 s
+  after a change, pulls when a linked device appears on the network and every 5 minutes (a pull
+  at most once a minute otherwise), and "Sync now" runs a round at once. A cursor that is too old
+  falls back to a full pull. A leader ignores its follower's entries; a follower journals but
+  does not send.
+- Sync screen: per linked device "Keep in step" (both ways / this PC leads / the other leads),
+  sent with `PUT /roles` and again on every round until both agree; a Changes row with Sync now
+  and the last round.
+- Restore reads the fork's NAS connection section (tag 901) and, when it carries the password
+  sealed with a passphrase (`TMP1`, Argon2id + AES-256-GCM, `tm-backup/src/seal.rs`), the Sync
+  screen asks for the passphrase and saves the password for this profile's NAS. The plain
+  `__PRIVATE_remote_storage_password` in tag 104 is never read.
+Checked with two copies of the app under Xvfb: a phone-style entry pushed to one reached the
+other by itself, a library removal on the leader reached the follower within seconds, changing
+who leads on one changed it on the other, and a synthetic phone backup's NAS password unlocked
+with the right passphrase and was refused with a wrong one. Not done: `POST /roles/take` and the
+questions after scanning (roles/1), a notice when the other device changes who leads, restores
+writing journal entries, bookmarks from the computer (it has no bookmark action yet).
+
+Next step: the phone builds its half (mihon#16, #17); then `roles/take` and the questions after
+scanning. Have Mehdi try merge + "Download all here" with the real phone.
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download

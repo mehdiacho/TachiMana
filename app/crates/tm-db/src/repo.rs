@@ -576,6 +576,32 @@ impl Db {
         })
     }
 
+    pub fn set_bookmark(&self, chapter_id: i64, bookmark: bool) -> Result<()> {
+        self.write(|c| {
+            update_chapter(
+                c,
+                chapter_id,
+                &ChapterUpdate {
+                    bookmark: Some(bookmark),
+                    ..Default::default()
+                },
+            )
+        })
+    }
+
+    /// A reading session from another device: the later time read, and `time_read` ms added to
+    /// the total (`history.upsert` adds it).
+    pub fn add_history(&self, chapter_id: i64, last_read: i64, time_read: i64) -> Result<()> {
+        self.write(|c| {
+            c.execute(
+                q("history", "upsert")?,
+                named_params! {":historyChapterId": chapter_id, ":historyLastRead": last_read,
+                ":historyTimeRead": time_read.max(0)},
+            )?;
+            Ok(())
+        })
+    }
+
     /// Record that a chapter was read now (`history.upsert`).
     pub fn record_history(&self, chapter_id: i64) -> Result<()> {
         self.record_history_at(chapter_id, now_ms())
@@ -685,6 +711,11 @@ impl Db {
             return Ok(());
         }
         self.write(|c| update_category(c, id, Some(name), None))
+    }
+
+    /// Places a category at `sort` (another device's order), leaving the others where they are.
+    pub fn set_category_sort(&self, id: i64, sort: i64) -> Result<()> {
+        self.write(|c| update_category(c, id, None, Some(sort)))
     }
 
     /// Delete a category and its memberships.
