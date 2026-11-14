@@ -14,10 +14,13 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
-/// Where releases are published: a public repository, so the app can download installers and the
-/// extension helper without signing in (the source repository is private). CI publishes there on
-/// `app-v*` tags (`.github/workflows/app-release.yml`).
-pub const DEFAULT_REPO: &str = "mehdiacho/tachimana-releases";
+/// Where releases are published: this app's own public repository, so the app can download
+/// installers and the extension helper without signing in. CI publishes there on `app-v*` tags
+/// (`.github/workflows/app-release.yml`). Up to 0.1.9 this was `mehdiacho/tachimana-releases`
+/// (back when the source was private); CI still mirrors each release there so those installs
+/// can update to a build that reads from here. The Kotlin app's `v*` releases live here too and
+/// are skipped by [`TAG_PREFIX`].
+pub const DEFAULT_REPO: &str = "mehdiacho/TachiMana";
 pub const API_BASE: &str = "https://api.github.com";
 /// Tag prefix of the Rust app's releases.
 pub const TAG_PREFIX: &str = "app-v";
