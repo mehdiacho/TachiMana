@@ -49,7 +49,11 @@ export function SplitHandle({
         const d = drag.current;
         if (d) onChange(clamp(d.from + pos(e) - d.at, min, max()));
       }}
-      onPointerUp={() => (drag.current = null)}
+      onPointerUp={(e) => {
+        drag.current = null;
+        // A drag with the mouse leaves no keyboard focus behind on the divider.
+        e.currentTarget.blur();
+      }}
       onPointerCancel={() => (drag.current = null)}
       onDoubleClick={onReset}
       onKeyDown={(e) => {
