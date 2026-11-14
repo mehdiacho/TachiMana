@@ -4489,6 +4489,7 @@ dependencies = [
  "mdns-sd",
  "percent-encoding",
  "reqwest",
+ "rusqlite",
  "rustls",
  "serde",
  "serde_json",

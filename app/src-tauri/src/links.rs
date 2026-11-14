@@ -312,6 +312,8 @@ pub async fn link_device(
         last_address: address_of(&host, port),
         linked_at: now_ms(),
         last_seen: now_ms(),
+        mode: tm_sync::roles::Mode::Both,
+        mode_at: 0,
     };
     let dto = LinkDto::from(&link);
     let Some((their_id, their_name)) = joining else {

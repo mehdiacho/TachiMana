@@ -434,6 +434,7 @@ pub fn init(app: &AppHandle) {
                 links: Arc::clone(&state.sync.links),
                 refused: Arc::clone(&state.sync.refused),
                 outbox: Arc::clone(&state.sync.phone.outbox),
+                changes: None,
             });
         let started =
             SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;

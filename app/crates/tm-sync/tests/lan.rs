@@ -350,6 +350,7 @@ async fn linking_gives_a_key_that_replaces_the_code() {
             links: Arc::clone(&links),
             refused: Arc::clone(&refused),
             outbox: Arc::clone(&outbox),
+            changes: None,
         }),
     )
     .await
@@ -452,4 +453,127 @@ async fn a_server_without_profiles_does_not_link() {
         .link("127.0.0.1", server.port(), "123456", &link_req("p"))
         .await;
     assert!(matches!(r, Err(SyncError::Http(_))), "{r:?}");
+}
+
+/// `changes/1` and `roles/1` over a real server: push, pull without the caller's own entries,
+/// the leader refusing its follower's entries, and `PUT /roles` keeping the newer change.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn changes_and_roles_travel_over_the_link() {
+    use tm_sync::client::Pulled;
+    use tm_sync::journal::{Entry, Journal, CHAPTER_READ, MANGA_VIEWER};
+    use tm_sync::roles::Mode;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let a = instance(&tmp.path().join("A"), false);
+    let links = Arc::new(tm_sync::LinkStore::open(&tmp.path().join("links.json")));
+    let journal = Arc::new(Journal::open(&tmp.path().join("journal.db"), "A-id").unwrap());
+    let applied: Arc<Mutex<Vec<(String, serde_json::Value)>>> = Arc::default();
+    let seen = Arc::clone(&applied);
+    let server = SyncServer::start_with(
+        DeviceIdentity {
+            id: "A-id".into(),
+            name: "Instance A".into(),
+            pairing_code: "123456".into(),
+        },
+        a.local.clone(),
+        backup_fn(&a.db),
+        Some(0),
+        Some(tm_sync::server::Linking {
+            profile_id: "prof-1".into(),
+            profile_name: "Main".into(),
+            links: Arc::clone(&links),
+            refused: Arc::new(std::sync::Mutex::new(None)),
+            outbox: Arc::new(tm_sync::queue::Outbox::open(
+                &tmp.path().join("outbox.json"),
+            )),
+            changes: Some(tm_sync::server::Changes {
+                journal: Arc::clone(&journal),
+                apply: Arc::new(move |e: &Entry, v: &serde_json::Value| {
+                    seen.lock().unwrap().push((e.kind.clone(), v.clone()));
+                }),
+                changed: Arc::new(|| {}),
+            }),
+        }),
+    )
+    .await
+    .unwrap();
+    let port = server.port();
+    let client = SyncClient::new().unwrap();
+    let key = client
+        .link("127.0.0.1", port, "123456", &link_req("prof-1"))
+        .await
+        .unwrap()
+        .key
+        .unwrap();
+    let peer = PeerDevice {
+        id: "A-id".into(),
+        name: "A".into(),
+        host: "127.0.0.1".into(),
+        port,
+    };
+    let chapter = serde_json::json!({"sourceId": "1", "mangaUrl": "/m", "chapterUrl": "/c"});
+    let phone_entry = |id: &str, at: i64, read: bool| Entry {
+        change_id: id.into(),
+        device_id: "B-id".into(),
+        at,
+        seq: 0,
+        kind: CHAPTER_READ.into(),
+        target: chapter.clone(),
+        value: serde_json::json!({"read": read, "lastPageRead": 0}),
+    };
+
+    // The phone pushes a read mark: applied once, a repeat is not.
+    let n = client
+        .push_changes(&peer, &key, "B-id", &[phone_entry("p1", 1_000, true)])
+        .await
+        .unwrap();
+    assert_eq!(n, Some(1));
+    let n = client
+        .push_changes(&peer, &key, "B-id", &[phone_entry("p1", 1_000, true)])
+        .await
+        .unwrap();
+    assert_eq!(n, Some(0));
+    assert_eq!(applied.lock().unwrap().len(), 1);
+
+    // A makes a change of its own; the phone pulls it but not its own entry back.
+    journal
+        .record(
+            MANGA_VIEWER,
+            serde_json::json!({"sourceId": "1", "mangaUrl": "/m"}),
+            serde_json::json!({"viewer": 2}),
+        )
+        .unwrap();
+    let Pulled::Page(page) = client.changes_after(&peer, &key, 0, 100).await.unwrap() else {
+        panic!("expected a page");
+    };
+    assert_eq!(page.changes.len(), 1);
+    assert_eq!(page.changes[0].kind, MANGA_VIEWER);
+    assert_eq!(page.next, 2);
+    assert!(!page.more);
+
+    // The phone says A leads (it follows): A stops taking its entries and keeps sending its own.
+    let r = client
+        .put_roles(&peer, &key, Mode::TheyLead, 5_000)
+        .await
+        .unwrap();
+    assert_eq!(r, Some((Mode::TheyLead, 5_000)));
+    assert_eq!(links.by_peer("B-id").unwrap().mode, Mode::ILead);
+    let n = client
+        .push_changes(&peer, &key, "B-id", &[phone_entry("p2", 9_000, false)])
+        .await
+        .unwrap();
+    assert_eq!(n, Some(0), "the leader ignores its follower");
+    assert_eq!(applied.lock().unwrap().len(), 1);
+    // An older role change loses and the answer carries the one that holds.
+    let r = client
+        .put_roles(&peer, &key, Mode::Both, 4_000)
+        .await
+        .unwrap();
+    assert_eq!(r, Some((Mode::TheyLead, 5_000)));
+
+    // Without a key nothing is served.
+    let none = client
+        .changes_after(&peer, "x".repeat(43).as_str(), 0, 10)
+        .await;
+    assert!(matches!(none, Err(SyncError::Unlinked)), "{none:?}");
 }
