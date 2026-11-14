@@ -267,7 +267,7 @@ App
 | --- | --- | --- |
 | A | Mehdi runs the checklist in §3; the phone side answers the questions in §9 | answers only |
 | B | Usability asks of §7.1; library sorts (last read, latest chapter) | no |
-| C | Protocol standard in place: `hello`, capability pages for what exists, test files, stand-in peer | yes: `hello` |
+| C | Protocol standard in place: `hello`, capability pages for what exists, test files, stand-in peer (computer side done in 0.1.18) | yes: `hello` |
 | D | Changes sync (§4.3) over the direct link, with roles and the linking questions (§4.1) | yes |
 | E | Shared-storage carrier (§4.3, item 2) | yes |
 | F | Live channel; one shared download queue; move a queue (§5) | yes |

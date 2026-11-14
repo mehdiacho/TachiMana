@@ -380,6 +380,17 @@ accept shown on C, "Don't ask again" letting the next merge run without a card, 
 reaching D by itself, and "Both ways" on C showing the notice on D. Not done: the questions after
 scanning (roles/1), restores writing journal entries.
 
+HELLO AND THE STAND-IN PEER (branch `feat/hello`, 0.1.18):
+- `GET /hello` (`hello/1`, `docs/protocol/capabilities/hello-1.md`): the server lists what it
+  implements; `SyncClient::hello` asks and falls back to `/ping` for older apps
+  (`Hello::from_answers` is the pure rule, run against `docs/protocol/vectors/hello-1/`).
+- The Sync screen asks each linked device each minute (`link_hello`) and says under it what its
+  app can't do yet (`helloLine` in `ui/src/lib/sync.ts`). Not seen in the running app with a real
+  older peer; the line has unit tests and the route was tried with the stand-in.
+- The calls themselves do not consult `/hello` yet; they still try their route.
+- Stand-in peer: `cargo run -p tm-sync --example stand_in -- serve|check` (protocol README §6).
+  Tried: `check` against `serve` passes all checks, with and without `--no-changes`.
+
 SETTINGS PAGES AND NSFW (branch `feat/settings-pages-nsfw`, 0.1.17, asked by Mehdi 2026-11-14):
 - Settings is a list of pages (Profiles, Appearance, Reader, Browse, Tracking, Data and storage,
   Sync, About) with a search box. `ui/src/lib/settingsIndex.ts` lists every setting with its page

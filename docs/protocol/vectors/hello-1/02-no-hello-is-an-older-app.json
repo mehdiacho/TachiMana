@@ -1,0 +1,23 @@
+{
+  "note": "No /hello but /ping answers: an app from before hello/1. It gets link/2 and pull/1 only.",
+  "hello": null,
+  "ping": {
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "profileId": "prof-1",
+    "profileName": "Main"
+  },
+  "expect": {
+    "reachable": true,
+    "capabilities": [
+      "link/2",
+      "pull/1"
+    ],
+    "supports": {
+      "link/2": true,
+      "pull/1": true,
+      "changes/1": false,
+      "hello/1": false
+    }
+  }
+}

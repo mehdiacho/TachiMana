@@ -17,8 +17,8 @@ use tokio::sync::oneshot;
 
 use crate::links::{Link, LinkStore};
 use crate::protocol::{
-    resolve_manifest_path, LinkRequest, LinkResponse, ManifestFile, PingInfo, SyncManifest,
-    DEFAULT_PORT, LINK_HEADER, PAIR_HEADER, PORT_ATTEMPTS,
+    resolve_manifest_path, AppInfo, Hello, LinkRequest, LinkResponse, ManifestFile, PingInfo,
+    SyncManifest, DEFAULT_PORT, LINK_HEADER, PAIR_HEADER, PORT_ATTEMPTS,
 };
 use crate::queue::{Outbox, OutboxList};
 use crate::{DeviceIdentity, Result, SyncError};
@@ -143,6 +143,7 @@ impl SyncServer {
         });
         let app = Router::new()
             .route("/ping", get(ping))
+            .route("/hello", get(hello))
             .route("/manifest", get(manifest))
             .route("/backup", get(backup_route))
             .route("/file", get(file))
@@ -656,6 +657,35 @@ async fn ping(State(s): State<Arc<ServerState>>) -> Json<PingInfo> {
         device_name: s.identity.name.clone(),
         profile_id: s.linking.as_ref().map(|l| l.profile_id.clone()),
         profile_name: s.linking.as_ref().map(|l| l.profile_name.clone()),
+    })
+}
+
+/// `GET /hello` (`hello/1`): who this device is and what it implements. No authentication, like
+/// `/ping`, and nothing here that `/ping` and the app's public release do not already say.
+async fn hello(State(s): State<Arc<ServerState>>) -> Json<Hello> {
+    // Without linking this server only lets a library be pulled with the code.
+    let capabilities: &[&str] = match &s.linking {
+        None => &["hello/1", "pull/1"],
+        Some(_) => crate::protocol::CAPABILITIES,
+    };
+    let journal = s.linking.as_ref().is_some_and(|l| l.changes.is_some());
+    let capabilities: Vec<String> = capabilities
+        .iter()
+        .filter(|c| **c != "changes/1" || journal)
+        .map(|c| (*c).to_owned())
+        .collect();
+    Json(Hello {
+        protocol: crate::protocol::PROTOCOL.to_owned(),
+        device_id: s.identity.id.clone(),
+        device_name: s.identity.name.clone(),
+        platform: std::env::consts::OS.to_owned(),
+        profile_id: s.linking.as_ref().map(|l| l.profile_id.clone()),
+        profile_name: s.linking.as_ref().map(|l| l.profile_name.clone()),
+        app: AppInfo {
+            name: "tachimana".to_owned(),
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+        },
+        capabilities,
     })
 }
 

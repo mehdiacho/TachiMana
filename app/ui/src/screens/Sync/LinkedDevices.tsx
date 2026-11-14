@@ -4,7 +4,7 @@
 import { Copy, Laptop, Link2, RefreshCw, Smartphone, Unlink } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
-import { keys, queryClient, useChangesLast, useLinks, useTakeAsks } from "../../api/queries";
+import { keys, queryClient, useChangesLast, useLinkHello, useLinks, useTakeAsks } from "../../api/queries";
 import { OutlinedButton, Skeleton, TextButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { LinkDto } from "../../gen/LinkDto";
@@ -13,7 +13,7 @@ import type { RoundDto } from "../../gen/RoundDto";
 import type { TakeAskDto } from "../../gen/TakeAskDto";
 import { useAction } from "../../hooks/useAction";
 import { relativeDate } from "../../lib/chapters";
-import { cleanCode, spacedCode } from "../../lib/sync";
+import { cleanCode, helloLine, spacedCode } from "../../lib/sync";
 import l from "../Library/Library.module.css";
 import st from "../Settings/Settings.module.css";
 import s from "./Sync.module.css";
@@ -225,6 +225,7 @@ function LinkRow({ link }: { link: LinkDto }) {
     { ok: () => `Unlinked ${link.peerName}.`, toastError: true },
   );
   const Icon = link.platform === "android" ? Smartphone : Laptop;
+  const cant = helloLine(useLinkHello(link.peerDeviceId).data, link.peerName);
   return (
     <div className={st.row} role="listitem">
       <Icon size={20} className={st.rowIcon} />
@@ -233,6 +234,7 @@ function LinkRow({ link }: { link: LinkDto }) {
         <span className={st.rowDesc}>
           {confirm ? "It will need the pairing code again to link." : linkLine(link)}
         </span>
+        {!confirm && cant && <span className={st.rowDesc}>{cant}</span>}
         {!confirm && <ModeChoice link={link} />}
         {copying && <CopyOnce link={link} onClose={() => setCopying(false)} />}
       </div>

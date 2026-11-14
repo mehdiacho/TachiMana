@@ -7,7 +7,7 @@ use futures_util::StreamExt;
 use tokio::io::AsyncWriteExt;
 
 use crate::protocol::{
-    LinkRequest, LinkResponse, PeerDevice, PingInfo, SyncManifest, LINK_HEADER, PAIR_HEADER,
+    Hello, LinkRequest, LinkResponse, PeerDevice, PingInfo, SyncManifest, LINK_HEADER, PAIR_HEADER,
 };
 use crate::queue::{
     ChapterRef, ClaimRequest, ClaimResponse, DoneEvent, DoneRequest, DoneResponse, QueueItem,
@@ -77,6 +77,44 @@ impl SyncClient {
             name: info.device_name,
             ..peer
         })
+    }
+
+    /// What the device at `host:port` is and implements (`hello/1`). A device that answers
+    /// `/ping` but has no usable `/hello` is an older app: it gets the capabilities those had.
+    /// `None` when nothing answers.
+    pub async fn hello(&self, host: &str, port: u16) -> Option<Hello> {
+        let peer = PeerDevice {
+            id: String::new(),
+            name: String::new(),
+            host: host.trim().to_owned(),
+            port,
+        };
+        let asked = self
+            .http
+            .get(format!("http://{}/hello", peer.address()))
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await;
+        let hello = match asked {
+            Ok(resp) if resp.status().is_success() => small_body(resp).await,
+            _ => None,
+        };
+        // An answer that parses needs no second request.
+        if let Some(h) = Hello::from_answers(hello.as_deref(), None) {
+            return Some(h);
+        }
+        let resp = self
+            .http
+            .get(format!("http://{}/ping", peer.address()))
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let ping = small_body(resp).await;
+        Hello::from_answers(None, ping.as_deref())
     }
 
     /// `GET /changes?after=<after>` on a linked device (`changes/1`).
@@ -583,4 +621,12 @@ async fn read_capped(resp: reqwest::Response, cap: u64) -> Result<Vec<u8>> {
         out.extend_from_slice(&chunk);
     }
     Ok(out)
+}
+
+/// Largest `/hello` or `/ping` answer read.
+const MAX_HELLO_BYTES: u64 = 64 * 1024;
+
+/// A small answer's body, read with a cap; `None` when it is too large or the read fails.
+async fn small_body(resp: reqwest::Response) -> Option<Vec<u8>> {
+    read_capped(resp, MAX_HELLO_BYTES).await.ok()
 }

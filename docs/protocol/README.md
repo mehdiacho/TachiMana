@@ -40,7 +40,8 @@ capabilities it claims.** Nothing else about it has to match.
 
 ## 3. Versions and capabilities
 
-*Proposed.* Today the apps discover each other's abilities by trying routes.
+Built on the computer in 0.1.18; the full page is [`capabilities/hello-1.md`](capabilities/hello-1.md).
+Apps released before it discover each other's abilities by trying routes.
 
 `GET /hello` (no authentication) answers:
 
@@ -75,7 +76,7 @@ specified in [`../rust-port/profiles-and-remote-downloads.md`](../rust-port/prof
 | `queue/1` | existing | `GET /queue`, `POST /queue/claim`, `POST /queue/release`: one device downloads another's queue |
 | `done/1` | existing | `POST /downloads/done`, `GET /outbox`: "this chapter is now on the server / on me / sent to you" |
 | `file/1` | existing | `PUT /file`: receive a finished chapter |
-| `hello/1` | proposed | §3 |
+| `hello/1` | computer side built (0.1.18), [page](capabilities/hello-1.md); phone side is a work order | §3 |
 | `changes/1` | proposed; computer side built except the questions after scanning, [page](capabilities/changes-1.md) | each device's change journal, served after a cursor and pushed; removals; the rules for who wins |
 | `roles/1` | proposed; computer side built except the questions after scanning, [page](capabilities/roles-1.md) | who leads, one-way or two-way, switch, one-off "send everything / take everything", the questions after scanning |
 | `live/1` | proposed | a channel held open for queue changes and download progress |
@@ -121,13 +122,24 @@ not use the form.
 
 ## 6. Test files and the stand-in peer
 
-*Proposed.*
+- `docs/protocol/vectors/<capability>/*.json`: one case per file: the state the device is in,
+  what arrives, and what is required afterwards. Each capability page says how its files read.
+- The **stand-in peer** is a small program in this repository that plays a correct device with
+  an empty library. It is this crate's real server, so it answers what the computer app answers.
 
-- `docs/protocol/vectors/<capability>/*.json`: one case per file: the request, the state the
-  server is in, and the answer that is required (status, body, and which fields may differ).
-- A small **stand-in peer** (one script, no install) that plays either side from those files:
-  serve as a correct peer so an app can be tried against it, and call an app's server and report
-  which cases pass.
+  ```text
+  cd app
+  cargo run -p tm-sync --example stand_in -- serve --port 27300 --code 123456
+  cargo run -p tm-sync --example stand_in -- check 192.168.0.20:27193 --code 123456
+  ```
+
+  - `serve` prints every change it receives and every one-off copy it is asked for.
+    `--no-changes` plays an app without a change journal, to see what an app does about that.
+  - `check` calls a device and prints one line per check, `ok` or `FAIL`: `/hello` and `/ping`,
+    and with `--code` linking, `GET /changes` and `POST /changes` (once and repeated). Linking
+    leaves "Stand-in peer" in that device's linked list and one unread mark for a manga that does
+    not exist in its journal, so point it at a test profile.
+  - It needs Rust. A build of it for the phone session to download is not made yet.
 - A capability is "built" on a side when its vectors pass there, and "working" when the two real
   apps have been seen doing it together. The registry tracks both.
 

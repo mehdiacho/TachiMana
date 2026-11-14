@@ -4,6 +4,7 @@ import type { AppInfo } from "../gen/AppInfo";
 import type { ProfileInput } from "../gen/ProfileInput";
 import type { ProfilesDto } from "../gen/ProfilesDto";
 import type { LinkDto } from "../gen/LinkDto";
+import type { PeerHelloDto } from "../gen/PeerHelloDto";
 import type { RoundDto } from "../gen/RoundDto";
 import type { TakeAskDto } from "../gen/TakeAskDto";
 import type { LinkOutcomeDto } from "../gen/LinkOutcomeDto";
@@ -87,6 +88,8 @@ export const api = {
   unlinkDevice: (peerDeviceId: string) => call<LinkDto[]>("unlink_device", { peerDeviceId }),
   /** Who leads on a link; answers the mode that holds (the other device's, if it changed it later). */
   linkSetMode: (peerDeviceId: string, mode: LinkDto["mode"]) => call<LinkDto["mode"]>("link_set_mode", { peerDeviceId, mode }),
+  /** What a linked device's app can do with this one (hello/1). */
+  linkHello: (peerDeviceId: string) => call<PeerHelloDto>("link_hello", { peerDeviceId }),
   /** Pull from and push to every linked device now (changes/1). */
   changesSyncNow: () => call<RoundDto | null>("changes_sync_now"),
   changesLast: () => call<RoundDto | null>("changes_last"),

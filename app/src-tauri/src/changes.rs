@@ -735,6 +735,51 @@ pub fn changes_last(app: AppHandle) -> Option<RoundDto> {
         .and_then(|g| g.clone())
 }
 
+/// What a linked device's app can do with this one (`hello/1`), for the Sync screen.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PeerHelloDto {
+    /// False when the device did not answer; the rest is then empty.
+    pub reachable: bool,
+    /// Its app's version as it names it; empty for an app from before `hello/1`.
+    pub app_version: String,
+    /// It keeps a change journal, so the two libraries can stay in step.
+    pub changes: bool,
+    /// It understands who leads and copying a library once.
+    pub roles: bool,
+}
+
+/// Asks a linked device what its app implements.
+#[tauri::command]
+pub async fn link_hello(app: AppHandle, peer_device_id: String) -> R<PeerHelloDto> {
+    let state = app.state::<AppState>();
+    let link = state
+        .sync
+        .links
+        .by_peer(&peer_device_id)
+        .ok_or_else(|| CmdError::not_found("That device"))?;
+    let unreachable = PeerHelloDto {
+        reachable: false,
+        app_version: String::new(),
+        changes: false,
+        roles: false,
+    };
+    let (Some(peer), Ok(client)) = (peer_of(&state, &link), SyncClient::new()) else {
+        return Ok(unreachable);
+    };
+    Ok(match client.hello(&peer.host, peer.port).await {
+        // Another device now answers at that address: say nothing about it.
+        Some(h) if h.device_id == link.peer_device_id => PeerHelloDto {
+            reachable: true,
+            changes: h.supports("changes/1"),
+            roles: h.supports("roles/1"),
+            app_version: h.app.version.chars().take(40).collect(),
+        },
+        _ => unreachable,
+    })
+}
+
 /// Sets who leads on a link ("both", "iLead", "theyLead") and tells the other device when it can
 /// be reached; otherwise it is told on the next round. Answers the mode that holds.
 #[tauri::command]

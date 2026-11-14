@@ -1,0 +1,40 @@
+{
+  "note": "Entries that are not name/major are dropped, the rest stand.",
+  "hello": {
+    "protocol": "1",
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "platform": "android",
+    "profileId": "prof-1",
+    "profileName": "Main",
+    "app": {
+      "name": "mihon-custom",
+      "version": "0.0.0-test"
+    },
+    "capabilities": [
+      "changes/1",
+      "Changes/1",
+      "changes",
+      "changes/",
+      "/1",
+      "changes/one",
+      "pull/1"
+    ]
+  },
+  "ping": {
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "profileId": "prof-1",
+    "profileName": "Main"
+  },
+  "expect": {
+    "reachable": true,
+    "capabilities": [
+      "changes/1",
+      "pull/1"
+    ],
+    "supports": {
+      "changes/1": true
+    }
+  }
+}
