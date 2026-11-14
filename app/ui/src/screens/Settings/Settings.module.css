@@ -14,6 +14,7 @@
   margin-bottom: var(--tm-space-lg);
 }
 .section {
+  scroll-margin-top: var(--tm-space-xl);
   font: var(--tm-type-label);
   color: var(--tm-color-accent);
   letter-spacing: 0.08em;
@@ -178,4 +179,43 @@
   height: 6px;
   margin-top: var(--tm-space-xs, 4px);
   accent-color: var(--tm-color-accent);
+}
+
+/* The list of sections, pinned beside the page when the window has the room. */
+.index {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .screen {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: var(--tm-space-3xl);
+  }
+  .col {
+    flex: 1;
+    min-width: 0;
+  }
+  .index {
+    position: sticky;
+    top: 0;
+    flex: none;
+    width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--tm-space-xxs);
+    padding-top: 64px;
+  }
+  .indexItem {
+    text-align: left;
+    font: var(--tm-type-body-small);
+    color: var(--tm-color-on-background-med);
+    padding: var(--tm-space-sm) var(--tm-space-base);
+    border-radius: var(--tm-radius-md);
+  }
+  .indexItem:hover {
+    background: var(--tm-color-hover);
+    color: var(--tm-color-on-background);
+  }
 }
