@@ -1,0 +1,30 @@
+# Run by hand: deletes this repo's build artifacts and caches, to free Actions storage.
+# Releases keep their installers; artifacts are only the per-run copies.
+name: Clean Actions storage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete artifacts and caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          n=0
+          for id in $(gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" --jq '.artifacts[].id'); do
+            gh api -X DELETE "repos/$REPO/actions/artifacts/$id" && n=$((n+1))
+          done
+          echo "Deleted $n artifacts."
+          c=0
+          for id in $(gh api --paginate "repos/$REPO/actions/caches?per_page=100" --jq '.actions_caches[].id'); do
+            gh api -X DELETE "repos/$REPO/actions/caches/$id" && c=$((c+1))
+          done
+          echo "Deleted $c caches."
