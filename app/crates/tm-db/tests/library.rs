@@ -162,6 +162,105 @@ fn sync_chapters_adds_new_and_never_touches_read_state() {
     assert_eq!(db.unread_counts().unwrap().get(&id), Some(&2));
 }
 
+fn numbered(url: &str, name: &str, number: f64, scanlator: &str) -> SourceChapter {
+    SourceChapter {
+        url: url.into(),
+        name: name.into(),
+        date_upload: 1,
+        chapter_number: number,
+        scanlator: Some(scanlator.into()),
+    }
+}
+
+#[test]
+fn sync_chapters_follows_a_source_that_moved_its_chapters() {
+    // The source changed its address: same chapters, new urls. Read state, history and row ids
+    // stay, nothing is duplicated.
+    let db = Db::open_in_memory().unwrap();
+    let old = [
+        numbered("old/2", "Chapter 2", 2.0, "old.example"),
+        numbered("old/1", "Chapter 1", 1.0, "old.example"),
+    ];
+    let id = db.add_to_library(7, &manga("/m", "T"), &old).unwrap();
+    let before = db.chapters(id).unwrap();
+    let one = before.iter().find(|c| c.url == "old/1").unwrap().clone();
+    db.mark_progress(one.id, 4, 0, true).unwrap();
+
+    let moved = [
+        numbered("new/3", "Chapter 3", 3.0, "new.example"),
+        numbered("new/2", "Chapter 2", 2.0, "new.example"),
+        numbered("new/1", "Chapter 1", 1.0, "new.example"),
+    ];
+    assert_eq!(
+        db.sync_chapters(id, &moved).unwrap(),
+        1,
+        "only chapter 3 is new"
+    );
+    let after = db.chapters(id).unwrap();
+    assert_eq!(after.len(), 3);
+    let ch1 = after.iter().find(|c| c.url == "new/1").unwrap();
+    assert_eq!(ch1.id, one.id, "the same row, at its new url");
+    assert!(ch1.read);
+    assert_eq!(ch1.scanlator.as_deref(), Some("new.example"));
+    assert!(after.iter().all(|c| c.url.starts_with("new/")));
+}
+
+#[test]
+fn sync_chapters_hands_read_state_to_a_duplicate_and_removes_the_old_one() {
+    // A refresh before this fix had already added the new urls next to the old ones, so the new
+    // chapters exist by url and the old read ones are gone from the source.
+    let db = Db::open_in_memory().unwrap();
+    let both = [
+        numbered("new/1", "Chapter 1", 1.0, "new.example"),
+        numbered("old/1", "Chapter 1", 1.0, "old.example"),
+    ];
+    let id = db.add_to_library(7, &manga("/m", "T"), &both).unwrap();
+    let old = db
+        .chapters(id)
+        .unwrap()
+        .into_iter()
+        .find(|c| c.url == "old/1")
+        .unwrap();
+    db.mark_progress(old.id, 9, 0, true).unwrap();
+
+    db.sync_chapters(id, &[numbered("new/1", "Chapter 1", 1.0, "new.example")])
+        .unwrap();
+    let after = db.chapters(id).unwrap();
+    assert_eq!(after.len(), 1);
+    assert_eq!(after[0].url, "new/1");
+    assert!(after[0].read, "the read mark came across");
+}
+
+#[test]
+fn sync_chapters_removes_vanished_chapters_but_not_on_an_empty_list() {
+    let db = Db::open_in_memory().unwrap();
+    let id = db
+        .add_to_library(
+            7,
+            &manga("/m", "T"),
+            &[
+                numbered("a", "Chapter 2", 2.0, "s"),
+                numbered("b", "Chapter 1", 1.0, "s"),
+            ],
+        )
+        .unwrap();
+    assert_eq!(db.sync_chapters(id, &[]).unwrap(), 0);
+    assert_eq!(
+        db.chapters(id).unwrap().len(),
+        2,
+        "an empty answer removes nothing"
+    );
+    db.sync_chapters(id, &[numbered("a", "Chapter 2", 2.0, "s")])
+        .unwrap();
+    let left: Vec<String> = db
+        .chapters(id)
+        .unwrap()
+        .into_iter()
+        .map(|c| c.url)
+        .collect();
+    assert_eq!(left, ["a"]);
+}
+
 #[test]
 fn categories_crud_order_and_assignment() {
     let db = Db::open_in_memory().unwrap();
