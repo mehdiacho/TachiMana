@@ -132,7 +132,7 @@ pub async fn helper_install_file(app: AppHandle) -> R<Option<HelperStatusDto>> {
 
 /// Where the helper zips are: the `extHostBaseUrl` setting when set (a folder holding
 /// `tachimana-ext-host-<platform>.zip` and its `.sha256`, for example on a NAS), else this
-/// version's release in the public releases repository ([`tm_update::DEFAULT_REPO`]).
+/// version's release in the app's repository ([`tm_update::DEFAULT_REPO`]).
 fn download_base(state: &AppState) -> R<String> {
     let custom = state
         .settings

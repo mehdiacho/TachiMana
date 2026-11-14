@@ -309,11 +309,16 @@ his worklog `projects/mihon-nas.md`). After he tries the Windows installer, a PR
 and `release.yml` (ext-host and the Kotlin modules it needs stay).
 
 P8 not done yet:
-- Open question 1 answered 2026-11-03 (Mehdi: public releases repo). Releases go to the public
-  repository `mehdiacho/tachimana-releases`; the updater and the helper download read from it
-  (`extHostBaseUrl` still overrides the helper's, and "From file…" always works). Before the
-  first `app-v*` tag, Mehdi creates that repository (with a README so it has a branch) and adds
-  the `RELEASES_TOKEN` secret here (fine-grained token, Contents read/write on it only).
+- Open question 1 answered 2026-11-03 (Mehdi: public releases repo); changed 2026-11-14 when
+  this repository went public. Releases now go to `mehdiacho/TachiMana` itself; the updater and
+  the helper download read from it from 0.1.10 on (`extHostBaseUrl` still overrides the
+  helper's, and "From file…" always works). App releases here are never marked "Latest", so the
+  Kotlin app's `/releases/latest` check keeps seeing its own `v*` release.
+- Builds up to 0.1.9 read from `mehdiacho/tachimana-releases`, so CI still mirrors every
+  release there (needs the `RELEASES_TOKEN` secret, Contents read/write on that repository
+  only; without it the mirror is skipped with a warning). Once every install is on 0.1.10 or
+  later: remove the mirror from `app-release.yml`, delete the secret, and archive (never
+  delete) `tachimana-releases`, since 0.1.9 and older still download their helper zips from it.
 - The Windows installers are built by CI only; nobody has installed one yet.
 - The Tauri updater plugin was not used: it needs signed update manifests and public URLs, and the
   repo is private. The updater ports `UpdateChecker.kt` instead, as PLAN.md allows.
@@ -386,7 +391,7 @@ Every Kotlin self-test and every Kotlin desktop feature, and what covers it in t
 | Packaged installer (`release.yml`, jpackage) | `app-release.yml`: NSIS, MSI, deb, AppImage, helper zips |
 
 ### Still missing or different (P9)
-- Releases repository and `RELEASES_TOKEN` secret to be created by Mehdi (see P8 not done yet).
+- Retire the `tachimana-releases` mirror once every install is on 0.1.10+ (see P8 not done yet).
 - Windows: installers built by CI only; Windows measurements not taken (both apps).
 - Pinned manga do not exist in either app (the Kotlin app only round-trips the backup memo).
 - `browseSelfTest`-style online checks need an open network; not run here.

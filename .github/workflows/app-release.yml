@@ -1,8 +1,11 @@
 name: App release (Rust)
 
 # Builds the Rust app's installers and the extension helper zips (PLAN.md §P8.4–5).
-# A tag `app-v<version>` (e.g. app-v0.2.0) publishes a release with all of them in the public
-# repository mehdiacho/tachimana-releases; the app's updater and helper download read from there.
+# A tag `app-v<version>` (e.g. app-v0.2.0) publishes a release with all of them in this repository;
+# the app's updater and helper download read from there. Each release is also mirrored to the old
+# public releases repository (mehdiacho/tachimana-releases), because installs of 0.1.9 and earlier
+# look for updates there: the mirror is how they reach a build that reads from here. Drop the
+# mirror (LEGACY_REPO and the LEGACY_TOKEN lines) once every install is on 0.1.10 or later.
 # Running it by hand builds everything as workflow artifacts; give it a version to publish that
 # version too. When publishing, each build job puts its files straight onto a draft release and
 # the last job publishes it, so a release does not depend on the account's artifact storage. The Kotlin app keeps its own `v*.*.*` tags and release.yml until P9.
@@ -27,6 +30,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # Where releases go now (the source repository is public), and the old releases repository.
+  RELEASE_REPO: ${{ github.repository }}
+  LEGACY_REPO: mehdiacho/tachimana-releases
+
 jobs:
   version:
     runs-on: ubuntu-24.04
@@ -50,9 +58,9 @@ jobs:
             echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # The draft the build jobs upload to. Published to the public releases repository, which the
-  # app's updater and helper download read without signing in (this repository is private).
-  # RELEASES_TOKEN is a fine-grained token with Contents read/write on that repository only.
+  # The draft the build jobs upload to, here and in the legacy mirror. GITHUB_TOKEN writes here;
+  # RELEASES_TOKEN is a fine-grained token with Contents read/write on the legacy repository only.
+  # Without it the mirror is skipped with a warning and the release still goes out here.
   draft:
     needs: version
     if: needs.version.outputs.publish == 'true'
@@ -60,14 +68,22 @@ jobs:
     steps:
       - name: Create the draft release
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          MAIN_TOKEN: ${{ github.token }}
+          LEGACY_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          test -n "$GH_TOKEN" || { echo "::error::Add the RELEASES_TOKEN secret (see the comment above)"; exit 1; }
-          gh release view "app-v$VERSION" --repo mehdiacho/tachimana-releases > /dev/null 2>&1 || \
-            gh release create "app-v$VERSION" --repo mehdiacho/tachimana-releases --draft \
-              --title "TachiMana $VERSION" \
-              --notes "Installers for Windows (setup.exe, msi) and Linux (deb, AppImage), and the extension helper zips the app downloads on first use."
+          notes="Installers for Windows (setup.exe, msi) and Linux (deb, AppImage), and the extension helper zips the app downloads on first use."
+          draft() { # <repo> <token> [extra create flags]
+            local repo="$1" token="$2"; shift 2
+            GH_TOKEN="$token" gh release view "app-v$VERSION" --repo "$repo" > /dev/null 2>&1 || \
+              GH_TOKEN="$token" gh release create "app-v$VERSION" --repo "$repo" --draft --latest=false \
+                --title "TachiMana $VERSION" --notes "$notes" "$@"
+          }
+          # Here the tag is this commit (it already exists when a tag push started the run). The
+          # legacy repository holds no code, so its tag goes on its own default branch as before.
+          draft "$RELEASE_REPO" "$MAIN_TOKEN" --target "$GITHUB_SHA"
+          if [ -n "$LEGACY_TOKEN" ]; then draft "$LEGACY_REPO" "$LEGACY_TOKEN"
+          else echo "::warning::RELEASES_TOKEN not set: not mirroring to $LEGACY_REPO, so 0.1.9 and older will not see this update"; fi
 
   ext-host:
     needs: [version, draft]
@@ -113,9 +129,14 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          MAIN_TOKEN: ${{ github.token }}
+          LEGACY_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
-        run: gh release upload "app-v$VERSION" dist/* --repo mehdiacho/tachimana-releases --clobber
+        run: |
+          GH_TOKEN="$MAIN_TOKEN" gh release upload "app-v$VERSION" dist/* --repo "$RELEASE_REPO" --clobber
+          if [ -n "$LEGACY_TOKEN" ]; then
+            GH_TOKEN="$LEGACY_TOKEN" gh release upload "app-v$VERSION" dist/* --repo "$LEGACY_REPO" --clobber
+          fi
       # A build that isn't published keeps its files as an artifact for a day. The account's
       # artifact storage is small, so a full store must not fail the build.
       - uses: actions/upload-artifact@v4
@@ -184,9 +205,14 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          MAIN_TOKEN: ${{ github.token }}
+          LEGACY_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
-        run: gh release upload "app-v$VERSION" dist/* --repo mehdiacho/tachimana-releases --clobber
+        run: |
+          GH_TOKEN="$MAIN_TOKEN" gh release upload "app-v$VERSION" dist/* --repo "$RELEASE_REPO" --clobber
+          if [ -n "$LEGACY_TOKEN" ]; then
+            GH_TOKEN="$LEGACY_TOKEN" gh release upload "app-v$VERSION" dist/* --repo "$LEGACY_REPO" --clobber
+          fi
       # A build that isn't published keeps its files as an artifact for a day. The account's
       # artifact storage is small, so a full store must not fail the build.
       - uses: actions/upload-artifact@v4
@@ -204,8 +230,14 @@ jobs:
     steps:
       - name: Publish the release
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          MAIN_TOKEN: ${{ github.token }}
+          LEGACY_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          gh release view "app-v$VERSION" --repo mehdiacho/tachimana-releases --json assets --jq '.assets[].name'
-          gh release edit "app-v$VERSION" --repo mehdiacho/tachimana-releases --draft=false --latest
+          GH_TOKEN="$MAIN_TOKEN" gh release view "app-v$VERSION" --repo "$RELEASE_REPO" --json assets --jq '.assets[].name'
+          # Not "Latest" here: the Kotlin app reads /releases/latest of this repository and must keep
+          # seeing its own v* release. The Rust updater lists the releases and picks app-v* itself.
+          GH_TOKEN="$MAIN_TOKEN" gh release edit "app-v$VERSION" --repo "$RELEASE_REPO" --draft=false --latest=false
+          if [ -n "$LEGACY_TOKEN" ]; then
+            GH_TOKEN="$LEGACY_TOKEN" gh release edit "app-v$VERSION" --repo "$LEGACY_REPO" --draft=false --latest
+          fi
