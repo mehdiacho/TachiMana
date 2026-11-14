@@ -42,8 +42,10 @@ Then settings as pages with search and the NSFW source switch and mark (0.1.17, 
 "SETTINGS PAGES AND NSFW").
 
 **What to build next on the computer** is ranked in `docs/plan/improvement-review.md` (a review of
-every screen against Mihon, 2026-11-14). It waits on Mehdi's ranking. Protocol pieces still not
-built: `hello/1`, the stand-in peer, and `docs/catalog/computer.md`.
+every screen against Mihon, 2026-11-14). It waits on Mehdi's ranking. `hello/1` and the stand-in peer
+are built on the computer (branch `feat/hello`, STATUS.md "HELLO AND THE STAND-IN PEER"); the
+phone's half of `hello/1` is a work order on the fork. Still not written:
+`docs/catalog/computer.md`.
 
 Before more sync work, read `docs/plan/system-plan.md` (draft) and
 `docs/protocol/README.md` (the TachiMana Link Protocol and the form for phone-app work orders).
