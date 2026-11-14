@@ -120,7 +120,8 @@ pub fn roles_hook(app: &AppHandle) -> Arc<tm_sync::server::RolesChangedFn> {
 
 /// Copies `link`'s library into this profile once. With `Replace`, this profile's library is
 /// saved to a backup file first and what the other device does not have leaves the library.
-/// When `request_id` is set (the other device asked), the result goes into its outbox.
+/// When `request_id` is set (the other device asked), the result goes into its outbox and a
+/// notice.
 pub async fn run(app: &AppHandle, link: &Link, how: How, request_id: Option<&str>) -> R<String> {
     let out = copy(app, link, how).await;
     let state = app.state::<AppState>();
@@ -134,13 +135,16 @@ pub async fn run(app: &AppHandle, link: &Link, how: How, request_id: Option<&str
             DoneEvent::take(&state.sync.identity.id, id, ok, message),
         );
     }
-    let _ = app.emit(
-        "notice",
-        match &out {
-            Ok(text) => text.clone(),
-            Err(e) => format!("Copying {}'s library failed: {}", link.peer_name, e.message),
-        },
-    );
+    // Asked from here, the screen that asked shows the result; asked from there, say it here.
+    if request_id.is_some() {
+        let _ = app.emit(
+            "notice",
+            match &out {
+                Ok(text) => text.clone(),
+                Err(e) => format!("Copying {}'s library failed: {}", link.peer_name, e.message),
+            },
+        );
+    }
     out
 }
 
@@ -180,6 +184,9 @@ async fn copy(app: &AppHandle, link: &Link, how: How) -> R<String> {
             let _ = jr.set_cursor(&link.peer_device_id, cur);
         }
     }
+    // Counted here rather than from the restore summary, which calls a manga that comes back
+    // into the library "updated".
+    let before: HashSet<i64> = state.db.library()?.iter().map(|m| m.id).collect();
     let report = crate::sync::pull_from(app, peer, link.key.clone()).await?;
     let mut removed = 0usize;
     if let Some(theirs) = theirs {
@@ -192,15 +199,23 @@ async fn copy(app: &AppHandle, link: &Link, how: How) -> R<String> {
         }
         let _ = app.emit("library-changed", ());
     }
-    let added = report.summary.manga_added;
+    let added = state
+        .db
+        .library()?
+        .iter()
+        .filter(|m| !before.contains(&m.id))
+        .count();
+    // The ones that came back into the library are in the summary's "updated" count.
+    let back = added.saturating_sub(report.summary.manga_added as usize);
+    let updated = (report.summary.manga_updated as usize).saturating_sub(back);
     Ok(match saved {
         Some(file) => format!(
             "This PC now has {}'s library: {added} manga added, {removed} removed. The old library is saved in {file}.",
             link.peer_name
         ),
         None => format!(
-            "Merged {}'s library: {added} manga added, {} brought up to date.",
-            link.peer_name, report.summary.manga_updated
+            "Merged {}'s library: {added} manga added, {updated} brought up to date.",
+            link.peer_name
         ),
     })
 }

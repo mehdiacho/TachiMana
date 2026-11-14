@@ -445,6 +445,25 @@ fn progress_only_moves_forward_and_categories_are_additive() {
 }
 
 #[test]
+fn a_restore_brings_a_manga_back_into_the_library_and_never_takes_one_out() {
+    let db = Db::open_in_memory().unwrap();
+    let mut b = mihon_backup();
+    import(&db, &b).unwrap();
+    let id = db.library().unwrap()[0].id;
+
+    // Taken out here, still in the library in the backup: it comes back.
+    db.set_favorite(id, false).unwrap();
+    assert!(db.library().unwrap().is_empty());
+    import(&db, &b).unwrap();
+    assert_eq!(db.library().unwrap().len(), 1);
+
+    // Out of the library in the backup: this library keeps it.
+    b.backup_manga[0].favorite = Some(false);
+    import(&db, &b).unwrap();
+    assert_eq!(db.library().unwrap().len(), 1);
+}
+
+#[test]
 fn categories_match_by_name_case_insensitively() {
     let db = Db::open_in_memory().unwrap();
     db.create_category("reading").unwrap();

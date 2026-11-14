@@ -35,8 +35,9 @@ D4 reading beside the library is a toggle, off by default (built in step B). Ste
 library/manga-page work in STATUS.md; steps C to H wait on the phone side (mihon#13, #14).
 
 Built since (branch `feat/changes-roles`, see STATUS.md "SYNC STEP C"): the change journal
-(`changes/1`), who leads (`roles/1`, without `roles/take` yet) and the NAS password from phone
-backups. The phone's half is mihon#16 and #17.
+(`changes/1`), who leads (`roles/1`) and the NAS password from phone backups (0.1.15); then
+(branch `feat/take-once`, STATUS.md "COPY ONCE") copying a library once between linked devices
+(`roles/take`), a notice when the other side changes who leads, and bookmarks (0.1.16). The phone's half is mihon#16 and #17.
 
 Before more sync work, read `docs/plan/system-plan.md` (draft) and
 `docs/protocol/README.md` (the TachiMana Link Protocol and the form for phone-app work orders).
