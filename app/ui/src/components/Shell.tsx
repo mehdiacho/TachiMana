@@ -58,9 +58,9 @@ const ITEMS: { id: Screen; label: string; icon: LucideIcon }[] = [
   { id: "sync", label: "Sync", icon: RefreshCw },
 ];
 
-function RailItem({ label, icon: Icon, active, compact, onClick }: { label: string; icon: LucideIcon; active: boolean; compact: boolean; onClick: () => void }) {
+function RailItem({ label, icon: Icon, active, compact, onClick, hint }: { label: string; icon: LucideIcon; active: boolean; compact: boolean; onClick: () => void; hint?: string }) {
   return (
-    <button type="button" className={s.railItem} data-active={active} aria-current={active ? "page" : undefined} title={label} onClick={onClick}>
+    <button type="button" className={s.railItem} data-active={active} aria-current={active ? "page" : undefined} title={hint ? `${label} (${hint})` : label} onClick={onClick}>
       <span className={s.railCapsule}>
         <Icon size={21} strokeWidth={active ? 2.2 : 1.7} />
       </span>
@@ -81,12 +81,12 @@ function Rail({ compact }: { compact: boolean }) {
   };
   return (
     <nav className={s.rail} data-compact={compact} aria-label="Main">
-      {ITEMS.map((it) => (
-        <RailItem key={it.id} {...it} compact={compact} active={screen === it.id} onClick={() => go(it.id)} />
+      {ITEMS.map((it, i) => (
+        <RailItem key={it.id} {...it} hint={`Ctrl+${i + 1}`} compact={compact} active={screen === it.id} onClick={() => go(it.id)} />
       ))}
       <div className={s.railSpacer} />
-      <RailItem label="Rotate" icon={RotateCw} compact={compact} active={rotated} onClick={toggleRotate} />
-      <RailItem label="Settings" icon={Settings} compact={compact} active={screen === "settings"} onClick={() => go("settings")} />
+      <RailItem label="Rotate" hint="Ctrl+Alt+R" icon={RotateCw} compact={compact} active={rotated} onClick={toggleRotate} />
+      <RailItem label="Settings" hint="Ctrl+," icon={Settings} compact={compact} active={screen === "settings"} onClick={() => go("settings")} />
     </nav>
   );
 }
@@ -136,15 +136,58 @@ export function Shell({ children }: { children: (cls: WidthClass) => ReactNode }
     }
   }, [settings.data, setRotated]);
 
+  const immersive = useUi((u) => u.immersive && u.reader !== null);
+  const setScreen = useUi((u) => u.setScreen);
+  const closeReader = useUi((u) => u.closeReader);
+
+  // The window follows the reader in and out of full screen.
   useEffect(() => {
+    void win()
+      ?.setFullscreen(immersive)
+      .catch(() => undefined);
+  }, [immersive]);
+
+  useEffect(() => {
+    const go = (id: Screen) => {
+      closeReader();
+      setScreen(id);
+    };
+    // Back: out of the reader, or out of the open manga.
+    const back = () => {
+      const u = useUi.getState();
+      if (u.reader) closeReader();
+      else if (u.screen === "library" && u.selectedMangaId !== null) u.select(null);
+      else return false;
+      return true;
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.altKey && (e.key === "r" || e.key === "R")) {
         e.preventDefault();
         toggleRotate();
+      } else if (e.ctrlKey && !e.altKey && !e.shiftKey && /^[1-5]$/.test(e.key)) {
+        // Ctrl+1 to Ctrl+5 are the five screens in the side rail, top to bottom.
+        const item = ITEMS[Number(e.key) - 1];
+        if (item) {
+          e.preventDefault();
+          go(item.id);
+        }
+      } else if (e.ctrlKey && !e.altKey && e.key === ",") {
+        e.preventDefault();
+        go("settings");
+      } else if (e.altKey && !e.ctrlKey && e.key === "ArrowLeft") {
+        if (back()) e.preventDefault();
       }
     };
+    // The mouse's back button.
+    const onMouse = (e: MouseEvent) => {
+      if (e.button === 3 && back()) e.preventDefault();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("mouseup", onMouse);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mouseup", onMouse);
+    };
   });
 
   // One root that only changes its transform, so rotating never remounts the current screen.
@@ -161,13 +204,13 @@ export function Shell({ children }: { children: (cls: WidthClass) => ReactNode }
           transform: `translate(-50%, -50%) rotate(${rotated ? 90 : 0}deg)`,
         }}
       >
-        <TitleBar />
+        {!immersive && <TitleBar />}
         <div className={s.activity}>
           <ActivityBar />
         </div>
         <UpdateBanner />
         <div className={s.body}>
-          <Rail compact={cls === "COMPACT"} />
+          {!immersive && <Rail compact={cls === "COMPACT"} />}
           <main className={s.content}>{children(cls)}</main>
         </div>
         <Toasts />

@@ -13,6 +13,9 @@ interface UiState {
   selectedMangaId: number | null;
   reader: ReaderTarget | null;
   rotated: boolean;
+  /** The reader fills the screen: no title bar, no side rail, the window full screen. */
+  immersive: boolean;
+  setImmersive: (on: boolean) => void;
   setScreen: (s: Screen) => void;
   select: (id: number | null) => void;
   openReader: (t: ReaderTarget) => void;
@@ -25,9 +28,11 @@ export const useUi = create<UiState>((set) => ({
   selectedMangaId: null,
   reader: null,
   rotated: false,
+  immersive: false,
+  setImmersive: (immersive) => set({ immersive }),
   setScreen: (screen) => set({ screen }),
   select: (selectedMangaId) => set({ selectedMangaId }),
   openReader: (reader) => set({ reader }),
-  closeReader: () => set({ reader: null }),
+  closeReader: () => set({ reader: null, immersive: false }),
   setRotated: (rotated) => set({ rotated }),
 }));

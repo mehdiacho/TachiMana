@@ -1,7 +1,7 @@
 // The reader (spec §3.2; behaviour ported from ui/reader/ReaderScreen.kt). Multi-chapter in both
 // directions: the strip loads the next chapter at the end and the previous one at the top without
 // a jump; paged modes turn across chapter edges.
-import { ArrowLeft, Minus, Plus } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Maximize, Minimize, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { useLibraryInvalidate, useMangaDetail, useSetSettings, useSettings } from "../../api/queries";
@@ -49,6 +49,9 @@ export function ReaderScreen({ mangaId, chapterId }: { mangaId: number; chapterI
 
 function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof useMangaDetail>["data"]>; chapterId: number }) {
   const close = useUi((u) => u.closeReader);
+  const openReader = useUi((u) => u.openReader);
+  const immersive = useUi((u) => u.immersive);
+  const setImmersive = useUi((u) => u.setImmersive);
   const settings = useSettings();
   const save = useSetSettings();
   const invalidate = useLibraryInvalidate();
@@ -104,10 +107,32 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
     void api.setViewer(detail.manga.id, VIEWER[m]).catch(() => undefined);
   };
 
+  // Another chapter opens the reader afresh there, at the page it was left on.
+  const goChapter = (by: 1 | -1) => {
+    const next = seq[pos.chapter + by];
+    if (next) {
+      flush();
+      openReader({ mangaId: detail.manga.id, chapterId: next.id });
+    }
+  };
+  const hasPrev = pos.chapter > 0;
+  const hasNext = pos.chapter < seq.length - 1;
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
-      close();
+      // Out of full screen first, then out of the reader.
+      if (immersive) setImmersive(false);
+      else close();
+    } else if (e.key === "F11" || ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.altKey && !e.metaKey)) {
+      e.preventDefault();
+      setImmersive(!immersive);
+    } else if (e.key === "]" || (e.ctrlKey && e.key === "ArrowRight")) {
+      e.preventDefault();
+      goChapter(1);
+    } else if (e.key === "[" || (e.ctrlKey && e.key === "ArrowLeft")) {
+      e.preventDefault();
+      goChapter(-1);
     } else if (e.key === "+" || e.key === "=") {
       e.preventDefault();
       zoomBy(ZOOM_STEP);
@@ -138,11 +163,13 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
   return (
     <div ref={rootRef} className={s.reader} tabIndex={-1} onKeyDown={onKeyDown} onWheelCapture={onWheel}>
       <div className={s.top}>
-        <IconButton icon={ArrowLeft} label="Back" onClick={close} />
+        <IconButton icon={ArrowLeft} label="Back to the manga (Esc)" onClick={close} />
         <div className={s.titles}>
           <span className={s.manga}>{detail.manga.title}</span>
           <span className={s.chapterName}>{current?.name ?? ""}</span>
         </div>
+        <IconButton icon={ChevronLeft} label="Previous chapter ( [ )" size={18} disabled={!hasPrev} onClick={() => goChapter(-1)} />
+        <IconButton icon={ChevronRight} label="Next chapter ( ] )" size={18} disabled={!hasNext} onClick={() => goChapter(1)} />
         <IconButton icon={Minus} label="Zoom out" size={18} onClick={() => zoomBy(1 / ZOOM_STEP)} />
         <button type="button" className={`${s.ctl} ${s.zoomPct}`} title="Reset zoom" onClick={() => setZoom(1)}>
           {Math.round(zoom * 100)}%
@@ -153,12 +180,13 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
             {coverSolo ? "Cover · solo" : "Cover · pair"}
           </button>
         )}
-        <button type="button" className={`${s.ctl} ${s.ctlAccent}`} title="Fit" onClick={() => save.mutate({ readerFit: nextOf(FITS, fit) })}>
+        <button type="button" className={`${s.ctl} ${s.ctlAccent}`} title="How pages fit: click for the next one" onClick={() => save.mutate({ readerFit: nextOf(FITS, fit) })}>
           {FITS.find((f) => f.id === fit)?.label}
         </button>
-        <button type="button" className={`${s.ctl} ${s.ctlAccent}`} title="Reading mode" onClick={() => changeMode(nextOf(MODES, mode))}>
+        <button type="button" className={`${s.ctl} ${s.ctlAccent}`} title="Reading mode: click for the next one" onClick={() => changeMode(nextOf(MODES, mode))}>
           {MODES.find((m) => m.id === mode)?.label}
         </button>
+        <IconButton icon={immersive ? Minimize : Maximize} label={immersive ? "Leave full screen (F or Esc)" : "Full screen (F)"} size={18} onClick={() => setImmersive(!immersive)} />
       </div>
       <div className={s.area}>
         {seq.length === 0 ? <ErrorState message="This manga has no chapters to read." onRetry={close} /> : view}
