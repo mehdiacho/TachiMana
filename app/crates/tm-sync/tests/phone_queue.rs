@@ -174,6 +174,7 @@ async fn the_pc_reads_claims_releases_reports_and_sends() {
         where_: Where::Sent,
         device_id: "pc-id".into(),
         at: 7,
+        take: None,
     };
     assert_eq!(
         c.done(&peer, KEY, vec![ev]).await.unwrap(),

@@ -1,15 +1,16 @@
 // Linked devices (docs/rust-port/profiles-and-remote-downloads.md §2): this profile's link code as
 // a QR code and as text, linking to another device, and the list with Unlink. A linked device
 // talks to this one without the six-digit code.
-import { Laptop, Link2, RefreshCw, Smartphone, Unlink } from "lucide-react";
+import { Copy, Laptop, Link2, RefreshCw, Smartphone, Unlink } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/commands";
-import { keys, queryClient, useChangesLast, useLinks } from "../../api/queries";
+import { keys, queryClient, useChangesLast, useLinks, useTakeAsks } from "../../api/queries";
 import { OutlinedButton, Skeleton, TextButton } from "../../components/ui";
 import type { CmdError } from "../../gen/CmdError";
 import type { LinkDto } from "../../gen/LinkDto";
 import type { LinksDto } from "../../gen/LinksDto";
 import type { RoundDto } from "../../gen/RoundDto";
+import type { TakeAskDto } from "../../gen/TakeAskDto";
 import { useAction } from "../../hooks/useAction";
 import { relativeDate } from "../../lib/chapters";
 import { cleanCode, spacedCode } from "../../lib/sync";
@@ -108,8 +109,113 @@ function SyncNow() {
   );
 }
 
+type How = "merge" | "replace";
+
+/** The one-off copies offered on a linked device, worded for this PC. */
+export function copyChoices(other: string): { id: string; dir: "take" | "send"; how: How; title: string; text: string }[] {
+  return [
+    { id: "take-merge", dir: "take", how: "merge", title: `Merge ${other}'s library into this PC`, text: `What's missing here is added and what both have is brought up to date. Nothing here is removed.` },
+    { id: "take-replace", dir: "take", how: "replace", title: `Replace this PC's library with ${other}'s`, text: `Manga ${other} doesn't have leave this PC's library. This PC's library is saved to a backup file first.` },
+    { id: "send-merge", dir: "send", how: "merge", title: `Merge this PC's library into ${other}`, text: `${other} is asked first. Nothing there is removed.` },
+    { id: "send-replace", dir: "send", how: "replace", title: `Replace ${other}'s library with this PC's`, text: `${other} is asked first and saves a backup of its own library before it's replaced.` },
+  ];
+}
+
+/** "Copy once…" on a linked device: take its library, or send this PC's, merging or replacing. */
+function CopyOnce({ link, onClose }: { link: LinkDto; onClose: () => void }) {
+  const [chosen, setChosen] = useState<string | null>(null);
+  const run = useAction(
+    async (id: string) => {
+      const c = copyChoices(link.peerName).find((x) => x.id === id);
+      if (!c) return "";
+      if (c.dir === "take") return api.takeFrom(link.peerDeviceId, c.how);
+      await api.sendTo(link.peerDeviceId, c.how);
+      return `Asked ${link.peerName}. You'll see its answer here when it comes.`;
+    },
+    { ok: (text) => text, toastError: true },
+  );
+  const choice = copyChoices(link.peerName).find((c) => c.id === chosen);
+  return (
+    <div className={s.choice} role="group" aria-label={`Copy once with ${link.peerName}`}>
+      {copyChoices(link.peerName).map((c) => (
+        <label key={c.id} className={s.option}>
+          <span className={st.rowTitle}>
+            <input type="radio" name={`copy-${link.peerDeviceId}`} checked={chosen === c.id} onChange={() => setChosen(c.id)} /> {c.title}
+          </span>
+          <span className={st.rowDesc}>{c.text}</span>
+        </label>
+      ))}
+      <div className={st.buttons}>
+        <OutlinedButton
+          busy={run.pending}
+          disabled={!choice || run.pending}
+          onClick={async () => {
+            if (!choice) return;
+            const r = await run.run(choice.id);
+            if (r !== undefined) onClose();
+          }}
+        >
+          {run.pending ? (choice?.dir === "take" ? "Copying…" : "Asking…") : choice?.how === "replace" ? "Replace" : "Copy"}
+        </OutlinedButton>
+        <TextButton onClick={onClose}>Cancel</TextButton>
+      </div>
+    </div>
+  );
+}
+
+/** "Pixel wants to send its library here": accept or decline. */
+export function askText(a: TakeAskDto): string {
+  return a.how === "replace"
+    ? `${a.peerName} asks to replace this PC's ${a.libraryCount} manga with its library. This PC's library is saved to a backup file first.`
+    : `${a.peerName} asks to merge its library into this PC. Nothing here is removed.`;
+}
+
+function TakeAsk({ ask }: { ask: TakeAskDto }) {
+  const [remember, setRemember] = useState(false);
+  const answer = useAction(
+    async (accept: boolean) => {
+      await api.takeAnswer(ask.requestId, accept, remember);
+      await queryClient.invalidateQueries({ queryKey: keys.takeAsks });
+      return accept;
+    },
+    { ok: (accept) => (accept ? `Copying ${ask.peerName}'s library…` : `Declined. ${ask.peerName} is told.`), toastError: true },
+  );
+  return (
+    <div className={s.card} role="alert">
+      <div className={s.deviceName}>{ask.peerName} wants to send its library here</div>
+      <div className={st.rowDesc}>{askText(ask)}</div>
+      {ask.how === "merge" && (
+        <label className={st.rowDesc}>
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Don't ask again when {ask.peerName} merges
+        </label>
+      )}
+      <div className={st.buttons}>
+        <OutlinedButton busy={answer.pending} onClick={() => void answer.run(true)}>
+          {ask.how === "replace" ? "Replace" : "Merge"}
+        </OutlinedButton>
+        <TextButton disabled={answer.pending} onClick={() => void answer.run(false)}>
+          Decline
+        </TextButton>
+      </div>
+    </div>
+  );
+}
+
+function TakeAsks() {
+  const q = useTakeAsks();
+  if (!q.data || q.data.length === 0) return null;
+  return (
+    <>
+      {q.data.map((a) => (
+        <TakeAsk key={a.requestId} ask={a} />
+      ))}
+    </>
+  );
+}
+
 function LinkRow({ link }: { link: LinkDto }) {
   const [confirm, setConfirm] = useState(false);
+  const [copying, setCopying] = useState(false);
   const unlink = useAction(
     async () => {
       const links = await api.unlinkDevice(link.peerDeviceId);
@@ -128,6 +234,7 @@ function LinkRow({ link }: { link: LinkDto }) {
           {confirm ? "It will need the pairing code again to link." : linkLine(link)}
         </span>
         {!confirm && <ModeChoice link={link} />}
+        {copying && <CopyOnce link={link} onClose={() => setCopying(false)} />}
       </div>
       <div className={st.buttons}>
         {confirm ? (
@@ -138,9 +245,16 @@ function LinkRow({ link }: { link: LinkDto }) {
             <TextButton onClick={() => setConfirm(false)}>Cancel</TextButton>
           </>
         ) : (
-          <TextButton onClick={() => setConfirm(true)} aria-label={`Unlink ${link.peerName}`}>
-            <Unlink size={16} /> Unlink
-          </TextButton>
+          <>
+            {!copying && (
+              <TextButton onClick={() => setCopying(true)} aria-label={`Copy once with ${link.peerName}`}>
+                <Copy size={16} /> Copy once…
+              </TextButton>
+            )}
+            <TextButton onClick={() => setConfirm(true)} aria-label={`Unlink ${link.peerName}`}>
+              <Unlink size={16} /> Unlink
+            </TextButton>
+          </>
         )}
       </div>
     </div>
@@ -344,6 +458,7 @@ export function LinkedDevices() {
         </div>
       </div>
       {d.refused && <RefusedOffer refused={d.refused} empty={d.empty} />}
+      <TakeAsks />
       <div role="list" aria-label="Linked devices">
         {d.links.length === 0 ? (
           <div className={s.searching}>No devices linked to this profile yet.</div>

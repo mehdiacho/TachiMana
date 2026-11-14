@@ -1,5 +1,5 @@
 # Rust port status
-Updated: 2026-11-14 by Claude (sync step C: change journal, who leads, NAS password from phone backups)
+Updated: 2026-11-14 by Claude (copy a library once between linked devices, who-leads notice, bookmarks journalled)
 Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). 0.1.2 released (restore progress). Now: UI states everywhere and an in-place updater (feat/ui-states), then 0.1.3. The Kotlin app stays until Mehdi has tried the Windows installer
 
 Done:
@@ -356,12 +356,31 @@ files. The computer side is built:
 Checked with two copies of the app under Xvfb: a phone-style entry pushed to one reached the
 other by itself, a library removal on the leader reached the follower within seconds, changing
 who leads on one changed it on the other, and a synthetic phone backup's NAS password unlocked
-with the right passphrase and was refused with a wrong one. Not done: `POST /roles/take` and the
-questions after scanning (roles/1), a notice when the other device changes who leads, restores
-writing journal entries, bookmarks from the computer (it has no bookmark action yet).
+with the right passphrase and was refused with a wrong one. Shipped as 0.1.15 (PR 38).
 
-Next step: the phone builds its half (mihon#16, #17); then `roles/take` and the questions after
-scanning. Have Mehdi try merge + "Download all here" with the real phone.
+COPY ONCE (branch `feat/take-once`, 0.1.16): the rest of roles/1 on the computer.
+- `POST /roles/take` (`tm-sync` server and `SyncClient::ask_take`): a repeated request id is
+  answered but not run again; the result goes into the outbox as a `take` done event.
+- `src-tauri/src/take.rs`: "Copy once…" on a linked device offers merge or replace, either way.
+  Taking copies their library here (`pull/1`); replace first saves this library to
+  `backups/before-<device>-<time>.tachibk` in the profile folder, then takes out of the library
+  what the other device doesn't have (journalled). Sending asks the other device, which shows a
+  card (Merge or Replace / Decline, and "Don't ask again" for merges, stored as `autoMerge` on the
+  link); the asking side reads the answer from the other's outbox every 5 s for 15 minutes and
+  shows it. This side's push cursor jumps to its head before a take so older entries don't undo
+  it; the pull cursor is left as it is (the spec says both).
+- A notice when the other device changes who leads (`PUT /roles` hook).
+- Bookmarks: "Bookmark" / "Remove the bookmark" on a chapter's menu, a mark in the chapter list,
+  journalled as `chapter.bookmark`.
+- Fixed on the way: a restore never put a manga back into the library when it was known here but
+  taken out; now a manga in the backup's library comes back in (nothing leaves the library).
+Checked with two copies of the app under Xvfb: replace sent from C and accepted on D (backup file
+written, D's extra manga left the library, C's came back in), merge taken from D, a decline and an
+accept shown on C, "Don't ask again" letting the next merge run without a card, a bookmark on C
+reaching D by itself, and "Both ways" on C showing the notice on D. Not done: the questions after
+scanning (roles/1), restores writing journal entries.
+
+Next step: the phone builds its half (mihon#16, #17); then the questions after scanning. Have Mehdi try merge + "Download all here" with the real phone.
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),
 and "sync from the original device" over the existing pairing when it is reachable, with Download

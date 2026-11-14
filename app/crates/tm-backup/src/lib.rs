@@ -596,6 +596,23 @@ fn import_manga(
     let manga_id = match &existing {
         Some(m) => {
             s.manga_updated += 1;
+            // A restore adds to the library: a manga known here but out of the library comes
+            // back in when the backup has it there. Nothing here leaves the library.
+            if bm.favorite() && !m.favorite {
+                tm_db::update_manga_tx(
+                    c,
+                    m.id,
+                    &tm_db::MangaUpdate {
+                        favorite: Some(true),
+                        date_added: Some(if bm.date_added != 0 {
+                            bm.date_added
+                        } else {
+                            now
+                        }),
+                        ..Default::default()
+                    },
+                )?;
+            }
             m.id
         }
         None => {

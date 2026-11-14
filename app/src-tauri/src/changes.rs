@@ -228,6 +228,21 @@ pub fn chapter_read(state: &AppState, chapter_id: i64) {
     );
 }
 
+/// The chapter was bookmarked or unbookmarked.
+pub fn chapter_bookmark(state: &AppState, chapter_id: i64) {
+    let Ok(Some(ch)) = state.db.chapter(chapter_id) else {
+        return;
+    };
+    let Ok(Some(m)) = state.db.manga(ch.manga_id) else {
+        return;
+    };
+    state.sync.changes.write(
+        j::CHAPTER_BOOKMARK,
+        chapter_target(&m, &ch.url),
+        json!({"bookmark": ch.bookmark}),
+    );
+}
+
 /// The chapter was read now. Reading time is not measured on the computer, so it adds none.
 pub fn history(state: &AppState, chapter_id: i64) {
     let Ok(Some(ch)) = state.db.chapter(chapter_id) else {
@@ -481,7 +496,7 @@ pub struct RoundDto {
     pub missed: Vec<String>,
 }
 
-fn peer_of(state: &AppState, link: &Link) -> Option<PeerDevice> {
+pub(crate) fn peer_of(state: &AppState, link: &Link) -> Option<PeerDevice> {
     if let Some(p) = state.sync.peer(&link.peer_device_id) {
         return Some(p);
     }

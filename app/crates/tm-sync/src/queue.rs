@@ -121,6 +121,47 @@ pub struct DoneEvent {
     pub where_: Where,
     pub device_id: String,
     pub at: i64,
+    /// Set on the answer to a one-off copy (`roles/1`, `POST /roles/take`) instead of a chapter.
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub take: Option<TakeResult>,
+}
+
+/// How a one-off copy asked for with `POST /roles/take` ended (`roles/1`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TakeResult {
+    /// Always `"take"`.
+    pub kind: String,
+    pub request_id: String,
+    pub ok: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+impl DoneEvent {
+    /// The done event for a one-off copy. It names no chapter.
+    pub fn take(device_id: &str, request_id: &str, ok: bool, message: Option<String>) -> Self {
+        Self {
+            chapter: ChapterRef {
+                source_id: 0,
+                manga_url: String::new(),
+                chapter_url: String::new(),
+            },
+            event_id: new_event_id(),
+            where_: Where::Device,
+            device_id: device_id.to_owned(),
+            at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+                .unwrap_or(0),
+            take: Some(TakeResult {
+                kind: "take".into(),
+                request_id: request_id.to_owned(),
+                ok,
+                message,
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -203,7 +244,8 @@ impl Outbox {
     pub fn add(&self, peer: &str, event: DoneEvent) {
         let mut map = self.lock();
         let list = map.entry(peer.to_owned()).or_default();
-        list.retain(|e| e.chapter != event.chapter);
+        let request = |e: &DoneEvent| e.take.as_ref().map(|t| t.request_id.clone());
+        list.retain(|e| e.chapter != event.chapter || request(e) != request(&event));
         list.push(event);
         if list.len() > MAX_OUTBOX {
             let extra = list.len() - MAX_OUTBOX;
@@ -262,7 +304,29 @@ mod tests {
             where_: Where::Device,
             device_id: "pc".into(),
             at: 1,
+            take: None,
         }
+    }
+
+    #[test]
+    fn a_take_event_has_the_roles_shape_and_does_not_replace_another() {
+        let e = DoneEvent::take("pc", "r1", false, Some("Declined".into()));
+        let v = serde_json::to_value(&e).unwrap();
+        assert_eq!(v["kind"], "take");
+        assert_eq!(v["requestId"], "r1");
+        assert_eq!(v["ok"], false);
+        assert_eq!(v["message"], "Declined");
+        let back: DoneEvent = serde_json::from_value(v).unwrap();
+        assert_eq!(back, e);
+        // A chapter event carries none of it.
+        let c = serde_json::to_value(ev("e1", "/c")).unwrap();
+        assert!(c.get("kind").is_none());
+
+        let dir = tempfile::tempdir().unwrap();
+        let o = Outbox::open(&dir.path().join("o.json"));
+        o.add("phone", DoneEvent::take("pc", "r1", true, None));
+        o.add("phone", DoneEvent::take("pc", "r2", true, None));
+        assert_eq!(o.pending("phone").len(), 2);
     }
 
     #[test]

@@ -26,6 +26,24 @@ pub struct RolesWire {
     pub mode_at: i64,
 }
 
+/// How a one-off copy combines the two libraries (`POST /roles/take`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum How {
+    /// Nothing is removed; the sender's values win where both have one.
+    Merge,
+    /// The receiver's library becomes the sender's, after the receiver saves a backup of its own.
+    Replace,
+}
+
+/// The body of `POST /roles/take`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TakeWire {
+    pub how: How,
+    pub request_id: String,
+}
+
 impl Mode {
     /// The wire name when this device answers (it is the server).
     pub fn as_server(self) -> &'static str {

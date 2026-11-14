@@ -5,6 +5,7 @@ import type { ProfileInput } from "../gen/ProfileInput";
 import type { ProfilesDto } from "../gen/ProfilesDto";
 import type { LinkDto } from "../gen/LinkDto";
 import type { RoundDto } from "../gen/RoundDto";
+import type { TakeAskDto } from "../gen/TakeAskDto";
 import type { LinkOutcomeDto } from "../gen/LinkOutcomeDto";
 import type { LinksDto } from "../gen/LinksDto";
 import type { CacheUsageDto } from "../gen/CacheUsageDto";
@@ -110,6 +111,7 @@ export const api = {
   chapterPages: (chapterId: number) => call<ChapterPagesDto>("chapter_pages", { chapterId }),
   saveProgress: (chapterId: number, page: number, total: number) =>
     call<void>("save_progress", { chapterId, page, total }),
+  setChapterBookmark: (chapterId: number, bookmark: boolean) => call<void>("set_chapter_bookmark", { chapterId, bookmark }),
   setChapterRead: (chapterId: number, read: boolean) =>
     call<void>("set_chapter_read", { chapterId, read }),
   settingsGet: () => call<UiSettings>("settings_get"),
@@ -178,6 +180,13 @@ export const api = {
   restoreDismiss: () => call<void>("restore_dismiss"),
   /** Unlocks the NAS password a phone backup sealed with a passphrase, and saves it. */
   restoreNasPassword: (passphrase: string) => call<void>("restore_nas_password", { passphrase }),
+  /** Linked devices asking to send their library here (roles/1). */
+  takeAsks: () => call<TakeAskDto[]>("take_asks"),
+  takeAnswer: (requestId: string, accept: boolean, remember: boolean) => call<void>("take_answer", { requestId, accept, remember }),
+  /** Copy a linked device's library here once; answers what happened. */
+  takeFrom: (peerDeviceId: string, how: "merge" | "replace") => call<string>("take_from", { peerDeviceId, how }),
+  /** Ask a linked device to take this PC's library once; it answers later as a notice. */
+  sendTo: (peerDeviceId: string, how: "merge" | "replace") => call<void>("send_to", { peerDeviceId, how }),
 
   // AniList. Account changes arrive as `anilist` events; a push after reading as `track-changed`.
   anilistAccount: () => call<AniListAccountDto>("anilist_account"),

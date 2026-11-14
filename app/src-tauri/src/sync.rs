@@ -49,6 +49,8 @@ pub struct Sync {
     pub phone: crate::phone_queue::PhoneQueue,
     /// The change journal and the background sync with linked devices (`changes/1`).
     pub changes: crate::changes::ChangeLog,
+    /// Linked devices asking to send their library here, waiting for the person (`roles/1`).
+    pub takes: crate::take::Takes,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -78,6 +80,7 @@ impl Sync {
             pulling: AtomicBool::new(false),
             phone: crate::phone_queue::PhoneQueue::open(data_dir),
             changes,
+            takes: crate::take::Takes::default(),
         }
     }
 
@@ -453,6 +456,8 @@ pub fn init(app: &AppHandle) {
                 refused: Arc::clone(&state.sync.refused),
                 outbox: Arc::clone(&state.sync.phone.outbox),
                 changes: crate::changes::server_changes(&app),
+                take: Some(crate::take::server_hook(&app)),
+                roles_changed: Some(crate::take::roles_hook(&app)),
             });
         let started =
             SyncServer::start_with(state.sync.identity.clone(), local, backup, None, linking).await;

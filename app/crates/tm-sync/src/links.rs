@@ -36,6 +36,10 @@ pub struct Link {
     /// When `mode` was last changed, on the device that changed it (0 = never).
     #[serde(default)]
     pub mode_at: i64,
+    /// The person agreed once that this device may merge its library in here whenever it asks
+    /// (`POST /roles/take` with `merge`), so it is not asked again.
+    #[serde(default)]
+    pub auto_merge: bool,
 }
 
 impl std::fmt::Debug for Link {
@@ -269,6 +273,7 @@ mod tests {
             last_seen: 0,
             mode: crate::roles::Mode::Both,
             mode_at: 0,
+            auto_merge: false,
         }
     }
 

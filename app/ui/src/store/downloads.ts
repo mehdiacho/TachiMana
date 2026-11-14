@@ -9,7 +9,9 @@ import type { AniListAccountDto } from "../gen/AniListAccountDto";
 import type { UpdateStatusDto } from "../gen/UpdateStatusDto";
 import type { UploadJobDto } from "../gen/UploadJobDto";
 import type { RoundDto } from "../gen/RoundDto";
+import type { TakeAskDto } from "../gen/TakeAskDto";
 import { newlyDone } from "../lib/downloads";
+import { toast } from "./activity";
 
 interface DownloadsState {
   jobs: DownloadJobDto[];
@@ -47,6 +49,13 @@ export const useDownloads = create<DownloadsState>((set, get) => {
       void listen<AniListAccountDto>("anilist", (e) => queryClient.setQueryData(keys.anilist, e.payload)).catch(() => undefined);
       void listen<UpdateStatusDto>("update", (e) => queryClient.setQueryData(keys.update, e.payload)).catch(() => undefined);
       void listen<number>("track-changed", (e) => void queryClient.invalidateQueries({ queryKey: keys.track(e.payload) })).catch(() => undefined);
+      // Short news from the sync side: a one-off copy finished, the other device changed who leads.
+      void listen<string>("notice", (e) => toast.info(e.payload)).catch(() => undefined);
+      void listen("links-changed", () => void queryClient.invalidateQueries({ queryKey: keys.links })).catch(() => undefined);
+      void listen<TakeAskDto>("take-asked", (e) => {
+        void queryClient.invalidateQueries({ queryKey: keys.takeAsks });
+        toast.info(`${e.payload.peerName} wants to send its library here. Answer on the Sync screen.`);
+      }).catch(() => undefined);
       void listen<RoundDto>("changes-round", (e) => {
         queryClient.setQueryData(keys.changesLast, e.payload);
         void queryClient.invalidateQueries({ queryKey: keys.links });

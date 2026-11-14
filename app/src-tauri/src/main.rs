@@ -15,6 +15,7 @@ mod profiles;
 mod protocol;
 mod state;
 mod sync;
+mod take;
 mod track;
 mod update;
 
@@ -91,6 +92,10 @@ fn main() {
             sync::restore_nas_password,
             changes::changes_last,
             changes::link_set_mode,
+            take::take_asks,
+            take::take_answer,
+            take::take_from,
+            take::send_to,
             commands::app_info,
             commands::open_folder,
             profiles::profiles_list,
@@ -121,6 +126,7 @@ fn main() {
             commands::chapter_pages,
             commands::save_progress,
             commands::set_chapter_read,
+            commands::set_chapter_bookmark,
             commands::settings_get,
             commands::settings_set,
             commands::cache_usage,

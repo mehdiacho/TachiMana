@@ -390,6 +390,14 @@ pub fn save_progress(
 }
 
 #[tauri::command]
+pub fn set_chapter_bookmark(state: State<'_, AppState>, chapter_id: i64, bookmark: bool) -> R<()> {
+    chapter_or_404(&state, chapter_id)?;
+    state.db.set_bookmark(chapter_id, bookmark)?;
+    crate::changes::chapter_bookmark(&state, chapter_id);
+    Ok(())
+}
+
+#[tauri::command]
 pub fn set_chapter_read(state: State<'_, AppState>, chapter_id: i64, read: bool) -> R<()> {
     state.db.set_read(chapter_id, read)?;
     crate::changes::chapter_read(&state, chapter_id);

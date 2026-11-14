@@ -15,6 +15,7 @@ export const keys = {
   profiles: ["profiles"] as const,
   links: ["links"] as const,
   changesLast: ["changes", "last"] as const,
+  takeAsks: ["takes"] as const,
   library: ["library"] as const,
   categories: ["categories"] as const,
   detail: (id: number) => ["detail", id] as const,
@@ -43,6 +44,7 @@ export const useAniList = () => useQuery({ queryKey: keys.anilist, queryFn: api.
 export const useTrack = (mangaId: number) => useQuery({ queryKey: keys.track(mangaId), queryFn: () => api.trackGet(mangaId) });
 export const useSyncStatus = () => useQuery({ queryKey: keys.sync, queryFn: api.syncStatus, staleTime: Infinity });
 // Polled gently: a phone can link to this PC at any time.
+export const useTakeAsks = () => useQuery({ queryKey: keys.takeAsks, queryFn: api.takeAsks });
 export const useChangesLast = () => useQuery({ queryKey: keys.changesLast, queryFn: api.changesLast });
 export const useLinks = () => useQuery({ queryKey: keys.links, queryFn: api.linksInfo, refetchInterval: 15_000 });
 export const useProfiles = () => useQuery({ queryKey: keys.profiles, queryFn: api.profilesList, staleTime: Infinity });
