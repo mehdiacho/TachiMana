@@ -592,7 +592,36 @@ pub async fn load_online_chapter(
 }
 
 pub async fn chapter_pages(state: &AppState, manga: &Manga, ch: &Chapter) -> R<ChapterPagesDto> {
-    let open = load_online_chapter(state, manga, ch).await?;
+    let open = match load_online_chapter(state, manga, ch).await {
+        Ok(open) => open,
+        Err(first) => {
+            // Sources move chapters (a new domain, a new url format), and some extensions then
+            // refuse the old url with "Refresh Chapter List". Refresh the chapter list once,
+            // which moves the stored chapter to its new url, and try again.
+            tracing::info!(
+                "pages of {} failed ({}); refreshing the chapter list",
+                ch.url,
+                first.message
+            );
+            let refreshed = matches!(
+                refresh(state, manga.source, &manga.url, &manga.title).await,
+                Ok(RefreshDto { error: None, .. })
+            );
+            if !refreshed {
+                return Err(first);
+            }
+            match state.db.chapter(ch.id)? {
+                Some(now) if now.url != ch.url => load_online_chapter(state, manga, &now).await?,
+                Some(_) => return Err(first),
+                None => {
+                    return Err(CmdError::new(
+                        "source",
+                        "The source no longer lists this chapter. Go back and pick it from the refreshed list.",
+                    ))
+                }
+            }
+        }
+    };
     Ok(ChapterPagesDto {
         chapter_id: ch.id,
         // Sizes are unknown until an image loads; the strip corrects heights as pages arrive.

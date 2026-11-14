@@ -1,7 +1,7 @@
 //! Library operations, ported from `desktop/.../data/LibraryRepo.kt` and `CategoryRepo.kt`.
 //! Each function runs the Kotlin app's own named query (see [`crate::queries`]).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use rusqlite::{named_params, Connection, OptionalExtension};
 
@@ -109,6 +109,67 @@ pub(crate) fn chapters_of(c: &Connection, manga_id: i64) -> Result<Vec<Chapter>>
     Ok(v)
 }
 
+/// Whether `old` (a stored row the source no longer lists) is `new` at another address: the
+/// same chapter number when the source numbers it, otherwise the same name.
+fn same_chapter(old: &Chapter, new: &SourceChapter) -> bool {
+    same(old.chapter_number, &old.name, new.chapter_number, &new.name)
+}
+
+/// One chapter under two numbers and names. A negative number means the source could not
+/// number it, and then only an identical, non-empty name counts.
+fn same(a_number: f64, a_name: &str, b_number: f64, b_name: &str) -> bool {
+    if a_number >= 0.0 && b_number >= 0.0 {
+        (a_number - b_number).abs() < 1e-6
+    } else {
+        !a_name.trim().is_empty() && a_name.trim() == b_name.trim()
+    }
+}
+
+/// Passes a removed chapter's read mark, bookmark, page and history on to a remaining chapter
+/// that is the same chapter (`kept`: id, number, name). Only ever adds: an unread mark or an
+/// earlier page never overwrites what the remaining chapter has.
+fn hand_on(c: &Connection, old: &Chapter, kept: &[(i64, f64, String)]) -> Result<()> {
+    if !old.read && !old.bookmark && old.last_page_read <= 0 {
+        return Ok(());
+    }
+    let Some((to, _, _)) = kept
+        .iter()
+        .find(|(_, number, name)| same(old.chapter_number, &old.name, *number, name))
+    else {
+        return Ok(());
+    };
+    let Some(target) = chapter_by_id(c, *to)? else {
+        return Ok(());
+    };
+    update_chapter(
+        c,
+        target.id,
+        &ChapterUpdate {
+            read: (old.read && !target.read).then_some(true),
+            bookmark: (old.bookmark && !target.bookmark).then_some(true),
+            last_page_read: (!target.read && old.last_page_read > target.last_page_read)
+                .then_some(old.last_page_read),
+            ..Default::default()
+        },
+    )?;
+    // History is one row per chapter; move it when the remaining chapter has none.
+    c.execute(
+        "UPDATE history SET history_chapter_id = ?1 WHERE history_chapter_id = ?2 \
+         AND NOT EXISTS (SELECT 1 FROM history WHERE history_chapter_id = ?1)",
+        rusqlite::params![target.id, old.id],
+    )?;
+    Ok(())
+}
+
+fn chapter_by_id(c: &Connection, id: i64) -> Result<Option<Chapter>> {
+    Ok(c.query_row(
+        q("chapters", "getChaptersById")?,
+        named_params! {":id": id},
+        Chapter::from_row,
+    )
+    .optional()?)
+}
+
 /// A new chapter row (`chapters.insert`).
 pub(crate) fn insert_chapter(
     c: &Connection,
@@ -132,6 +193,8 @@ pub(crate) fn insert_chapter(
 /// Partial chapter update (`chapters.update`).
 #[derive(Debug, Default, Clone)]
 pub struct ChapterUpdate {
+    /// A new url, for a chapter the source moved (same chapter, new address).
+    pub url: Option<String>,
     pub name: Option<String>,
     pub scanlator: Option<String>,
     pub read: Option<bool>,
@@ -147,7 +210,7 @@ pub(crate) fn update_chapter(c: &Connection, id: i64, u: &ChapterUpdate) -> Resu
     c.execute(
         q("chapters", "update")?,
         named_params! {
-            ":mangaId": None::<i64>, ":url": None::<String>, ":name": u.name,
+            ":mangaId": None::<i64>, ":url": u.url, ":name": u.name,
             ":scanlator": u.scanlator, ":read": u.read, ":bookmark": u.bookmark,
             ":lastPageRead": u.last_page_read, ":pagesLeft": u.pages_left,
             ":chapterNumber": u.chapter_number, ":sourceOrder": u.source_order,
@@ -219,23 +282,47 @@ impl Db {
             .collect())
     }
 
-    /// `LibraryRepo.syncChapters`: insert chapters missing by url, refresh order/name/date of
-    /// existing ones, never touch read state. `fresh` is newest first. Returns how many were added.
+    /// Brings a manga's chapters in line with the source's list (`fresh`, newest first), as
+    /// Mihon's `SyncChaptersWithSource` does. Returns how many chapters are new.
+    ///
+    /// - A chapter the source still lists (same url) keeps its row and its read state; its name,
+    ///   order and dates are refreshed.
+    /// - A chapter the source no longer lists is removed, unless the source moved it: when a new
+    ///   url has the same chapter number (or, for unnumbered chapters, the same name) as one that
+    ///   disappeared, the old row takes the new url. Sources that change domain or url format
+    ///   (and extensions that then refuse the old urls with "Refresh Chapter List") keep the
+    ///   reading state, history and row id that way.
+    /// - A removed chapter that was read, bookmarked or started hands that on to a remaining
+    ///   chapter with the same number, so a refresh never turns read chapters unread.
+    /// - An empty list removes nothing: a source that answers with nothing is more likely broken
+    ///   than empty.
     pub fn sync_chapters(&self, manga_id: i64, fresh: &[SourceChapter]) -> Result<usize> {
         let now = now_ms();
         self.write(|c| {
             let existing = chapters_of(c, manga_id)?;
+            let fresh_urls: HashSet<&str> = fresh.iter().map(|ch| ch.url.as_str()).collect();
             let by_url: HashMap<&str, &Chapter> =
                 existing.iter().map(|ch| (ch.url.as_str(), ch)).collect();
+            // Rows whose url the source no longer lists, oldest claim first.
+            let mut gone: Vec<&Chapter> = if fresh.is_empty() {
+                Vec::new()
+            } else {
+                existing
+                    .iter()
+                    .filter(|ch| !fresh_urls.contains(ch.url.as_str()))
+                    .collect()
+            };
             let mut added = 0usize;
+            // Every row that stays, with its number, for handing on read state below.
+            let mut kept: Vec<(i64, f64, String)> = Vec::new();
             for (index, ch) in fresh.iter().enumerate() {
                 let order = i64::try_from(index).unwrap_or(i64::MAX);
-                match by_url.get(ch.url.as_str()) {
-                    None => {
-                        insert_chapter(c, manga_id, ch, order, now)?;
-                        added += 1;
-                    }
-                    Some(ex) if ex.source_order != order || ex.name != ch.name => {
+                if let Some(ex) = by_url.get(ch.url.as_str()) {
+                    if ex.source_order != order
+                        || ex.name != ch.name
+                        || ex.scanlator != ch.scanlator
+                        || ex.date_upload != ch.date_upload
+                    {
                         update_chapter(
                             c,
                             ex.id,
@@ -249,8 +336,38 @@ impl Db {
                             },
                         )?;
                     }
-                    Some(_) => {}
+                    kept.push((ex.id, ch.chapter_number, ch.name.clone()));
+                    continue;
                 }
+                // Not here by url: the same chapter at a new address, or a new chapter.
+                if let Some(pos) = gone.iter().position(|old| same_chapter(old, ch)) {
+                    let old = gone.remove(pos);
+                    update_chapter(
+                        c,
+                        old.id,
+                        &ChapterUpdate {
+                            url: Some(ch.url.clone()),
+                            name: Some(ch.name.clone()),
+                            scanlator: ch.scanlator.clone(),
+                            chapter_number: Some(ch.chapter_number),
+                            source_order: Some(order),
+                            date_upload: Some(ch.date_upload),
+                            ..Default::default()
+                        },
+                    )?;
+                    kept.push((old.id, ch.chapter_number, ch.name.clone()));
+                } else {
+                    let id = insert_chapter(c, manga_id, ch, order, now)?;
+                    kept.push((id, ch.chapter_number, ch.name.clone()));
+                    added += 1;
+                }
+            }
+            for old in gone {
+                hand_on(c, old, &kept)?;
+                c.execute(
+                    q("chapters", "delete")?,
+                    named_params! {":chapterId": old.id},
+                )?;
             }
             Ok(added)
         })
