@@ -40,6 +40,26 @@ pub struct HelperStatusDto {
     /// A helper zip is published for this computer, so Download can work.
     pub can_download: bool,
     pub busy: bool,
+    /// The app version an installed helper was downloaded for; `file` when it came from a zip the
+    /// user picked; empty when unknown (installed before 0.1.9) or not installed.
+    pub version: String,
+}
+
+/// Holds the app version the installed helper was downloaded for (see [`HelperStatusDto::version`]).
+const VERSION_FILE: &str = "helper-version";
+/// Marks a helper the user installed from a file; it is never replaced automatically.
+const FROM_FILE: &str = "file";
+
+fn installed_version(state: &AppState) -> String {
+    std::fs::read_to_string(state.paths.ext_host_dir().join(VERSION_FILE))
+        .map(|s| s.trim().chars().take(64).collect())
+        .unwrap_or_default()
+}
+
+fn mark_version(state: &AppState, version: &str) {
+    if let Err(e) = std::fs::write(state.paths.ext_host_dir().join(VERSION_FILE), version) {
+        tracing::warn!("couldn't record the helper's version: {e}");
+    }
 }
 
 pub fn status_of(state: &AppState) -> HelperStatusDto {
@@ -49,6 +69,11 @@ pub fn status_of(state: &AppState) -> HelperStatusDto {
         folder: folder.to_string_lossy().into_owned(),
         can_download: platform().is_some(),
         busy: INSTALLING.load(Ordering::Relaxed),
+        version: if source == "installed" {
+            installed_version(state)
+        } else {
+            String::new()
+        },
     }
 }
 
@@ -61,8 +86,8 @@ fn words(e: InstallError) -> CmdError {
     CmdError::new("helper", format!("Couldn't install the helper: {e}"))
 }
 
-/// Stops a running host, then unpacks `zip` into the data folder.
-async fn install(app: &AppHandle, zip: PathBuf) -> R<HelperStatusDto> {
+/// Stops a running host, then unpacks `zip` into the data folder and records `version` for it.
+async fn install(app: &AppHandle, zip: PathBuf, version: &str) -> R<HelperStatusDto> {
     if INSTALLING.swap(true, Ordering::AcqRel) {
         return Err(CmdError::new(
             "busy",
@@ -80,6 +105,7 @@ async fn install(app: &AppHandle, zip: PathBuf) -> R<HelperStatusDto> {
     match r {
         Ok(Ok(n)) => {
             tracing::info!("helper installed ({n} files)");
+            mark_version(&state, version);
             Ok(status_of(&state))
         }
         Ok(Err(e)) => Err(words(e)),
@@ -101,7 +127,7 @@ pub async fn helper_install_file(app: AppHandle) -> R<Option<HelperStatusDto>> {
     let path = file
         .into_path()
         .map_err(|e| CmdError::new("invalid", format!("That file can't be opened: {e}")))?;
-    install(&app, path).await.map(Some)
+    install(&app, path, FROM_FILE).await.map(Some)
 }
 
 /// Where the helper zips are: the `extHostBaseUrl` setting when set (a folder holding
@@ -178,7 +204,35 @@ pub async fn helper_download(app: AppHandle) -> R<HelperStatusDto> {
             ),
             other => CmdError::new("helper", other.to_string()),
         })?;
-    let r = install(&app, zip.clone()).await;
+    let r = install(&app, zip.clone(), CURRENT).await;
     let _ = std::fs::remove_file(&zip);
     r
+}
+
+/// The helper carries the sources' network code, so it has to move with the app: after an app
+/// update, a helper that was downloaded for another version is replaced with this version's.
+/// One the user installed from a file, or one that isn't in the data folder, is left alone.
+pub fn update_if_stale(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let status = status_of(&state);
+    if status.source != "installed" || !status.can_download {
+        return;
+    }
+    if status.version == CURRENT || status.version == FROM_FILE {
+        return;
+    }
+    tracing::info!(
+        from = %status.version,
+        to = CURRENT,
+        "the extension helper is from another version; updating it"
+    );
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        match helper_download(app.clone()).await {
+            Ok(_) => {
+                let _ = app.emit("helper-updated", CURRENT);
+            }
+            Err(e) => tracing::warn!("couldn't update the extension helper: {}", e.message),
+        }
+    });
 }

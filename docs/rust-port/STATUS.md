@@ -273,7 +273,14 @@ Fixes from Mehdi's try of 0.1.7 on Windows (2026-11-13, branch `fix/challenge-wi
   after any attempt that didn't end in a clearance. The window carries a line saying what to do.
   Compiled in CI only; whether the retry then gets the image is not known.
 
-Next step: 0.1.7 is out (2026-11-06). Have Mehdi try merge + "Download all here" with the real phone, and
+0.1.8 (2026-11-13) carried those fixes, but Mehdi still saw the stuck challenge windows: the
+fix is in the ext-host jar, and the installed helper never updated with the app. Branch
+`fix/helper-updates`: a downloaded helper records the app version it was built for
+(`<data>/ext-host/helper-version`) and is replaced at start-up when it is from another version
+(`helper::update_if_stale`); one installed from a file is left alone. Seen in the container: a
+helper with no version file was replaced by the release's zip at launch.
+
+Next step: have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).
 Still open from Mehdi 2026-11-03: back up the NAS
 connection (credentials encrypted) and NAS state (dated; the user chooses to use it or recheck),

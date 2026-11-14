@@ -74,6 +74,8 @@ fn main() {
             sync::init(app.handle());
             // One quiet update check a little after start-up.
             update::init(app.handle());
+            // After an app update, bring the extension helper to this version too.
+            helper::update_if_stale(app.handle());
             // Stop the extension host when it has been idle for a while; it restarts on demand.
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
