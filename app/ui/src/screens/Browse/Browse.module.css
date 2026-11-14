@@ -204,3 +204,19 @@ button.item:hover,
   border-radius: var(--tm-radius-md);
   padding: var(--tm-space-md) var(--tm-space-base);
 }
+
+.hiddenNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+  padding: var(--tm-space-lg) var(--tm-space-md);
+}
+.linkBtn {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-accent);
+}
+.linkBtn:hover {
+  text-decoration: underline;
+}

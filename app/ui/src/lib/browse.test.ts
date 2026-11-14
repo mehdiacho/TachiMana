@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogEntryDto } from "../gen/CatalogEntryDto";
 import type { SourceDto } from "../gen/SourceDto";
-import { appendPage, catalogLangs, groupCatalog, groupSources, initials, langName } from "./browse";
+import { appendPage, catalogLangs, groupCatalog, groupSources, initials, langName, nsfwToggle, visibleSources } from "./browse";
 
 const src = (name: string, lang: string): SourceDto => ({
   id: `${name}-${lang}`,
@@ -12,6 +12,8 @@ const src = (name: string, lang: string): SourceDto => ({
   iconUrl: null,
   supportsLatest: true,
   isConfigurable: false,
+  nsfw: false,
+  nsfwByExtension: false,
 });
 
 const ext = (name: string, extra: Partial<CatalogEntryDto> = {}): CatalogEntryDto => ({
@@ -36,6 +38,22 @@ describe("groupSources", () => {
   it("filters by name or language", () => {
     expect(groupSources([src("MangaDex", "en"), src("Comick", "en")], "dex").flatMap((x) => x.items.map((s) => s.name))).toEqual(["MangaDex"]);
     expect(groupSources([src("A", "ja"), src("B", "en")], "japanese").flatMap((x) => x.items.map((s) => s.name))).toEqual(["A"]);
+  });
+});
+
+describe("NSFW sources", () => {
+  const dex = { ...src("MangaDex", "all"), nsfw: true, nsfwByExtension: true };
+  const safe = src("Safe", "en");
+  it("hides NSFW sources only when the switch is off, and counts them", () => {
+    expect(visibleSources([dex, safe], true)).toEqual({ shown: [dex, safe], hidden: 0 });
+    expect(visibleSources([dex, safe], false)).toEqual({ shown: [safe], hidden: 1 });
+    expect(visibleSources([], false)).toEqual({ shown: [], hidden: 0 });
+  });
+  it("offers the opposite mark, and clears the person's mark when that is what the extension says", () => {
+    expect(nsfwToggle(dex)).toEqual({ label: "Mark as not NSFW", set: false });
+    expect(nsfwToggle({ nsfw: false, nsfwByExtension: true })).toEqual({ label: "Mark as NSFW", set: null });
+    expect(nsfwToggle(safe)).toEqual({ label: "Mark as NSFW", set: true });
+    expect(nsfwToggle({ nsfw: true, nsfwByExtension: false })).toEqual({ label: "Mark as not NSFW", set: null });
   });
 });
 

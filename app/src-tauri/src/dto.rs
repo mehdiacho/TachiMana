@@ -285,6 +285,7 @@ pub struct UiSettings {
     pub disk_cache_mb: i64,
     pub rotated: bool,
     pub cloudflare_bypass_enabled: bool,
+    pub show_nsfw_sources: bool,
 }
 
 /// A partial update: only the fields present are written.
@@ -316,6 +317,8 @@ pub struct UiSettingsPatch {
     pub rotated: Option<bool>,
     #[ts(optional)]
     pub cloudflare_bypass_enabled: Option<bool>,
+    #[ts(optional)]
+    pub show_nsfw_sources: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -485,6 +488,10 @@ pub struct SourceDto {
     pub icon_url: Option<String>,
     pub supports_latest: bool,
     pub is_configurable: bool,
+    /// NSFW as the app treats it: the person's own mark, else the extension's flag.
+    pub nsfw: bool,
+    /// What the source's extension says.
+    pub nsfw_by_extension: bool,
 }
 
 /// A manga as a source lists it while browsing.

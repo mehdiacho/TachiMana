@@ -1,5 +1,5 @@
 # Rust port status
-Updated: 2026-11-14 by Claude (copy a library once between linked devices, who-leads notice, bookmarks journalled)
+Updated: 2026-11-14 by Claude (settings pages with search, NSFW sources switch and per-source mark)
 Current phase: P0–P9 merged; 0.1.0 released (mehdiacho/tachimana-releases). 0.1.2 released (restore progress). Now: UI states everywhere and an in-place updater (feat/ui-states), then 0.1.3. The Kotlin app stays until Mehdi has tried the Windows installer
 
 Done:
@@ -379,6 +379,20 @@ written, D's extra manga left the library, C's came back in), merge taken from D
 accept shown on C, "Don't ask again" letting the next merge run without a card, a bookmark on C
 reaching D by itself, and "Both ways" on C showing the notice on D. Not done: the questions after
 scanning (roles/1), restores writing journal entries.
+
+SETTINGS PAGES AND NSFW (branch `feat/settings-pages-nsfw`, 0.1.17, asked by Mehdi 2026-11-14):
+- Settings is a list of pages (Profiles, Appearance, Reader, Browse, Tracking, Data and storage,
+  Sync, About) with a search box. `ui/src/lib/settingsIndex.ts` lists every setting with its page
+  and search words; a new setting gets an entry there and an `<Item id>` on its page. A wide window
+  shows the list beside the page; a narrow one shows the list, then the page with a back arrow.
+- "Show NSFW sources" (Settings, Browse; `showNsfwSources`, on by default as in Mihon). A source is
+  NSFW when its extension is flagged; right-click a source in Browse to mark it yourself
+  (`sourceNsfw` in settings.json, `source_set_nsfw`), which wins over the extension's flag, so a
+  source such as MangaDex can stay listed with the switch off. Hidden sources are counted under the
+  list with a Show link. The Extensions tab's NSFW chip starts from the switch.
+Checked under Xvfb: pages, search (Enter opens the first result and outlines it), the narrow
+layout. The NSFW hiding and the per-source mark have unit tests but were NOT tried with a real
+source: the test rig cannot reach an extension repository.
 
 Next step: the phone builds its half (mihon#16, #17); then the questions after scanning. Have Mehdi try merge + "Download all here" with the real phone.
 Still open from Mehdi 2026-11-03: back up the NAS

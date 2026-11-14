@@ -71,6 +71,22 @@ export function groupSources(sources: SourceDto[], query: string): Group<SourceD
     .map((k) => ({ key: k, title: langName(k), items: (by.get(k) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }));
 }
 
+/** Sources to list: all of them, or without the NSFW ones, and how many that leaves out. */
+export function visibleSources(sources: SourceDto[], showNsfw: boolean): { shown: SourceDto[]; hidden: number } {
+  if (showNsfw) return { shown: sources, hidden: 0 };
+  const shown = sources.filter((s) => !s.nsfw);
+  return { shown, hidden: sources.length - shown.length };
+}
+
+/**
+ * The NSFW item of a source's menu. `set` is the person's own mark to store; null clears it, which
+ * is what going back to the extension's flag means.
+ */
+export function nsfwToggle(src: Pick<SourceDto, "nsfw" | "nsfwByExtension">): { label: string; set: boolean | null } {
+  const next = !src.nsfw;
+  return { label: src.nsfw ? "Mark as not NSFW" : "Mark as NSFW", set: next === src.nsfwByExtension ? null : next };
+}
+
 export interface CatalogFilter {
   query: string;
   showNsfw: boolean;

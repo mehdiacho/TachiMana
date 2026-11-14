@@ -129,6 +129,8 @@ export const api = {
   extInstall: (repoUrl: string, pkgName: string) => call<InstalledExtensionDto>("ext_install", { repoUrl, pkgName }),
   extUninstall: (pkgName: string) => call<void>("ext_uninstall", { pkgName }),
   browseSources: () => call<SourceDto[]>("browse_sources"),
+  /** The person's own NSFW mark for a source; null goes back to what its extension says. */
+  sourceSetNsfw: (sourceId: string, nsfw: boolean | null) => call<void>("source_set_nsfw", { sourceId, nsfw }),
   browseList: (sourceId: string, mode: BrowseMode, query: string | null, page: number) =>
     call<BrowsePageDto>("browse_list", { sourceId, mode, query, page }),
   onlineOpen: (sourceId: string, url: string, title: string) => call<RefreshDto>("online_open", { sourceId, url, title }),

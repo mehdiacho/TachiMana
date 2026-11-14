@@ -4,4 +4,4 @@
  * Settings the UI reads and writes. Keys and defaults are shared with the Kotlin app where
  * they exist there (see `tm_core::settings::keys`).
  */
-export type UiSettings = { theme: string, readerFit: string, readerZoom: number, readerCoverSolo: boolean, libraryGrid: boolean, librarySort: string, librarySortDescending: boolean, libraryUnreadOnly: boolean, libraryDownloadedOnly: boolean, diskCacheMb: number, rotated: boolean, cloudflareBypassEnabled: boolean, };
+export type UiSettings = { theme: string, readerFit: string, readerZoom: number, readerCoverSolo: boolean, libraryGrid: boolean, librarySort: string, librarySortDescending: boolean, libraryUnreadOnly: boolean, libraryDownloadedOnly: boolean, diskCacheMb: number, rotated: boolean, cloudflareBypassEnabled: boolean, showNsfwSources: boolean, };

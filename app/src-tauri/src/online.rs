@@ -300,13 +300,16 @@ pub async fn browse_sources(state: State<'_, AppState>) -> R<Vec<SourceDto>> {
         .into_iter()
         .map(|e| (e.pkg_name.clone(), e))
         .collect();
-    let mut out: Vec<SourceDto> = c
-        .sources()
-        .await?
+    let sources = c.sources().await?;
+    let settings = state.settings()?.clone();
+    let mut out: Vec<SourceDto> = sources
         .into_iter()
         .map(|s| {
             let ext = exts.get(&s.extension_pkg);
+            let by_extension = ext.is_some_and(|e| e.nsfw);
             SourceDto {
+                nsfw: settings.source_nsfw(s.id).unwrap_or(by_extension),
+                nsfw_by_extension: by_extension,
                 id: s.id,
                 extension_name: ext.map(|e| e.name.clone()).unwrap_or_default(),
                 icon_url: ext.and_then(|e| e.icon_url.clone()),
@@ -329,6 +332,18 @@ pub async fn browse_sources(state: State<'_, AppState>) -> R<Vec<SourceDto>> {
             .map(|s| (s.id, crate::nas::source_label(&s.name, &s.lang))),
     );
     Ok(out)
+}
+
+/// The person's own NSFW mark for a source; `None` goes back to what its extension says.
+#[tauri::command]
+pub fn source_set_nsfw(state: State<'_, AppState>, source_id: String, nsfw: Option<bool>) -> R<()> {
+    let id = source_id
+        .parse::<i64>()
+        .map_err(|_| CmdError::new("invalid", "That is not a source."))?;
+    let mut s = state.settings()?;
+    s.set_source_nsfw(id, nsfw);
+    s.save()?;
+    Ok(())
 }
 
 /// One page of a source's popular, latest or search list.

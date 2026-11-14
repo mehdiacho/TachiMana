@@ -140,6 +140,7 @@ fn main() {
             online::ext_install,
             online::ext_uninstall,
             online::browse_sources,
+            online::source_set_nsfw,
             online::browse_list,
             online::online_open,
             online::manga_refresh,

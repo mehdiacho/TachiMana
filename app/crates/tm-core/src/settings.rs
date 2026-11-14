@@ -40,6 +40,11 @@ pub mod keys {
     pub const REMOTE_ROLE: &str = "remoteStorageRole";
     /// Rust-only: whole-app 90° rotation for a rotated monitor (spec §2.18), remembered.
     pub const ROTATED: &str = "rotated";
+    /// Rust-only: list sources marked NSFW in Browse (default on, as in Mihon).
+    pub const SHOW_NSFW_SOURCES: &str = "showNsfwSources";
+    /// Rust-only: the person's own NSFW mark per source id, `{"<id>": true|false}`; it wins over
+    /// the extension's flag.
+    pub const SOURCE_NSFW: &str = "sourceNsfw";
 }
 
 /// The settings document plus where it lives.
@@ -115,6 +120,35 @@ impl Settings {
             .unwrap_or_else(|| default_i64(key))
     }
 
+    /// The person's own NSFW mark for a source, if they set one.
+    pub fn source_nsfw(&self, source_id: i64) -> Option<bool> {
+        self.map
+            .get(keys::SOURCE_NSFW)
+            .and_then(Value::as_object)
+            .and_then(|m| m.get(&source_id.to_string()))
+            .and_then(Value::as_bool)
+    }
+
+    /// Sets or clears (`None`: back to what the extension says) a source's NSFW mark.
+    pub fn set_source_nsfw(&mut self, source_id: i64, nsfw: Option<bool>) {
+        let mut m = self
+            .map
+            .get(keys::SOURCE_NSFW)
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        match nsfw {
+            Some(v) => {
+                m.insert(source_id.to_string(), Value::Bool(v));
+            }
+            None => {
+                m.remove(&source_id.to_string());
+            }
+        }
+        self.map
+            .insert(keys::SOURCE_NSFW.to_owned(), Value::Object(m));
+    }
+
     pub fn set(&mut self, key: &str, value: impl Into<Value>) {
         self.map.insert(key.to_owned(), value.into());
     }
@@ -168,7 +202,10 @@ impl Settings {
 fn default_bool(key: &str) -> bool {
     matches!(
         key,
-        keys::READER_COVER_SOLO | keys::REMOTE_USE_HTTPS | keys::REMOTE_REDOWNLOAD
+        keys::READER_COVER_SOLO
+            | keys::REMOTE_USE_HTTPS
+            | keys::REMOTE_REDOWNLOAD
+            | keys::SHOW_NSFW_SOURCES
     )
 }
 
@@ -212,6 +249,30 @@ mod tests {
         assert!(s.bool(keys::REMOTE_USE_HTTPS));
         assert_eq!(s.i64(keys::REMOTE_CACHE_MB), 2048);
         assert_eq!(s.i64(keys::DISK_CACHE_MB), 10240);
+    }
+
+    #[test]
+    fn a_source_nsfw_mark_is_kept_cleared_and_survives_a_damaged_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        let mut s = Settings::load(&p);
+        assert!(s.bool(keys::SHOW_NSFW_SOURCES));
+        assert_eq!(s.source_nsfw(-7), None);
+        s.set_source_nsfw(-7, Some(false));
+        s.set_source_nsfw(9, Some(true));
+        s.save().unwrap();
+        let mut s = Settings::load(&p);
+        assert_eq!(s.source_nsfw(-7), Some(false));
+        assert_eq!(s.source_nsfw(9), Some(true));
+        s.set_source_nsfw(9, None);
+        assert_eq!(s.source_nsfw(9), None);
+        // Not an object, or not a bool inside it: no mark, and setting one repairs it.
+        s.set(keys::SOURCE_NSFW, "nope");
+        assert_eq!(s.source_nsfw(-7), None);
+        s.set_source_nsfw(1, Some(true));
+        assert_eq!(s.source_nsfw(1), Some(true));
+        s.set(keys::SOURCE_NSFW, serde_json::json!({"1": "yes"}));
+        assert_eq!(s.source_nsfw(1), None);
     }
 
     #[test]
