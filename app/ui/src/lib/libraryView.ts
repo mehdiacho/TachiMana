@@ -62,12 +62,18 @@ function cmpTitle(a: string, b: string): number {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-/** Category, search, filters, then sort. `descending` reverses the whole order, ties included. */
-export function applyLibraryView(entries: LibraryEntryDto[], view: LibraryView): LibraryEntryDto[] {
+/**
+ * Category, search, filters, then sort. `descending` reverses the whole order, ties included.
+ * A search looks through the whole library whatever category is picked (unlike the Kotlin app),
+ * so finding a manga never means trying each category in turn; `withinCategory` keeps the
+ * category, for the grouped view where each section is searched on its own.
+ */
+export function applyLibraryView(entries: LibraryEntryDto[], view: LibraryView, withinCategory = false): LibraryEntryDto[] {
   const q = view.query.trim().toLowerCase();
+  const category = q === "" || withinCategory ? view.categoryId : null;
   const out = entries.filter(
     (e) =>
-      inCategory(e, view.categoryId) &&
+      inCategory(e, category) &&
       (q === "" ||
         e.manga.title.toLowerCase().includes(q) ||
         (e.manga.author?.toLowerCase().includes(q) ?? false)) &&
@@ -78,6 +84,25 @@ export function applyLibraryView(entries: LibraryEntryDto[], view: LibraryView):
     sortKey(a, view.sort) - sortKey(b, view.sort) || cmpTitle(a.manga.title, b.manga.title);
   out.sort(view.descending ? (a, b) => cmp(b, a) : cmp);
   return out;
+}
+
+export interface LibrarySection {
+  /** A category id, or [`UNCATEGORIZED`]. */
+  id: number;
+  name: string;
+  entries: LibraryEntryDto[];
+}
+
+/**
+ * The library as one page of sections, one per category in the user's order and Uncategorised
+ * last, each filtered and sorted by `view` (its `categoryId` is ignored). Sections with nothing
+ * to show are left out. A manga in two categories is in both sections.
+ */
+export function librarySections(entries: LibraryEntryDto[], categories: { id: number; name: string }[], view: LibraryView): LibrarySection[] {
+  const all = [...categories.map((c) => ({ id: c.id, name: c.name })), { id: UNCATEGORIZED, name: categories.length ? "Uncategorised" : "All" }];
+  return all
+    .map((c) => ({ ...c, entries: applyLibraryView(entries, { ...view, categoryId: c.id }, true) }))
+    .filter((x) => x.entries.length > 0);
 }
 
 /** Live chip counts: All, each category, Uncategorised (only when any manga is uncategorised). */
