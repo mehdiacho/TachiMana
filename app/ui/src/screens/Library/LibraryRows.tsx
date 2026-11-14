@@ -1,11 +1,14 @@
 // The library list or cover grid, flat or as one page of category sections that fold. The arrow
-// keys move through the manga; Home and End jump to the ends.
+// keys move through the manga; Home and End jump to the ends. A right-click (or the menu key)
+// on a manga opens its menu.
+import * as Ctx from "@radix-ui/react-context-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cover, UnreadBadge } from "../../components/ui";
 import type { LibraryEntryDto } from "../../gen/LibraryEntryDto";
 import type { LibrarySection } from "../../lib/libraryView";
+import { EntryMenu } from "./EntryMenu";
 import s from "./Library.module.css";
 
 const ROW_H = 69;
@@ -166,8 +169,9 @@ export function LibraryRows({
             const e = it.entries[0];
             if (!e) return null;
             return (
+              <Ctx.Root key={`r${it.first}`}>
+              <Ctx.Trigger asChild>
               <button
-                key={`r${it.first}`}
                 type="button"
                 role="option"
                 aria-selected={selected === e.manga.id}
@@ -189,13 +193,25 @@ export function LibraryRows({
                   <UnreadBadge count={e.unread} />
                 </span>
               </button>
+              </Ctx.Trigger>
+              <Ctx.Portal>
+                <EntryMenu
+                  entry={e}
+                  onOpen={() => {
+                    at.current = it.first;
+                    onSelect(e.manga.id);
+                  }}
+                />
+              </Ctx.Portal>
+              </Ctx.Root>
             );
           }
           return (
             <div key={`g${it.first}`} className={s.gridRow} style={{ ...style, ["--cols" as string]: cols }}>
               {it.entries.map((e, n) => (
+                <Ctx.Root key={e.manga.id}>
+                <Ctx.Trigger asChild>
                 <button
-                  key={e.manga.id}
                   type="button"
                   role="option"
                   aria-selected={selected === e.manga.id}
@@ -214,6 +230,17 @@ export function LibraryRows({
                   </span>
                   <span className={s.cellTitle}>{e.manga.title}</span>
                 </button>
+                </Ctx.Trigger>
+                <Ctx.Portal>
+                  <EntryMenu
+                    entry={e}
+                    onOpen={() => {
+                      at.current = it.first + n;
+                      onSelect(e.manga.id);
+                    }}
+                  />
+                </Ctx.Portal>
+                </Ctx.Root>
               ))}
             </div>
           );

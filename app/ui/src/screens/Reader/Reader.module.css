@@ -188,3 +188,75 @@
   font: var(--tm-type-caption);
   z-index: 1;
 }
+
+.ctlMenu {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-xxs);
+}
+.ctlMenu[data-state="open"] {
+  background: var(--tm-color-hover-strong);
+}
+.menu {
+  min-width: 220px;
+  background: var(--tm-color-surface);
+  border-radius: var(--tm-radius-xl);
+  padding: var(--tm-space-sm);
+  box-shadow: var(--tm-shadow-modal);
+  border: var(--tm-hairline) solid var(--tm-color-outline-faint);
+  z-index: 40;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  padding: var(--tm-space-md) var(--tm-space-base);
+  border-radius: var(--tm-radius-md);
+  font: var(--tm-type-body-small);
+  outline: 0;
+  cursor: pointer;
+}
+.menuItem[data-highlighted] {
+  background: var(--tm-color-hover-strong);
+}
+.menuCheck {
+  width: 16px;
+  color: var(--tm-color-accent);
+  display: inline-flex;
+}
+.menuLabel {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+  padding: var(--tm-space-sm) var(--tm-space-base);
+}
+
+/* Full screen: the pages get the whole window. The bars wait just past the top and bottom
+   edges and come back when the mouse reaches an edge, a control has the keyboard, or one of
+   their menus is open. */
+.reader[data-immersive="true"] .top,
+.reader[data-immersive="true"] .bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  opacity: 0;
+  transition:
+    transform var(--tm-motion-fast) ease-out,
+    opacity var(--tm-motion-fast) ease-out;
+}
+.reader[data-immersive="true"] .top {
+  top: 0;
+  transform: translateY(calc(-100% + 8px));
+}
+.reader[data-immersive="true"] .bottom {
+  bottom: 0;
+  transform: translateY(calc(100% - 8px));
+}
+.reader[data-immersive="true"] .top:hover,
+.reader[data-immersive="true"] .top:focus-within,
+.reader[data-immersive="true"] .top:has([data-state="open"]),
+.reader[data-immersive="true"] .bottom:hover,
+.reader[data-immersive="true"] .bottom:focus-within {
+  transform: none;
+  opacity: 1;
+}

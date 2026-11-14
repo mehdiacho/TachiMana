@@ -7,18 +7,19 @@ export type ReaderFit = "FIT_SCREEN" | "FIT_WIDTH" | "FIT_HEIGHT" | "ORIGINAL";
 /** The per-manga `viewer` column values the lineage uses. */
 export const VIEWER: Record<ReaderMode, number> = { STRIP: 5, LTR: 1, RTL: 2, DOUBLE: 6 };
 
-export const MODES: { id: ReaderMode; label: string }[] = [
-  { id: "STRIP", label: "Strip" },
-  { id: "LTR", label: "L→R" },
-  { id: "RTL", label: "R→L" },
-  { id: "DOUBLE", label: "2-up" },
+/** `label` is the short form on the reader's bar, `name` the one spelled out in its menu. */
+export const MODES: { id: ReaderMode; label: string; name: string }[] = [
+  { id: "STRIP", label: "Strip", name: "Long strip (scroll down)" },
+  { id: "LTR", label: "L→R", name: "Pages, left to right" },
+  { id: "RTL", label: "R→L", name: "Pages, right to left" },
+  { id: "DOUBLE", label: "2-up", name: "Two pages side by side" },
 ];
 
-export const FITS: { id: ReaderFit; label: string }[] = [
-  { id: "FIT_SCREEN", label: "Fit" },
-  { id: "FIT_WIDTH", label: "Fit W" },
-  { id: "FIT_HEIGHT", label: "Fit H" },
-  { id: "ORIGINAL", label: "100%" },
+export const FITS: { id: ReaderFit; label: string; name: string }[] = [
+  { id: "FIT_SCREEN", label: "Fit", name: "Fit the whole page" },
+  { id: "FIT_WIDTH", label: "Fit W", name: "Fit the width" },
+  { id: "FIT_HEIGHT", label: "Fit H", name: "Fit the height" },
+  { id: "ORIGINAL", label: "100%", name: "Original size" },
 ];
 
 /** Unknown or default (0) viewer opens as the strip, like the Kotlin app. */

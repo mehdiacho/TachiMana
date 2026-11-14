@@ -1,8 +1,10 @@
-// Manga detail (spec §3.1 detail region): info column and chapter list.
+// Manga detail (spec §3.1 detail region): info column and chapter list. Chapters can be picked
+// several at a time (Ctrl+click, Shift+click for a run, or "Select" in the right-click menu) and
+// then marked, downloaded or deleted together.
 import * as Ctx from "@radix-ui/react-context-menu";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Cloud, Download, Heart, Play, RefreshCw, Tags, TrendingUp } from "lucide-react";
+import { ArrowDownToLine, Check, CheckCheck, Circle, CircleAlert, CircleCheck, Cloud, Download, Heart, Play, RefreshCw, Tags, TrendingUp, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
@@ -135,6 +137,9 @@ function ChapterList({
   onToggleRead,
   onReadThrough,
   downloads,
+  picked,
+  onPick,
+  onPickAll,
 }: {
   chapters: ChapterDto[];
   onOpen: (c: ChapterDto) => void;
@@ -142,11 +147,24 @@ function ChapterList({
   /** Marks the chapter at `index` and every chapter listed below it (the earlier ones) read. */
   onReadThrough: (index: number) => void;
   downloads: Downloads | null;
+  picked: ReadonlySet<number>;
+  /** Picks or unpicks the chapter at `index`, or with "range" everything from the last pick to it. */
+  onPick: (index: number, how: "toggle" | "range") => void;
+  onPickAll: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({ count: chapters.length, getScrollElement: () => ref.current, estimateSize: () => 53, overscan: 10 });
   return (
-    <div ref={ref} className={s.chapterList}>
+    <div
+      ref={ref}
+      className={s.chapterList}
+      onKeyDown={(e) => {
+        if (e.ctrlKey && !e.altKey && (e.key === "a" || e.key === "A")) {
+          e.preventDefault();
+          onPickAll();
+        }
+      }}
+    >
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((it) => {
           const c = chapters[it.index];
@@ -156,8 +174,19 @@ function ChapterList({
             <div key={c.id} style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${it.start}px)` }}>
               <Ctx.Root>
               <Ctx.Trigger asChild>
-              <div className={s.chapter} data-read={c.read}>
-                <button type="button" className={s.chapterText} style={{ textAlign: "left" }} onClick={() => onOpen(c)}>
+              <div className={s.chapter} data-read={c.read} data-picked={picked.has(c.id)}>
+                <button
+                  type="button"
+                  className={s.chapterText}
+                  style={{ textAlign: "left" }}
+                  aria-pressed={picked.size > 0 ? picked.has(c.id) : undefined}
+                  onClick={(e) => {
+                    // While chapters are picked a plain click picks too, so the mouse alone is enough.
+                    if (e.shiftKey) onPick(it.index, "range");
+                    else if (e.ctrlKey || e.metaKey || picked.size > 0) onPick(it.index, "toggle");
+                    else onOpen(c);
+                  }}
+                >
                   <span className={s.chapterTitle}>{c.name}</span>
                   <span className={s.chapterStatus} data-reading={st.reading}>
                     {[st.text, c.scanlator].filter(Boolean).join(" · ")}
@@ -188,6 +217,13 @@ function ChapterList({
                       {c.downloaded ? "Delete the download" : "Download"}
                     </Ctx.Item>
                   )}
+                  <div className={s.menuSep} />
+                  <Ctx.Item className={s.menuItem} onSelect={() => onPick(it.index, "toggle")}>
+                    {picked.has(c.id) ? "Deselect" : "Select"}
+                  </Ctx.Item>
+                  <Ctx.Item className={s.menuItem} onSelect={onPickAll}>
+                    Select all
+                  </Ctx.Item>
                 </Ctx.Content>
               </Ctx.Portal>
               </Ctx.Root>
@@ -303,6 +339,12 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
   const [pendingDl, setPendingDl] = useState<ReadonlySet<number>>(new Set());
   const [markingAll, setMarkingAll] = useState(false);
   const [queueing, setQueueing] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<number>>(new Set());
+  const anchor = useRef<number | null>(null);
+  useEffect(() => {
+    setPicked(new Set());
+    anchor.current = null;
+  }, [mangaId]);
   const setPending = (id: number, on: boolean) =>
     setPendingDl((old) => {
       const next = new Set(old);
@@ -349,17 +391,18 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
       invalidate();
     }
   };
-  const markAllRead = (from = 0) => markManyRead(chapters.slice(from).filter((c) => !c.read));
-  const markManyRead = async (todo: ChapterDto[]) => {
+  const markAllRead = (from = 0) => markMany(chapters.slice(from), true);
+  const markMany = async (among: ChapterDto[], read: boolean) => {
+    const todo = among.filter((c) => c.read !== read);
     if (todo.length === 0) {
-      toast.info("Those chapters are already read.");
+      toast.info(`Those chapters are already ${read ? "read" : "unread"}.`);
       return;
     }
     setMarkingAll(true);
-    markRead(new Set(todo.map((c) => c.id)), true);
+    markRead(new Set(todo.map((c) => c.id)), read);
     try {
-      for (const c of todo) await api.setChapterRead(c.id, true);
-      toast.ok(`Marked ${todo.length} chapter${todo.length === 1 ? "" : "s"} read.`);
+      for (const c of todo) await api.setChapterRead(c.id, read);
+      toast.ok(`Marked ${todo.length} chapter${todo.length === 1 ? "" : "s"} ${read ? "read" : "unread"}.`);
     } catch (e) {
       fail(e);
     } finally {
@@ -394,6 +437,51 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
             });
         },
       };
+  // The picked chapters, in the order they are listed.
+  const sel = chapters.filter((c) => picked.has(c.id));
+  const clearPick = () => {
+    setPicked(new Set());
+    anchor.current = null;
+  };
+  const pick = (index: number, how: "toggle" | "range") => {
+    const next = new Set(picked);
+    const from = anchor.current;
+    if (how === "range" && from !== null) {
+      for (const c of chapters.slice(Math.min(from, index), Math.max(from, index) + 1)) next.add(c.id);
+    } else {
+      const c = chapters[index];
+      if (!c) return;
+      if (next.has(c.id)) next.delete(c.id);
+      else next.add(c.id);
+    }
+    anchor.current = index;
+    setPicked(next);
+  };
+  const downloadPicked = () => {
+    const ids = sel.filter((c) => !c.downloaded && !downloads?.jobFor(c)).map((c) => c.id);
+    if (ids.length === 0) {
+      toast.info("Those chapters are already downloaded or queued.");
+      return;
+    }
+    setError(null);
+    api
+      .downloadChapters(mangaId, ids)
+      .then((n) => toast.ok(`Queued ${n} chapter${n === 1 ? "" : "s"} to download.`))
+      .catch(fail);
+  };
+  const deletePicked = () => {
+    const ids = sel.filter((c) => c.downloaded).map((c) => c.id);
+    if (ids.length === 0) {
+      toast.info("None of those chapters is downloaded.");
+      return;
+    }
+    setError(null);
+    api
+      .downloadDelete(mangaId, ids)
+      .then((n) => toast.ok(`Deleted ${n} download${n === 1 ? "" : "s"}.`))
+      .catch(fail)
+      .finally(invalidate);
+  };
   const downloadUnread = () => {
     setError(null);
     setQueueing(true);
@@ -461,22 +549,56 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
           onReset={() => setInfoW(0)}
         />
       )}
-      <div className={s.chapters} data-cls={cls}>
+      <div
+        className={s.chapters}
+        data-cls={cls}
+        onKeyDown={(e) => {
+          // Only keys from the pane itself, not from a menu opened over it.
+          if (e.key === "Escape" && picked.size > 0 && e.currentTarget.contains(e.target as Node)) {
+            e.preventDefault();
+            clearPick();
+          }
+        }}
+      >
         <div className={s.chaptersHead}>
-          <span className={s.chaptersTitle}>
-            {chapters.length} chapter{chapters.length === 1 ? "" : "s"}
-          </span>
-          <span className={s.meta}>{unread} unread</span>
-          <span className={s.grow} />
-          {downloads && <IconButton icon={Download} label={queueing ? "Queueing…" : "Download unread"} size={18} disabled={unread === 0} busy={queueing} onClick={downloadUnread} />}
-          <IconButton icon={CheckCheck} label={markingAll ? "Marking read…" : "Mark all read"} size={18} disabled={unread === 0} busy={markingAll} onClick={() => void markAllRead()} />
+          {sel.length > 0 ? (
+            <div className={s.selBar} role="toolbar" aria-label="Selected chapters">
+              <span className={s.selCount}>{sel.length} selected</span>
+              <TextButton disabled={markingAll} onClick={() => void markMany(sel, true)}>Mark read</TextButton>
+              <TextButton disabled={markingAll} onClick={() => void markMany(sel, false)}>Mark unread</TextButton>
+              {downloads && <TextButton onClick={downloadPicked}>Download</TextButton>}
+              {downloads && <TextButton onClick={deletePicked}>Delete downloads</TextButton>}
+              <span className={s.grow} />
+              {sel.length < chapters.length && <TextButton onClick={() => setPicked(new Set(chapters.map((c) => c.id)))}>Select all</TextButton>}
+              <IconButton icon={X} label="Clear the selection (Esc)" size={18} onClick={clearPick} />
+            </div>
+          ) : (
+            <>
+              <span className={s.chaptersTitle}>
+                {chapters.length} chapter{chapters.length === 1 ? "" : "s"}
+              </span>
+              <span className={s.meta}>{unread} unread</span>
+              <span className={s.grow} />
+              {downloads && <IconButton icon={Download} label={queueing ? "Queueing…" : "Download unread"} size={18} disabled={unread === 0} busy={queueing} onClick={downloadUnread} />}
+              <IconButton icon={CheckCheck} label={markingAll ? "Marking read…" : "Mark all read"} size={18} disabled={unread === 0} busy={markingAll} onClick={() => void markAllRead()} />
+            </>
+          )}
         </div>
         {chapters.length === 0 ? (
           <div className={s.meta} style={{ padding: "0 var(--tm-space-2xl)" }}>
             {manga.isLocal ? "No chapters found. Check the manga's folder and rescan." : "The source lists no chapters for this title yet."}
           </div>
         ) : (
-          <ChapterList chapters={chapters} onOpen={open} onToggleRead={(c) => void toggleRead(c)} onReadThrough={(i) => void markAllRead(i)} downloads={downloads} />
+          <ChapterList
+            chapters={chapters}
+            onOpen={open}
+            onToggleRead={(c) => void toggleRead(c)}
+            onReadThrough={(i) => void markAllRead(i)}
+            downloads={downloads}
+            picked={picked}
+            onPick={pick}
+            onPickAll={() => setPicked(new Set(chapters.map((c) => c.id)))}
+          />
         )}
       </div>
     </>

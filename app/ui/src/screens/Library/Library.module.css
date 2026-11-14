@@ -485,6 +485,21 @@
 .chapter:hover {
   background: var(--tm-color-hover);
 }
+.chapter[data-picked="true"] {
+  background: var(--tm-color-accent-selected);
+}
+.selBar {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-sm);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.selCount {
+  font: var(--tm-type-title-medium);
+  margin-right: var(--tm-space-md);
+}
 .chapterTitle {
   font: var(--tm-type-body-row);
 }
@@ -533,8 +548,13 @@
   outline: 0;
   cursor: pointer;
 }
-.menuItem[data-highlighted] {
+.menuItem[data-highlighted],
+.menuItem[data-state="open"] {
   background: var(--tm-color-hover-strong);
+}
+.menuItem[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
 }
 .menuCheck {
   width: 16px;
