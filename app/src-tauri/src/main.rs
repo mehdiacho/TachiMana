@@ -88,6 +88,7 @@ fn main() {
         .register_asynchronous_uri_scheme_protocol("tm", protocol::handle)
         .invoke_handler(tauri::generate_handler![
             changes::changes_sync_now,
+            sync::restore_nas_password,
             changes::changes_last,
             changes::link_set_mode,
             commands::app_info,

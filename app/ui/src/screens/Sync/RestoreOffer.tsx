@@ -14,6 +14,41 @@ import l from "../Library/Library.module.css";
 import st from "../Settings/Settings.module.css";
 import s from "./Sync.module.css";
 
+/** The NAS password the phone sealed with a passphrase: type the passphrase to unlock it. */
+function NasPassword() {
+  const [phrase, setPhrase] = useState("");
+  const unlock = useAction(
+    async () => {
+      await api.restoreNasPassword(phrase);
+      setPhrase("");
+      await queryClient.invalidateQueries({ queryKey: keys.nas });
+      await queryClient.invalidateQueries({ queryKey: keys.sync });
+    },
+    { ok: () => "The NAS password is set. Your NAS is ready to use." },
+  );
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void unlock.run();
+      }}
+    >
+      <div className={st.rowDesc}>The backup has your NAS password, locked with the passphrase you typed on the phone. Type it here to unlock the password. The passphrase isn't saved.</div>
+      <div className={s.addRow}>
+        <input className={l.field} type="password" value={phrase} onChange={(e) => (setPhrase(e.target.value), unlock.setError(null))} placeholder="Passphrase" aria-label="Passphrase for the NAS password" autoComplete="off" />
+        <OutlinedButton type="submit" busy={unlock.pending} disabled={phrase.length === 0}>
+          {unlock.pending ? "Unlocking…" : "Unlock"}
+        </OutlinedButton>
+      </div>
+      {unlock.error && (
+        <div className={l.error} role="alert">
+          {unlock.error}
+        </div>
+      )}
+    </form>
+  );
+}
+
 export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
   const anilist = useAniList();
   const [plan, setPlan] = useState<RestoreExtensionsDto | null>(null);
@@ -24,7 +59,7 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
   const [helperNote, setHelperNote] = useState<string | null>(null);
 
   const signIn = offer.anilistSignIn && anilist.data?.connected !== true;
-  const nothing = offer.reposAdded.length === 0 && !offer.hasExtensions && offer.downloaded === 0 && !signIn;
+  const nothing = offer.reposAdded.length === 0 && !offer.hasExtensions && offer.downloaded === 0 && !signIn && !offer.nasPasswordSealed;
   if (nothing) return null;
 
   const look = async () => {
@@ -195,6 +230,8 @@ export function RestoreOffer({ offer }: { offer: RestoreOfferDto }) {
           </div>
         </>
       )}
+
+      {offer.nasPasswordSealed && <NasPassword />}
 
       {signIn && (
         <>

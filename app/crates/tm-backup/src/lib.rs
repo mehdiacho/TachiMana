@@ -11,6 +11,7 @@
 pub mod codec;
 pub mod model;
 pub mod prefs;
+pub mod seal;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Component, Path};
@@ -57,6 +58,9 @@ pub struct ImportSummary {
     pub errors: Vec<RestoreError>,
     /// The remote storage (NAS) settings the backup carries, without the password.
     pub nas: Option<prefs::NasPrefs>,
+    /// The NAS password sealed with the person's passphrase (`seal`), when the backup has one.
+    #[serde(skip)]
+    pub nas_sealed_password: Option<Vec<u8>>,
 }
 
 /// A manga a restore skipped, and why.
@@ -178,6 +182,7 @@ fn export_in(c: &Connection, source_names: &HashMap<i64, String>) -> Result<Back
         backup_extension_stores,
         // Only the app knows these; it fills them in with `annotate`.
         backup_extensions: Vec::new(),
+        remote_storage: None,
     })
 }
 
@@ -348,8 +353,29 @@ pub fn import_with(
     progress: &mut dyn FnMut(usize, usize, &str),
 ) -> Result<ImportSummary> {
     let now = now_ms();
+    // The fork's NAS connection section wins over its copy among the preferences, which still
+    // gives the switches the section does not carry.
+    let copy = prefs::nas_prefs(&backup.backup_preferences);
+    let (nas, nas_sealed_password) = match backup
+        .remote_storage
+        .as_deref()
+        .and_then(prefs::nas_section)
+    {
+        Some((mut n, sealed)) => {
+            if let Some(c) = copy
+                .as_ref()
+                .filter(|c| c.host.eq_ignore_ascii_case(&n.host))
+            {
+                n.enabled = c.enabled.or(n.enabled);
+                n.cache_mb = c.cache_mb;
+            }
+            (Some(n), sealed)
+        }
+        None => (copy, None),
+    };
     let mut s = ImportSummary {
-        nas: prefs::nas_prefs(&backup.backup_preferences),
+        nas,
+        nas_sealed_password,
         ..ImportSummary::default()
     };
     let category_by_order = db.write(|c| import_categories(c, backup, &mut s).map_err(into_db))?;

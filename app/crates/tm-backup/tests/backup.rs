@@ -250,7 +250,38 @@ fn mihon_backup() -> Backup {
             extension_list_url: Some("https://example.com/list.pb".into()),
         }],
         backup_extensions: Vec::new(),
+        remote_storage: None,
     }
+}
+
+#[test]
+fn a_phone_backup_brings_its_nas_connection_and_sealed_password() {
+    let sealed = tm_backup::seal::seal("pw", "phrase", [1; 16], [2; 12]).unwrap();
+    let field = |tag: u8, b: &[u8]| {
+        let mut out = vec![(tag << 3) | 2, u8::try_from(b.len()).unwrap()];
+        out.extend_from_slice(b);
+        out
+    };
+    let mut section = field(1, b"nas.local");
+    section.extend(field(4, b"Mihon"));
+    section.extend(field(6, &sealed));
+    let mut b = mihon_backup();
+    b.remote_storage = Some(section);
+    // Through the file format, as a restore reads it.
+    let decoded = codec::decode(&codec::encode(&b).unwrap()).unwrap();
+    let db = Db::open_in_memory().unwrap();
+    let s = import(&db, &decoded).unwrap();
+    let nas = s.nas.unwrap();
+    assert_eq!(nas.host, "nas.local");
+    assert_eq!(nas.folder.as_deref(), Some("Mihon"));
+    assert_eq!(
+        tm_backup::seal::unseal(&s.nas_sealed_password.unwrap(), "phrase")
+            .unwrap()
+            .as_str(),
+        "pw"
+    );
+    // The computer's own backups never carry the section.
+    assert_eq!(export(&db, &none()).unwrap().remote_storage, None);
 }
 
 #[test]

@@ -176,6 +176,8 @@ export const api = {
   /** Queues the chapters the backup's device had downloaded; resolves with how many. */
   restoreRedownload: (unreadOnly: boolean) => call<number>("restore_redownload", { unreadOnly }),
   restoreDismiss: () => call<void>("restore_dismiss"),
+  /** Unlocks the NAS password a phone backup sealed with a passphrase, and saves it. */
+  restoreNasPassword: (passphrase: string) => call<void>("restore_nas_password", { passphrase }),
 
   // AniList. Account changes arrive as `anilist` events; a push after reading as `track-changed`.
   anilistAccount: () => call<AniListAccountDto>("anilist_account"),

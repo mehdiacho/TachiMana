@@ -34,5 +34,9 @@ existing remote storage (WebDAV) holds the shared state and direct talk stays on
 D4 reading beside the library is a toggle, off by default (built in step B). Step B is the
 library/manga-page work in STATUS.md; steps C to H wait on the phone side (mihon#13, #14).
 
+Built since (branch `feat/changes-roles`, see STATUS.md "SYNC STEP C"): the change journal
+(`changes/1`), who leads (`roles/1`, without `roles/take` yet) and the NAS password from phone
+backups. The phone's half is mihon#16 and #17.
+
 Before more sync work, read `docs/plan/system-plan.md` (draft) and
 `docs/protocol/README.md` (the TachiMana Link Protocol and the form for phone-app work orders).

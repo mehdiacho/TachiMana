@@ -177,6 +177,79 @@ pub fn nas_prefs(prefs: &[Vec<u8>]) -> Option<NasPrefs> {
     })
 }
 
+/// A protobuf field as read leniently: a number or a length-delimited body.
+enum Field<'a> {
+    Varint(u64),
+    Bytes(&'a [u8]),
+}
+
+fn varint(buf: &[u8], pos: &mut usize) -> Option<u64> {
+    let mut out = 0u64;
+    for shift in (0..64).step_by(7) {
+        let b = *buf.get(*pos)?;
+        *pos = pos.checked_add(1)?;
+        out |= u64::from(b & 0x7f) << shift;
+        if b & 0x80 == 0 {
+            return Some(out);
+        }
+    }
+    None
+}
+
+/// The fields of one message, in order; `None` when it is malformed. Fixed-width fields are
+/// skipped, groups refuse the message.
+fn fields(buf: &[u8]) -> Option<Vec<(u64, Field<'_>)>> {
+    let mut out = Vec::new();
+    let mut pos = 0usize;
+    while pos < buf.len() {
+        let key = varint(buf, &mut pos)?;
+        let (tag, wire) = (key >> 3, key & 7);
+        match wire {
+            0 => out.push((tag, Field::Varint(varint(buf, &mut pos)?))),
+            1 => pos = pos.checked_add(8)?,
+            2 => {
+                let len = usize::try_from(varint(buf, &mut pos)?).ok()?;
+                let end = pos.checked_add(len)?;
+                out.push((tag, Field::Bytes(buf.get(pos..end)?)));
+                pos = end;
+            }
+            5 => pos = pos.checked_add(4)?,
+            _ => return None,
+        }
+    }
+    (pos == buf.len()).then_some(out)
+}
+
+/// The NAS connection section of a phone backup (tag 901, `remoteStorage`, TachiMana#35): the
+/// settings, and the password sealed with a passphrase when the person chose to include it.
+/// Read field by field and leniently, so a type the fork changes later drops that field only.
+/// `None` when it names no host or is not a message.
+pub fn nas_section(raw: &[u8]) -> Option<(NasPrefs, Option<Vec<u8>>)> {
+    let mut nas = NasPrefs::default();
+    let mut sealed = None;
+    let text = |b: &[u8]| std::str::from_utf8(b).ok().map(|s| s.trim().to_owned());
+    for (tag, f) in fields(raw)? {
+        match (tag, f) {
+            (1, Field::Bytes(b)) => nas.host = text(b).unwrap_or_default(),
+            (2, Field::Varint(n)) => nas.port = Some(n.to_string()),
+            (2, Field::Bytes(b)) => nas.port = text(b),
+            (3, Field::Varint(n)) => nas.use_https = Some(n != 0),
+            (4, Field::Bytes(b)) => nas.folder = text(b),
+            (5, Field::Bytes(b)) => nas.username = text(b),
+            (6, Field::Bytes(b)) if crate::seal::is_sealed(b) => sealed = Some(b.to_vec()),
+            _ => {}
+        }
+    }
+    nas.port = nas
+        .port
+        .filter(|p| p.parse::<u32>().is_ok_and(|n| (1..=65_535).contains(&n)));
+    if nas.host.is_empty() {
+        return None;
+    }
+    nas.enabled = Some(true);
+    Some((nas, sealed))
+}
+
 /// Writes `nas` into `prefs` the way the fork reads them, replacing any NAS keys already there.
 /// The password is never written.
 pub fn put_nas_prefs(prefs: &mut Vec<Vec<u8>>, nas: &NasPrefs) {
@@ -441,5 +514,44 @@ pub(crate) mod tests {
         assert!(is_private(&string_pref("__PRIVATE_track_token_2", "x")));
         assert!(!is_private(&string_pref("anilist_score_type", "x")));
         assert!(!is_private(&[0xff, 0x00]));
+    }
+
+    fn len_field(tag: u8, bytes: &[u8]) -> Vec<u8> {
+        let mut out = vec![(tag << 3) | 2, u8::try_from(bytes.len()).unwrap()];
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    #[test]
+    fn the_nas_connection_section_is_read_with_its_sealed_password() {
+        let sealed = crate::seal::seal("pw", "phrase", [3; 16], [4; 12]).unwrap();
+        let mut raw = len_field(1, b" nas.local ");
+        raw.extend([2 << 3, 0xb9, 0xc8, 0x01]); // port 25657 as a number
+        raw.extend([3 << 3, 1]);
+        raw.extend(len_field(4, b"Mihon"));
+        raw.extend(len_field(5, b"reader"));
+        raw.extend(len_field(6, &sealed));
+        raw.extend([7 << 3, 0x05]); // stateTakenAt
+        raw.extend(len_field(9, b"MIRROR")); // role, whatever its type
+        let (nas, got) = nas_section(&raw).unwrap();
+        assert_eq!(nas.host, "nas.local");
+        assert_eq!(nas.port.as_deref(), Some("25657"));
+        assert_eq!(nas.use_https, Some(true));
+        assert_eq!(nas.folder.as_deref(), Some("Mihon"));
+        assert_eq!(nas.username.as_deref(), Some("reader"));
+        assert_eq!(got.as_deref(), Some(sealed.as_slice()));
+    }
+
+    #[test]
+    fn a_broken_nas_section_is_ignored_not_fatal() {
+        let raw = len_field(1, b"nas");
+        for cut in 0..raw.len() {
+            assert!(nas_section(raw.get(..cut).unwrap()).is_none());
+        }
+        // A password that is not sealed is never taken.
+        let mut plain = len_field(1, b"nas");
+        plain.extend(len_field(6, b"hunter2"));
+        assert_eq!(nas_section(&plain).unwrap().1, None);
+        assert!(nas_section(&[0xff; 12]).is_none());
     }
 }

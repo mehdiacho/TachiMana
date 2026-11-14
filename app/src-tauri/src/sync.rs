@@ -111,6 +111,11 @@ impl Sync {
             source_ids: s.source_ids.clone(),
             downloaded: s.downloaded.clone(),
             anilist: s.trackers.contains(&tm_db::ANILIST_SYNC_ID),
+            nas_sealed: s
+                .nas
+                .as_ref()
+                .zip(s.nas_sealed_password.clone())
+                .map(|(n, b)| (n.host.clone(), b)),
         };
     }
 
@@ -139,6 +144,8 @@ struct RestoreOffer {
     source_ids: Vec<i64>,
     downloaded: Vec<DownloadedChapter>,
     anilist: bool,
+    /// The NAS password the phone sealed with a passphrase, and the server it is for.
+    nas_sealed: Option<(String, Vec<u8>)>,
 }
 
 impl RestoreOffer {
@@ -329,6 +336,8 @@ pub struct RestoreOfferDto {
     pub downloaded_unread: u32,
     /// AniList rows came back but this install is not signed in.
     pub anilist_sign_in: bool,
+    /// The backup carries the NAS password sealed with a passphrase; ask for it to unlock it.
+    pub nas_password_sealed: bool,
 }
 
 /// The extensions a restore can install, and the repos that could not be read to find them.
@@ -385,6 +394,7 @@ fn offer_of(state: &AppState) -> RestoreOfferDto {
         downloaded: n(o.downloaded.len()),
         downloaded_unread: n(o.downloaded.iter().filter(|d| !d.read).count()),
         anilist_sign_in: o.anilist && state.track.auth.session().is_none(),
+        nas_password_sealed: o.nas_sealed.is_some(),
     }
 }
 
@@ -967,6 +977,51 @@ pub fn restore_redownload(app: AppHandle, state: State<'_, AppState>, unread_onl
     }
     emit(&app);
     Ok(queued)
+}
+
+/// Unlocks the NAS password a phone backup sealed with the person's passphrase and saves it for
+/// this profile's NAS, when that is the server the backup names. The passphrase is not kept.
+#[tauri::command]
+pub async fn restore_nas_password(app: AppHandle, passphrase: String) -> R<()> {
+    let state = app.state::<AppState>();
+    let Some((host, blob)) = lock(&state.sync.offer).nas_sealed.clone() else {
+        return Err(CmdError::new(
+            "notFound",
+            "There is no NAS password to unlock any more.",
+        ));
+    };
+    let here = state
+        .settings()?
+        .string(tm_core::settings::keys::REMOTE_HOST)
+        .trim()
+        .to_owned();
+    if !here.eq_ignore_ascii_case(host.trim()) {
+        return Err(CmdError::new(
+            "invalid",
+            format!("This profile's NAS is another server ({here}), so the password for {host} was not set."),
+        ));
+    }
+    let password =
+        tauri::async_runtime::spawn_blocking(move || tm_backup::seal::unseal(&blob, &passphrase))
+            .await
+            .map_err(|e| CmdError::internal(e.to_string()))?
+            .map_err(|e| match e {
+                tm_backup::seal::SealError::WrongPassphrase => CmdError::new(
+                    "invalid",
+                    "That passphrase doesn't unlock the NAS password. It's the one you typed on the phone when making the backup.",
+                ),
+                other => CmdError::new("invalid", other.to_string()),
+            })?;
+    {
+        let mut s = state.settings()?;
+        s.set(tm_core::settings::keys::REMOTE_PASSWORD, password.as_str());
+        s.save()?;
+    }
+    state.nas.index.invalidate();
+    lock(&state.sync.offer).nas_sealed = None;
+    tracing::info!("unlocked the NAS password from the backup");
+    emit(&app);
+    Ok(())
 }
 
 /// Put away what is left of the restore offer.
