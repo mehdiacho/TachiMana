@@ -25,6 +25,10 @@ pub struct Link {
     pub last_address: String,
     /// Unix milliseconds.
     pub linked_at: i64,
+    /// When it was last heard from or seen on the network, Unix milliseconds (0 = not since
+    /// linking). Saved at most once a minute, so it is that coarse.
+    #[serde(default)]
+    pub last_seen: i64,
 }
 
 impl std::fmt::Debug for Link {
@@ -36,8 +40,19 @@ impl std::fmt::Debug for Link {
             .field("platform", &self.platform)
             .field("key", &"<redacted>")
             .field("last_address", &self.last_address)
+            .field("last_seen", &self.last_seen)
             .finish()
     }
+}
+
+/// How stale the saved "last seen" time may get before it is written again.
+const SEEN_EVERY_MS: i64 = 60_000;
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+        .unwrap_or(0)
 }
 
 /// Most links one profile keeps; a new one past this replaces the oldest.
@@ -111,15 +126,30 @@ impl LinkStore {
 
     /// Records where a linked device was just reached.
     pub fn seen_at(&self, peer_device_id: &str, address: &str) {
+        self.heard(peer_device_id, Some(address), now_ms());
+    }
+
+    /// Notes that `peer_device_id` called in with its key just now.
+    pub fn touch(&self, peer_device_id: &str) {
+        self.heard(peer_device_id, None, now_ms());
+    }
+
+    /// Records the time (and address) a linked device was last heard from. The file is written
+    /// when the address changes or the saved time is a minute old, not on every request.
+    fn heard(&self, peer_device_id: &str, address: Option<&str>, now: i64) {
         let mut g = self.lock();
         let mut next = g.clone();
         let Some(l) = next.iter_mut().find(|l| l.peer_device_id == peer_device_id) else {
             return;
         };
-        if l.last_address == address {
+        let moved = address.is_some_and(|a| !a.is_empty() && l.last_address != a);
+        if !moved && now.saturating_sub(l.last_seen) < SEEN_EVERY_MS {
             return;
         }
-        address.clone_into(&mut l.last_address);
+        if let Some(a) = address.filter(|_| moved) {
+            a.clone_into(&mut l.last_address);
+        }
+        l.last_seen = now;
         if save(&self.file, &next).is_ok() {
             *g = next;
         }
@@ -203,6 +233,7 @@ mod tests {
             key: key.into(),
             last_address: "10.0.0.2:27193".into(),
             linked_at: 1,
+            last_seen: 0,
         }
     }
 
@@ -249,5 +280,49 @@ mod tests {
         assert!(LinkStore::open(&f).list().is_empty());
         let k = new_key().unwrap();
         assert!(!format!("{:?}", link("x", &k)).contains(&k));
+    }
+
+    #[test]
+    fn last_seen_is_saved_at_most_once_a_minute_unless_the_address_moves() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("links.json");
+        let s = LinkStore::open(&f);
+        s.put(link("phone", &new_key().unwrap())).unwrap();
+        s.heard("phone", None, 100_000);
+        assert_eq!(
+            LinkStore::open(&f).by_peer("phone").unwrap().last_seen,
+            100_000
+        );
+        s.heard("phone", None, 130_000);
+        assert_eq!(
+            LinkStore::open(&f).by_peer("phone").unwrap().last_seen,
+            100_000
+        );
+        s.heard("phone", Some("10.0.0.7:1"), 131_000);
+        let back = LinkStore::open(&f).by_peer("phone").unwrap();
+        assert_eq!(
+            (back.last_seen, back.last_address.as_str()),
+            (131_000, "10.0.0.7:1")
+        );
+        s.heard("phone", Some(""), 500_000);
+        assert_eq!(
+            LinkStore::open(&f).by_peer("phone").unwrap().last_address,
+            "10.0.0.7:1"
+        );
+        s.heard("nobody", None, 900_000);
+        assert_eq!(LinkStore::open(&f).list().len(), 1);
+    }
+
+    #[test]
+    fn a_file_from_before_last_seen_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("links.json");
+        let key = new_key().unwrap();
+        std::fs::write(
+            &f,
+            format!(r#"[{{"peerDeviceId":"p","peerName":"P","profileId":"x","platform":"android","key":"{key}","lastAddress":"a:1","linkedAt":5}}]"#),
+        )
+        .unwrap();
+        assert_eq!(LinkStore::open(&f).by_peer("p").unwrap().last_seen, 0);
     }
 }

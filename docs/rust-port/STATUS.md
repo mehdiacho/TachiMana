@@ -320,6 +320,19 @@ list. Draft: `docs/plan/system-plan.md` and `docs/protocol/README.md`. It has a 
 to H of the plan before he has answered; step B (select several manga, manga page that stacks
 when narrow, reader beside the library, library sorts) is his own ask and can go ahead.
 
+STEP B (branch `feat/step-b`, Mehdi's own asks of 2026-11-14): pick several manga in the library
+(Ctrl+click, Shift+click, Ctrl+A, Esc) with a bar for categories, mark read, download unread,
+refresh and remove; a Genres filter (every genre in the library with counts, searchable, several
+at once) and clickable genre pills on the manga page; sorts "Last read" and "Latest chapter",
+"Recently added" renamed "Date added" (glossary); the manga page puts its chapters under the
+details when its pane is under 760 px; "Read beside the library" (Settings > Reading and a button
+in the reader's top bar, off by default; full screen still takes the window); a reload button
+(F5, Ctrl+R) in the reader; linked devices show when they were last seen (`lastSeen` in
+links.json, written at most once a minute, set by mDNS and by calls in with the link key).
+Checked under Xvfb on the synthetic library with genres added; online-only bulk actions and
+last-seen were not exercised (no source or linked phone in the rig). The chapter fix (PR 34)
+shipped as 0.1.13.
+
 Next step: have Mehdi try merge + "Download all here" with the real phone, and
 read the fork's answer on mihon#11 (NAS password).
 Still open from Mehdi 2026-11-03: back up the NAS

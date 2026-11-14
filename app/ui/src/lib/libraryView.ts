@@ -1,12 +1,14 @@
 // Port of desktop/src/main/kotlin/tachimana/library/LibraryView.kt `applyLibraryView`.
 import type { LibraryEntryDto } from "../gen/LibraryEntryDto";
 
-export type LibrarySort = "TITLE" | "UNREAD" | "DATE_ADDED" | "LAST_UPDATED";
+export type LibrarySort = "TITLE" | "UNREAD" | "DATE_ADDED" | "LAST_UPDATED" | "LAST_READ" | "LATEST_CHAPTER";
 
 export const SORTS: { id: LibrarySort; label: string; defaultDescending: boolean }[] = [
   { id: "TITLE", label: "Title", defaultDescending: false },
   { id: "UNREAD", label: "Unread", defaultDescending: true },
-  { id: "DATE_ADDED", label: "Recently added", defaultDescending: true },
+  { id: "DATE_ADDED", label: "Date added", defaultDescending: true },
+  { id: "LAST_READ", label: "Last read", defaultDescending: true },
+  { id: "LATEST_CHAPTER", label: "Latest chapter", defaultDescending: true },
   { id: "LAST_UPDATED", label: "Last updated", defaultDescending: true },
 ];
 
@@ -21,6 +23,8 @@ export interface LibraryView {
   unreadOnly: boolean;
   downloadedOnly: boolean;
   query: string;
+  /** Show only manga with every one of these genres (compared ignoring case). */
+  genres: string[];
 }
 
 export const DEFAULT_VIEW: LibraryView = {
@@ -30,10 +34,46 @@ export const DEFAULT_VIEW: LibraryView = {
   unreadOnly: false,
   downloadedOnly: false,
   query: "",
+  genres: [],
 };
 
 export function isSort(s: string): s is LibrarySort {
   return SORTS.some((x) => x.id === s);
+}
+
+/** A genre as compared: trimmed and lower-cased, so "Action" and "action " are one genre. */
+export function genreKey(g: string): string {
+  return g.trim().toLowerCase();
+}
+
+function hasGenres(e: LibraryEntryDto, wanted: string[]): boolean {
+  if (wanted.length === 0) return true;
+  const have = new Set(e.manga.genres.map(genreKey));
+  return wanted.every((g) => have.has(genreKey(g)));
+}
+
+/**
+ * Every genre in the library with how many manga have it, most common first. The name shown is
+ * the spelling most manga use.
+ */
+export function genreCounts(entries: LibraryEntryDto[]): { name: string; count: number }[] {
+  const by = new Map<string, { count: number; spellings: Map<string, number> }>();
+  for (const e of entries) {
+    const seen = new Set<string>();
+    for (const raw of e.manga.genres) {
+      const k = genreKey(raw);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      const g = by.get(k) ?? { count: 0, spellings: new Map<string, number>() };
+      g.count += 1;
+      const name = raw.trim();
+      g.spellings.set(name, (g.spellings.get(name) ?? 0) + 1);
+      by.set(k, g);
+    }
+  }
+  return [...by.values()]
+    .map((g) => ({ name: [...g.spellings.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? "", count: g.count }))
+    .sort((a, b) => b.count - a.count || cmpTitle(a.name, b.name));
 }
 
 function inCategory(e: LibraryEntryDto, id: number | null): boolean {
@@ -50,6 +90,10 @@ function sortKey(e: LibraryEntryDto, sort: LibrarySort): number {
       return e.manga.dateAdded;
     case "LAST_UPDATED":
       return e.manga.lastUpdate;
+    case "LAST_READ":
+      return e.lastRead;
+    case "LATEST_CHAPTER":
+      return e.latestUpload;
     case "TITLE":
       return 0;
   }
@@ -78,7 +122,8 @@ export function applyLibraryView(entries: LibraryEntryDto[], view: LibraryView, 
         e.manga.title.toLowerCase().includes(q) ||
         (e.manga.author?.toLowerCase().includes(q) ?? false)) &&
       (!view.unreadOnly || e.unread > 0) &&
-      (!view.downloadedOnly || e.downloaded),
+      (!view.downloadedOnly || e.downloaded) &&
+      hasGenres(e, view.genres),
   );
   const cmp = (a: LibraryEntryDto, b: LibraryEntryDto) =>
     sortKey(a, view.sort) - sortKey(b, view.sort) || cmpTitle(a.manga.title, b.manga.title);
@@ -127,6 +172,7 @@ export function nextSort(view: LibraryView, sort: LibrarySort): Pick<LibraryView
 export function noMatchesLine(view: LibraryView): string {
   const q = view.query.trim();
   if (q) return `Nothing matches "${q}".`;
+  if (view.genres.length > 0) return `Nothing here is ${view.genres.join(" and ")}.`;
   if (view.unreadOnly && view.downloadedOnly) return "Nothing here is both unread and downloaded.";
   if (view.unreadOnly) return "Everything here is read.";
   if (view.downloadedOnly) return "Nothing here is downloaded yet.";

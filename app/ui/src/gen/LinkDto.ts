@@ -8,4 +8,8 @@ platform: string, lastAddress: string,
 /**
  * Unix milliseconds.
  */
-linkedAt: number, };
+linkedAt: number, 
+/**
+ * Last heard from or seen on the network, Unix milliseconds; 0 when not since linking.
+ */
+lastSeen: number, };

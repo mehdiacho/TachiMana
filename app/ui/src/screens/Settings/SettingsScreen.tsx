@@ -1,6 +1,6 @@
 // Settings (spec §3.7): theme, rotation, online sources, AniList, storage (data folder, page
 // cache, NAS), sync, updates and about.
-import { CheckCircle2, ChevronRight, Circle, Database, Puzzle, FolderOpen, HardDrive, Info, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, Database, Puzzle, FolderOpen, HardDrive, Info, PanelLeftClose, RefreshCw, RotateCw, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
 import { ProfilesSection } from "../Profiles/Profiles";
 import { api } from "../../api/commands";
 import { keys, queryClient, useAniList, useAppInfo, useHelper, useCacheUsage, useSetSettings, useSettings } from "../../api/queries";
@@ -27,6 +27,7 @@ const SECTIONS = [
   { id: "profiles", name: "Profiles" },
   { id: "appearance", name: "Appearance" },
   { id: "rotation", name: "Rotation" },
+  { id: "reading", name: "Reading" },
   { id: "online-sources", name: "Online sources" },
   { id: "tracking", name: "Tracking" },
   { id: "storage", name: "Storage" },
@@ -176,6 +177,8 @@ export function SettingsScreen() {
   const qc = useQueryClient();
   const rotated = useUi((u) => u.rotated);
   const setRotated = useUi((u) => u.setRotated);
+  const beside = useUi((u) => u.besideLibrary);
+  const setBeside = useUi((u) => u.setBesideLibrary);
   const setScreen = useUi((u) => u.setScreen);
   const st = settings.data;
   const clear = useAction(
@@ -244,6 +247,18 @@ export function SettingsScreen() {
               save.mutate({ rotated: v });
             }}
           />
+        </div>
+
+        <div className={s.section} id="settings-reading">Reading</div>
+        <div className={s.row}>
+          <PanelLeftClose size={20} className={s.rowIcon} />
+          <div className={s.rowText}>
+            <span className={s.rowTitle}>Read beside the library</span>
+            <span className={s.rowDesc}>
+              Chapters open in the manga's pane with the library list still beside them. Full screen still takes the whole window. Off by default; the reader's top bar has the same switch.
+            </span>
+          </div>
+          <Toggle label="Read beside the library" checked={beside} onChange={setBeside} />
         </div>
 
         <div className={s.section} id="settings-online-sources">Online sources</div>

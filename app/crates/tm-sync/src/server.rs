@@ -206,6 +206,8 @@ fn check_as(
         headers.get(LINK_HEADER).and_then(|v| v.to_str().ok()),
     ) {
         if let Some(link) = l.links.by_key(key) {
+            drop(failures);
+            l.links.touch(&link.peer_device_id);
             return Ok(Some(link));
         }
         failures.push(now);
@@ -323,6 +325,7 @@ async fn link_route(
         key: key.clone(),
         last_address: SocketAddr::new(from.ip(), port).to_string(),
         linked_at: now_ms(),
+        last_seen: now_ms(),
     };
     let peer = link.peer_device_id.clone();
     let links = Arc::clone(&linking.links);

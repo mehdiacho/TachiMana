@@ -35,11 +35,15 @@ import {
   type LibrarySort,
   type LibraryView,
 } from "../../lib/libraryView";
+import { STACK_BELOW, useWidth } from "../../hooks/useWidth";
 import { summary, useLibraryUpdate } from "../../store/libraryUpdate";
-import { useUi } from "../../store/ui";
+import { readsInPane, useUi } from "../../store/ui";
+import { ReaderScreen } from "../Reader/ReaderScreen";
 import { clamp, isBoolean, isNumber, isNumberList, usePref } from "../../lib/prefs";
 import { CategoryBar, type CategoryChoice } from "./CategoryBar";
 import { CategoryEditor } from "./CategoryEditor";
+import { BulkBar } from "./BulkBar";
+import { GenreMenu } from "./GenreMenu";
 import { LibraryRows } from "./LibraryRows";
 import { MangaDetail } from "./MangaDetail";
 import s from "./Library.module.css";
@@ -94,13 +98,19 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
   const invalidate = useLibraryInvalidate();
   const selected = useUi((u) => u.selectedMangaId);
   const select = useUi((u) => u.select);
+  const reader = useUi((u) => u.reader);
+  const inPane = useUi((u) => readsInPane(u, cls === "COMPACT"));
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const genres = useUi((u) => u.libraryGenres);
+  const setGenres = useUi((u) => u.setLibraryGenres);
+  const [picked, setPicked] = useState<Set<number>>(() => new Set());
   const [editor, setEditor] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const screenRef = useRef<HTMLDivElement>(null);
+  const [detailRef, detailW] = useWidth();
   const [masterW, setMasterW] = usePref("library.masterW", MASTER_W, isNumber);
   const [grouped, setGrouped] = usePref("library.grouped", false, isBoolean);
   const [foldedIds, setFoldedIds] = usePref<number[]>("library.folded", [], isNumberList);
@@ -126,14 +136,16 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
     descending: st?.librarySortDescending ?? false,
     unreadOnly: st?.libraryUnreadOnly ?? false,
     downloadedOnly: st?.libraryDownloadedOnly ?? false,
+    genres,
   };
   const grid = st?.libraryGrid ?? false;
-  const entries = useMemo(() => applyLibraryView(lib.data ?? [], view), [lib.data, view.categoryId, view.query, view.sort, view.descending, view.unreadOnly, view.downloadedOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  const entries = useMemo(() => applyLibraryView(lib.data ?? [], view), [lib.data, view.categoryId, view.query, view.sort, view.descending, view.unreadOnly, view.downloadedOnly, genres]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pickedEntries = useMemo(() => (lib.data ?? []).filter((e) => picked.has(e.manga.id)), [lib.data, picked]);
   const counts = useMemo(() => categoryCounts(lib.data ?? []), [lib.data]);
   const searching = query.trim() !== "";
   const sections = useMemo(
     () => (grouped ? librarySections(lib.data ?? [], cats.data ?? [], view) : null),
-    [grouped, lib.data, cats.data, view.query, view.sort, view.descending, view.unreadOnly, view.downloadedOnly], // eslint-disable-line react-hooks/exhaustive-deps
+    [grouped, lib.data, cats.data, view.query, view.sort, view.descending, view.unreadOnly, view.downloadedOnly, genres], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const choices = useMemo<CategoryChoice[]>(() => {
     const list: CategoryChoice[] = [{ id: null, name: "All", count: counts.get(null) ?? 0 }];
@@ -236,6 +248,8 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
         selected={selected}
         onSelect={select}
         folded={folded}
+        picked={picked}
+        onPicked={setPicked}
         onFold={(id, f) => setFoldedIds(f ? [...foldedIds.filter((x) => x !== id), id] : foldedIds.filter((x) => x !== id))}
       />
     );
@@ -266,6 +280,14 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
             )}
           </label>
           <CategoryBar choices={choices} active={searching ? null : categoryId} onPick={(id) => { setQuery(""); setCategoryId(id); }} grouped={grouped} onGrouped={setGrouped} onEdit={() => setEditor(true)} />
+          {pickedEntries.length > 0 ? (
+            <BulkBar
+              entries={pickedEntries}
+              total={shown}
+              onAll={() => setPicked(new Set(sections ? sections.flatMap((x) => x.entries.map((e) => e.manga.id)) : entries.map((e) => e.manga.id)))}
+              onClear={() => setPicked(new Set())}
+            />
+          ) : (
           <div className={s.header}>
             <span className={s.headerTitle}>{catName}</span>
             <span className={s.headerCount}>{shown}</span>
@@ -296,6 +318,7 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
             )}
             <IconButton icon={RefreshCw} label={scanning ? "Scanning the local folder…" : "Rescan local folder"} size={18} onClick={() => void rescan()} busy={scanning} />
           </div>
+          )}
           {update && (
             <div className={s.updateBar} role="status">
               <span>
@@ -312,6 +335,12 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
             <Chip active={view.downloadedOnly} onClick={() => save.mutate({ libraryDownloadedOnly: !view.downloadedOnly })}>
               {view.downloadedOnly && <Check size={14} />} Downloaded
             </Chip>
+            <GenreMenu entries={lib.data ?? []} picked={genres} onChange={setGenres} />
+            {genres.map((g) => (
+              <Chip key={g} active onClick={() => setGenres(genres.filter((x) => x !== g))} aria-label={`Stop filtering by ${g}`} title="Stop filtering by this genre">
+                {g} <X size={13} />
+              </Chip>
+            ))}
           </div>
           {body}
         </section>
@@ -327,16 +356,18 @@ export function LibraryScreen({ cls }: { cls: WidthClass }) {
         />
       )}
       {showDetail && (
-        <section className={s.detail} data-cls={cls}>
+        <section className={s.detail} data-cls={cls} data-stacked={cls !== "COMPACT" && detailW < STACK_BELOW} ref={detailRef}>
           {compact && (
             <div className={s.back}>
               <IconButton icon={ChevronLeft} label="Back to library" onClick={() => select(null)} />
             </div>
           )}
-          {selected === null ? (
+          {reader && inPane ? (
+            <ReaderScreen mangaId={reader.mangaId} chapterId={reader.chapterId} />
+          ) : selected === null ? (
             <EmptyState icon={BookOpen} title="Select a manga" />
           ) : (
-            <MangaDetail mangaId={selected} cls={cls} />
+            <MangaDetail mangaId={selected} cls={cls} stacked={cls === "COMPACT" || detailW < STACK_BELOW} />
           )}
         </section>
       )}

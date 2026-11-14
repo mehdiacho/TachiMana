@@ -318,10 +318,13 @@ function DetailSkeleton() {
   );
 }
 
-export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass }) {
+/** `stacked`: chapters under the details in one scroll (a phone, or a narrow pane). */
+export function MangaDetail({ mangaId, cls, stacked }: { mangaId: number; cls: WidthClass; stacked: boolean }) {
   const d = useMangaDetail(mangaId);
   const invalidate = useLibraryInvalidate();
   const openReader = useUi((u) => u.openReader);
+  const setGenres = useUi((u) => u.setLibraryGenres);
+  const select = useUi((u) => u.select);
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setError(null), [mangaId]);
@@ -497,7 +500,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
   return (
     <>
       <div className={s.tint} />
-      <div className={s.info} ref={infoRef} style={cls === "COMPACT" || infoW <= 0 ? undefined : { width: clamp(infoW, INFO_MIN, maxInfoW()) }}>
+      <div className={s.info} ref={infoRef} style={stacked || infoW <= 0 ? undefined : { width: clamp(infoW, INFO_MIN, maxInfoW()) }}>
         <div className={s.infoHead}>
           <Cover className={s.detailCover} mangaId={manga.id} version={manga.coverVersion} title={manga.title} />
           <div className={s.infoText}>
@@ -526,9 +529,18 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
         {manga.genres.length > 0 && (
           <div className={s.genres}>
             {manga.genres.map((g) => (
-              <span key={g} className={s.genre}>
+              <button
+                key={g}
+                type="button"
+                className={s.genre}
+                title={`Show the library's ${g} manga`}
+                onClick={() => {
+                  setGenres([g]);
+                  if (cls === "COMPACT") select(null);
+                }}
+              >
                 {g}
-              </span>
+              </button>
             ))}
           </div>
         )}
@@ -539,7 +551,7 @@ export function MangaDetail({ mangaId, cls }: { mangaId: number; cls: WidthClass
           </PrimaryButton>
         )}
       </div>
-      {cls !== "COMPACT" && (
+      {!stacked && (
         <SplitHandle
           label="Resize the manga's details"
           value={clamp(infoW > 0 ? infoW : defaultInfoW, INFO_MIN, maxInfoW())}

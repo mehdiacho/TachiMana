@@ -1,6 +1,6 @@
 // Shared components from spec §2 (buttons §2.7, badges §2.8, chips §2.9, toggle §2.14).
 import { AlertCircle, Download, Loader2, type LucideIcon } from "lucide-react";
-import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { coverUrl } from "../lib/tmUrl";
 import s from "./ui.module.css";
 
@@ -34,14 +34,14 @@ export function IconButton({
   );
 }
 
-function BusyButton({ cls, busy, disabled, children, ...rest }: BtnProps & Busy & { cls: string | undefined }) {
+const BusyButton = forwardRef<HTMLButtonElement, BtnProps & Busy & { cls: string | undefined }>(function BusyButton({ cls, busy, disabled, children, ...rest }, ref) {
   return (
-    <button type="button" className={cls} aria-busy={busy || undefined} disabled={disabled || busy} {...rest}>
+    <button ref={ref} type="button" className={cls} aria-busy={busy || undefined} disabled={disabled || busy} {...rest}>
       {busy && <Spinner size={14} />}
       {children}
     </button>
   );
-}
+});
 
 export function PrimaryButton(props: BtnProps & Busy) {
   return <BusyButton cls={s.primaryBtn} {...props} />;
@@ -51,9 +51,10 @@ export function OutlinedButton(props: BtnProps & Busy) {
   return <BusyButton cls={s.outlinedBtn} {...props} />;
 }
 
-export function TextButton(props: BtnProps & Busy) {
-  return <BusyButton cls={s.textBtn} {...props} />;
-}
+/** Forwards its ref, so it can open a menu (`Trigger asChild`). */
+export const TextButton = forwardRef<HTMLButtonElement, BtnProps & Busy>(function TextButton(props, ref) {
+  return <BusyButton ref={ref} cls={s.textBtn} {...props} />;
+});
 
 /** The app's one spinner. */
 export function Spinner({ size = 16, label }: { size?: number; label?: string }) {
@@ -96,14 +97,15 @@ export function SkeletonGrid({ count = 18 }: { count?: number }) {
   );
 }
 
-export function Chip({ active, count, children, ...rest }: BtnProps & { active?: boolean; count?: number }) {
+/** Forwards its ref, so it can open a menu (`Trigger asChild`). */
+export const Chip = forwardRef<HTMLButtonElement, BtnProps & { active?: boolean; count?: number }>(function Chip({ active, count, children, ...rest }, ref) {
   return (
-    <button type="button" className={s.chip} data-active={active} aria-pressed={active} {...rest}>
+    <button ref={ref} type="button" className={s.chip} data-active={active} aria-pressed={active} {...rest}>
       {children}
       {count !== undefined && <span className={s.chipCount}>{count}</span>}
     </button>
   );
-}
+});
 
 export function UnreadBadge({ count }: { count: number }) {
   if (count <= 0) return null;

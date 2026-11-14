@@ -10,6 +10,7 @@ import type { CmdError } from "../../gen/CmdError";
 import type { LinkDto } from "../../gen/LinkDto";
 import type { LinksDto } from "../../gen/LinksDto";
 import { useAction } from "../../hooks/useAction";
+import { relativeDate } from "../../lib/chapters";
 import { cleanCode, spacedCode } from "../../lib/sync";
 import l from "../Library/Library.module.css";
 import st from "../Settings/Settings.module.css";
@@ -18,6 +19,13 @@ import s from "./Sync.module.css";
 function since(ms: number): string {
   const d = new Date(ms);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "Linked 3 Nov 2026 · last seen 5 min ago at 192.168.0.4:27193". */
+export function linkLine(link: LinkDto, now = Date.now()): string {
+  const seen = Number(link.lastSeen);
+  const when = seen > 0 ? `last seen ${relativeDate(seen, now)}` : "not seen since linking";
+  return `Linked ${since(Number(link.linkedAt))} · ${when}${link.lastAddress ? ` at ${link.lastAddress}` : ""}`;
 }
 
 function LinkRow({ link }: { link: LinkDto }) {
@@ -37,7 +45,7 @@ function LinkRow({ link }: { link: LinkDto }) {
       <div className={st.rowText}>
         <span className={st.rowTitle}>{link.peerName}</span>
         <span className={st.rowDesc}>
-          {confirm ? "It will need the pairing code again to link." : `Linked ${since(Number(link.linkedAt))}${link.lastAddress ? ` · last seen at ${link.lastAddress}` : ""}`}
+          {confirm ? "It will need the pairing code again to link." : linkLine(link)}
         </span>
       </div>
       <div className={st.buttons}>

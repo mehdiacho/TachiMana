@@ -56,6 +56,29 @@ const LATEST_SQL: &str = "WITH pick AS (SELECT c.manga_id AS manga_id, CASE WHEN
      SELECT c.manga_id, c.name FROM pick p \
      JOIN chapters c ON c.manga_id = p.manga_id AND c.source_order = p.so";
 
+const TIMES_SQL: &str = "SELECT c.manga_id, MAX(c.date_upload), MAX(h.history_last_read) \
+     FROM chapters c LEFT JOIN history h ON h.history_chapter_id = c._id GROUP BY c.manga_id";
+
+/// Per manga: the newest chapter's upload time and when it was last read (0 when never).
+fn manga_times(db: &tm_db::Db) -> R<HashMap<i64, (i64, i64)>> {
+    Ok(db.read(|c| {
+        let mut st = c.prepare(TIMES_SQL)?;
+        let rows = st.query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, Option<i64>>(1)?.unwrap_or(0),
+                r.get::<_, Option<i64>>(2)?.unwrap_or(0),
+            ))
+        })?;
+        let mut out = HashMap::new();
+        for row in rows {
+            let (id, upload, read) = row?;
+            out.insert(id, (upload, read));
+        }
+        Ok(out)
+    })?)
+}
+
 /// Newest chapter name per manga. Online sources list newest first (`source_order` 0 is the
 /// newest); the local importer numbers files in natural order (0 is the oldest).
 pub fn latest_names(db: &tm_db::Db) -> R<HashMap<i64, String>> {
@@ -86,6 +109,7 @@ fn library_now(state: &AppState) -> R<Vec<LibraryEntryDto>> {
     let unread = state.db.unread_counts()?;
     let cats = state.db.category_assignments()?;
     let latest = latest_names(&state.db)?;
+    let times = manga_times(&state.db)?;
     Ok(mangas
         .iter()
         .map(|m| LibraryEntryDto {
@@ -97,6 +121,8 @@ fn library_now(state: &AppState) -> R<Vec<LibraryEntryDto>> {
                 .unwrap_or_default(),
             downloaded: crate::downloads::has_any(state, m),
             latest_chapter: latest.get(&m.id).cloned(),
+            latest_upload: times.get(&m.id).map_or(0, |t| t.0),
+            last_read: times.get(&m.id).map_or(0, |t| t.1),
         })
         .collect())
 }
@@ -361,7 +387,14 @@ pub fn settings_get(state: State<'_, AppState>) -> R<UiSettings> {
 
 const THEMES: &[&str] = &["YOKAI_DARK", "YOKAI_LIGHT", "MIDNIGHT", "INK_VERMILION"];
 const FITS: &[&str] = &["FIT_SCREEN", "FIT_WIDTH", "FIT_HEIGHT", "ORIGINAL"];
-const SORTS: &[&str] = &["TITLE", "UNREAD", "DATE_ADDED", "LAST_UPDATED"];
+const SORTS: &[&str] = &[
+    "TITLE",
+    "UNREAD",
+    "DATE_ADDED",
+    "LAST_UPDATED",
+    "LAST_READ",
+    "LATEST_CHAPTER",
+];
 
 fn one_of(v: &str, allowed: &[&str], what: &str) -> R<()> {
     if allowed.contains(&v) {

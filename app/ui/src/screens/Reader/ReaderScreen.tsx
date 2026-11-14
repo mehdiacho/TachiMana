@@ -2,8 +2,8 @@
 // directions: the strip loads the next chapter at the end and the previous one at the top without
 // a jump; paged modes turn across chapter edges.
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Maximize, Minimize, Minus, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Maximize, Minimize, Minus, PanelLeftClose, PanelLeftOpen, Plus, RotateCw } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/commands";
 import { useLibraryInvalidate, useMangaDetail, useSetSettings, useSettings } from "../../api/queries";
 import { ErrorState, IconButton, Loading } from "../../components/ui";
@@ -83,6 +83,9 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
   const openReader = useUi((u) => u.openReader);
   const immersive = useUi((u) => u.immersive);
   const setImmersive = useUi((u) => u.setImmersive);
+  const beside = useUi((u) => u.besideLibrary);
+  const setBeside = useUi((u) => u.setBesideLibrary);
+  const onLibrary = useUi((u) => u.screen === "library");
   const settings = useSettings();
   const save = useSetSettings();
   const invalidate = useLibraryInvalidate();
@@ -146,6 +149,13 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
       openReader({ mangaId: detail.manga.id, chapterId: next.id });
     }
   };
+  // Reload: fetch the chapter's page list again and redraw the pages, for a page that failed or a
+  // chapter the source has just fixed.
+  const [reloads, setReloads] = useState(0);
+  const reload = () => {
+    win.retry(pos.chapter);
+    setReloads((n) => n + 1);
+  };
   const hasPrev = pos.chapter > 0;
   const hasNext = pos.chapter < seq.length - 1;
 
@@ -167,6 +177,10 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
     } else if (e.key === "F11" || ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.altKey && !e.metaKey)) {
       e.preventDefault();
       setImmersive(!immersive);
+    } else if (e.key === "F5" || (e.ctrlKey && !e.altKey && (e.key === "r" || e.key === "R"))) {
+      // Never the webview's own reload, which would restart the whole app.
+      e.preventDefault();
+      reload();
     } else if (e.key === "]" || (e.ctrlKey && e.key === "ArrowRight")) {
       e.preventDefault();
       goChapter(1);
@@ -222,10 +236,19 @@ function Reader({ detail, chapterId }: { detail: NonNullable<ReturnType<typeof u
         )}
         <ChoiceMenu label="How pages fit" options={FITS} value={fit} onChange={(f) => save.mutate({ readerFit: f })} />
         <ChoiceMenu label="Reading mode" options={MODES} value={mode} onChange={changeMode} />
+        <IconButton icon={RotateCw} label="Reload the chapter (F5)" size={18} onClick={reload} />
+        {onLibrary && !immersive && (
+          <IconButton
+            icon={beside ? PanelLeftOpen : PanelLeftClose}
+            label={beside ? "Read over the whole window" : "Read beside the library"}
+            size={18}
+            onClick={() => setBeside(!beside)}
+          />
+        )}
         <IconButton icon={immersive ? Minimize : Maximize} label={immersive ? "Leave full screen (F or Esc)" : "Full screen (F)"} size={18} onClick={() => setImmersive(!immersive)} />
       </div>
       <div className={s.area}>
-        {seq.length === 0 ? <ErrorState message="This manga has no chapters to read." onRetry={close} /> : view}
+        {seq.length === 0 ? <ErrorState message="This manga has no chapters to read." onRetry={close} /> : <Fragment key={reloads}>{view}</Fragment>}
         {total > 0 && (
           <div className={s.progress}>
             <div className={s.progressFill} style={{ width: `${(Math.min(pos.page + 1, total) / total) * 100}%`, marginLeft: rtl ? "auto" : undefined }} />

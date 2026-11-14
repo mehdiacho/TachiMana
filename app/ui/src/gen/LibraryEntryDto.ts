@@ -12,4 +12,12 @@ downloaded: boolean,
 /**
  * Name of the most recently uploaded chapter, for the row subtitle.
  */
-latestChapter: string | null, };
+latestChapter: string | null, 
+/**
+ * Upload time of the newest chapter, epoch ms (0 when unknown).
+ */
+latestUpload: number, 
+/**
+ * When any chapter was last read, epoch ms (0 when never).
+ */
+lastRead: number, };

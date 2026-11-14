@@ -287,9 +287,8 @@ the stand-in peer before it is tried on the real phone.
   network too so that neither device has to be awake for the other. A hosted account comes last.
 - **D4: reading beside the library is not the default.** It is a switch the user turns on; once on,
   "Start / Continue" opens the reader in the manga pane and the library stays visible.
-- **D2 is waiting on a clarification** he asked for. "Read-only" would have meant the follower
-  cannot add or remove manga or change categories; reading would still be marked there. The
-  proposal stands: the follower works normally and its changes simply stay on it.
+- **D2: the follower works normally and its changes stay on it** (decided 2026-11-14). In a
+  one-way mode the follower can still add, remove, recategorise and read; none of it is sent.
 - **A shared feature catalogue and glossary** so neither session describes a screen the other app
   does not have: [`docs/catalog/`](../catalog/README.md).
 

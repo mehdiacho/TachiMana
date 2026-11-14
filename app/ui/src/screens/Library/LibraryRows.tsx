@@ -1,6 +1,6 @@
 // The library list or cover grid, flat or as one page of category sections that fold. The arrow
 // keys move through the manga; Home and End jump to the ends. A right-click (or the menu key)
-// on a manga opens its menu.
+// on a manga opens its menu. Ctrl+click picks several, Shift+click a run, Ctrl+A all, Esc none.
 import * as Ctx from "@radix-ui/react-context-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -56,6 +56,8 @@ export function LibraryRows({
   onSelect,
   folded,
   onFold,
+  picked,
+  onPicked,
 }: {
   /** Sections for the grouped view, or null for one flat list of `entries`. */
   sections: LibrarySection[] | null;
@@ -65,6 +67,9 @@ export function LibraryRows({
   onSelect: (id: number) => void;
   folded: ReadonlySet<number>;
   onFold: (id: number, folded: boolean) => void;
+  /** Manga picked for a bulk action (not the same as the one open). */
+  picked: ReadonlySet<number>;
+  onPicked: (next: Set<number>) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(320);
@@ -96,6 +101,36 @@ export function LibraryRows({
     return out;
   }, [items]);
   const at = useRef(-1);
+  // Where a Shift+click run starts.
+  const anchor = useRef(-1);
+
+  /** A click on the manga at `pos`: open it, or with Ctrl or Shift add it to the picked ones. */
+  const click = (ev: React.MouseEvent, pos: number, id: number) => {
+    at.current = pos;
+    if (ev.shiftKey) {
+      let from = anchor.current;
+      if (from < 0 || from >= order.length) from = Math.max(0, order.findIndex((o) => o.id === selected));
+      const next = new Set(ev.ctrlKey || ev.metaKey ? picked : []);
+      for (let i = Math.min(from, pos); i <= Math.max(from, pos); i++) {
+        const o = order[i];
+        if (o) next.add(o.id);
+      }
+      onPicked(next);
+      return;
+    }
+    anchor.current = pos;
+    if (ev.ctrlKey || ev.metaKey) {
+      const next = new Set(picked);
+      // The open manga counts as the first one picked, as in a file manager.
+      if (next.size === 0 && selected !== null && selected !== id && order.some((o) => o.id === selected)) next.add(selected);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      onPicked(next);
+      return;
+    }
+    if (picked.size > 0) onPicked(new Set());
+    onSelect(id);
+  };
 
   const move = (to: number) => {
     const target = order[to];
@@ -108,6 +143,18 @@ export function LibraryRows({
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // Keys pressed in a menu opened from here bubble up through React; they are not ours.
+    if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "a" || e.key === "A") && order.length > 0) {
+      e.preventDefault();
+      onPicked(new Set(order.map((o) => o.id)));
+      return;
+    }
+    if (e.key === "Escape" && picked.size > 0) {
+      e.preventDefault();
+      onPicked(new Set());
+      return;
+    }
     if (e.ctrlKey || e.altKey || e.metaKey || order.length === 0) return;
     let here = at.current;
     if (here < 0 || order[here]?.id !== selected) here = order.findIndex((o) => o.id === selected);
@@ -177,12 +224,10 @@ export function LibraryRows({
                 aria-selected={selected === e.manga.id}
                 className={s.row}
                 data-selected={selected === e.manga.id}
+                data-picked={picked.has(e.manga.id)}
                 data-pos={it.first}
                 style={{ ...style, height: ROW_H }}
-                onClick={() => {
-                  at.current = it.first;
-                  onSelect(e.manga.id);
-                }}
+                onClick={(ev) => click(ev, it.first, e.manga.id)}
               >
                 <Cover mangaId={e.manga.id} version={e.manga.coverVersion} title={e.manga.title} width={40} height={57} />
                 <span className={s.rowText}>
@@ -217,11 +262,9 @@ export function LibraryRows({
                   aria-selected={selected === e.manga.id}
                   className={s.cell}
                   data-selected={selected === e.manga.id}
+                  data-picked={picked.has(e.manga.id)}
                   data-pos={it.first + n}
-                  onClick={() => {
-                    at.current = it.first + n;
-                    onSelect(e.manga.id);
-                  }}
+                  onClick={(ev) => click(ev, it.first + n, e.manga.id)}
                   title={e.manga.title}
                 >
                   <Cover className={s.cellCover} mangaId={e.manga.id} version={e.manga.coverVersion} title={e.manga.title} />

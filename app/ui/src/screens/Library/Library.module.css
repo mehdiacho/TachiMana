@@ -137,6 +137,28 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.menuSearch {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-sm);
+  padding: var(--tm-space-sm) var(--tm-space-base);
+  margin-bottom: var(--tm-space-xs);
+  border-bottom: var(--tm-hairline) solid var(--tm-color-divider);
+  color: var(--tm-color-on-background-med);
+  position: sticky;
+  top: calc(-1 * var(--tm-space-sm));
+  background: var(--tm-color-surface);
+  z-index: 1;
+}
+.menuSearch input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--tm-color-on-background);
+  font: var(--tm-type-body-small);
+}
 .menuCount {
   font: var(--tm-type-caption);
   color: var(--tm-color-on-background-med);
@@ -226,6 +248,7 @@
 
 .filters {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--tm-space-sm);
   padding: 0 var(--tm-space-lg) var(--tm-space-sm);
   flex: none;
@@ -253,8 +276,15 @@
 .row:hover {
   background: var(--tm-color-hover);
 }
-.row[data-selected="true"] {
+.row[data-selected="true"],
+.row[data-picked="true"] {
   background: var(--tm-color-accent-selected);
+}
+.row[data-picked="true"] .rowTitle::before,
+.cell[data-picked="true"] .cellTitle::before {
+  content: "✓ ";
+  color: var(--tm-color-accent);
+  font-weight: 700;
 }
 .rowText {
   flex: 1;
@@ -305,6 +335,7 @@
   outline-color: var(--tm-color-accent);
 }
 /* The cover fills the cell, so the ring for the open manga is drawn over it. */
+.cell[data-picked="true"]::after,
 .cell[data-selected="true"]::after {
   content: "";
   position: absolute;
@@ -351,7 +382,8 @@
   position: relative;
   overflow: hidden;
 }
-.detail[data-cls="COMPACT"] {
+.detail[data-cls="COMPACT"],
+.detail[data-stacked="true"] {
   flex-direction: column;
   overflow-y: auto;
 }
@@ -377,9 +409,15 @@
 .detail[data-cls="MEDIUM"] .info {
   width: 340px;
 }
-.detail[data-cls="COMPACT"] .info {
+.detail[data-cls="COMPACT"] .info,
+.detail[data-stacked="true"] .info {
   width: auto;
   overflow: visible;
+  flex: none;
+}
+/* Side by side, the cover and title row sits above the actions; stacked there is room beside it. */
+.detail[data-stacked="true"] .infoSpacer {
+  display: none;
 }
 .infoHead {
   display: flex;
@@ -442,6 +480,12 @@
   background: var(--tm-color-surface);
   border-radius: var(--tm-radius-md);
   padding: var(--tm-space-xs) var(--tm-space-base);
+  color: inherit;
+  cursor: pointer;
+}
+.genre:hover,
+.genre:focus-visible {
+  background: var(--tm-color-hover-strong);
 }
 .infoSpacer {
   flex: 1;
@@ -454,9 +498,12 @@
   flex-direction: column;
   position: relative;
 }
-.detail[data-cls="COMPACT"] .chapters {
+.detail[data-cls="COMPACT"] .chapters,
+.detail[data-stacked="true"] .chapters {
   border-left: 0;
   min-height: 60vh;
+  flex: none;
+  height: 85vh;
 }
 .chaptersHead {
   display: flex;
@@ -836,4 +883,11 @@
   place-items: center;
   flex: none;
   color: var(--tm-color-on-background-med);
+}
+
+/* The header row while several manga are picked. */
+.bulk {
+  flex-wrap: wrap;
+  row-gap: 0;
+  background: var(--tm-color-accent-selected);
 }

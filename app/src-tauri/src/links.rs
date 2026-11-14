@@ -28,6 +28,9 @@ pub struct LinkDto {
     /// Unix milliseconds.
     #[ts(type = "number")]
     pub linked_at: i64,
+    /// Last heard from or seen on the network, Unix milliseconds; 0 when not since linking.
+    #[ts(type = "number")]
+    pub last_seen: i64,
 }
 
 impl From<&Link> for LinkDto {
@@ -38,6 +41,7 @@ impl From<&Link> for LinkDto {
             platform: l.platform.clone(),
             last_address: l.last_address.clone(),
             linked_at: l.linked_at,
+            last_seen: l.last_seen,
         }
     }
 }
@@ -209,7 +213,7 @@ fn unreachable_err(host: &str, port: u16) -> CmdError {
     )
 }
 
-fn address_of(host: &str, port: u16) -> String {
+pub(crate) fn address_of(host: &str, port: u16) -> String {
     if host.contains(':') {
         format!("[{host}]:{port}")
     } else {
@@ -307,6 +311,7 @@ pub async fn link_device(
         key,
         last_address: address_of(&host, port),
         linked_at: now_ms(),
+        last_seen: now_ms(),
     };
     let dto = LinkDto::from(&link);
     let Some((their_id, their_name)) = joining else {
