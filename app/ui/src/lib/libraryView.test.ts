@@ -1,7 +1,7 @@
 // Cases from desktop/src/main/kotlin/tachimana/library/CategorySelfTest.kt.
 import { describe, expect, it } from "vitest";
 import type { LibraryEntryDto } from "../gen/LibraryEntryDto";
-import { applyLibraryView, categoryCounts, DEFAULT_VIEW, librarySections, nextSort, noMatchesLine, UNCATEGORIZED } from "./libraryView";
+import { applyLibraryView, categoryCounts, genreCounts, DEFAULT_VIEW, librarySections, nextSort, noMatchesLine, UNCATEGORIZED } from "./libraryView";
 
 const READING = 1;
 const ON_HOLD = 2;
@@ -11,7 +11,7 @@ function entry(
   title: string,
   unread: number,
   categoryIds: number[],
-  extra: { author?: string; dateAdded?: number; downloaded?: boolean } = {},
+  extra: { author?: string; dateAdded?: number; downloaded?: boolean; genres?: string[]; lastRead?: number; latestUpload?: number } = {},
 ): LibraryEntryDto {
   return {
     manga: {
@@ -23,7 +23,7 @@ function entry(
       author: extra.author ?? null,
       artist: null,
       description: null,
-      genres: [],
+      genres: extra.genres ?? [],
       status: 0,
       viewer: 0,
       dateAdded: extra.dateAdded ?? 0,
@@ -35,6 +35,8 @@ function entry(
     categoryIds,
     downloaded: extra.downloaded ?? false,
     latestChapter: null,
+    latestUpload: extra.latestUpload ?? 0,
+    lastRead: extra.lastRead ?? 0,
   };
 }
 
@@ -118,4 +120,30 @@ describe("librarySections", () => {
   it("searches inside each section", () => expect(names({ query: "alp" })).toEqual(["Reading:Alpha", "On hold:Alpha"]));
   it("is one section called All when there are no categories", () =>
     expect(librarySections(entries, [], DEFAULT_VIEW).map((x) => x.name)).toEqual(["All"]));
+});
+
+describe("genres and the newer sorts", () => {
+  const more = [
+    entry(1, "Alpha", 0, [], { genres: ["Action", "Comedy"], lastRead: 50, latestUpload: 900 }),
+    entry(2, "Beta", 0, [], { genres: ["action ", "Drama"], lastRead: 70, latestUpload: 100 }),
+    entry(3, "Gamma", 0, [], { genres: ["Comedy", "Comedy"], latestUpload: 500 }),
+  ];
+  const t = (v: Partial<typeof DEFAULT_VIEW>) => applyLibraryView(more, { ...DEFAULT_VIEW, ...v }).map((e) => e.manga.title);
+  it("filters by every picked genre, ignoring case and spaces", () => {
+    expect(t({ genres: ["ACTION"] })).toEqual(["Alpha", "Beta"]);
+    expect(t({ genres: ["action", "comedy"] })).toEqual(["Alpha"]);
+    expect(t({ genres: ["Horror"] })).toEqual([]);
+    expect(noMatchesLine({ ...DEFAULT_VIEW, genres: ["Horror"] })).toBe("Nothing here is Horror.");
+  });
+  it("counts each genre once per manga, most common first", () => {
+    expect(genreCounts(more)).toEqual([
+      { name: "Action", count: 2 },
+      { name: "Comedy", count: 2 },
+      { name: "Drama", count: 1 },
+    ]);
+  });
+  it("sorts by last read and by latest chapter", () => {
+    expect(t({ sort: "LAST_READ", descending: true })).toEqual(["Beta", "Alpha", "Gamma"]);
+    expect(t({ sort: "LATEST_CHAPTER", descending: true })).toEqual(["Alpha", "Gamma", "Beta"]);
+  });
 });

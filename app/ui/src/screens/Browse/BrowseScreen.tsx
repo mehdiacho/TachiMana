@@ -7,6 +7,7 @@ import type { WidthClass } from "../../components/Shell";
 import { SplitHandle } from "../../components/SplitHandle";
 import { EmptyState, IconButton, Loading } from "../../components/ui";
 import { clamp, isNumber, usePref } from "../../lib/prefs";
+import { STACK_BELOW, useWidth } from "../../hooks/useWidth";
 import { useBrowse } from "../../store/browse";
 import l from "../Library/Library.module.css";
 import { MangaDetail } from "../Library/MangaDetail";
@@ -27,6 +28,7 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
   const screenRef = useRef<HTMLDivElement>(null);
   const [masterW, setMasterW] = usePref("library.masterW", 340, isNumber);
   const maxMasterW = () => Math.max(260, (screenRef.current?.clientWidth ?? 1200) - 420);
+  const [detailRef, detailW] = useWidth();
 
   useEffect(() => {
     if (!toast) return;
@@ -80,7 +82,7 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
         <SplitHandle label="Resize the list" value={clamp(masterW, 260, maxMasterW())} min={260} max={maxMasterW} onChange={setMasterW} onReset={() => setMasterW(340)} />
       )}
       {showDetail && (
-        <section className={l.detail} data-cls={cls}>
+        <section className={l.detail} data-cls={cls} data-stacked={!compact && detailW < STACK_BELOW} ref={detailRef}>
           {compact && (
             <div className={l.back}>
               <IconButton icon={ChevronLeft} label="Back to results" onClick={() => openManga(null)} />
@@ -89,7 +91,7 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
           {mangaId === null ? (
             <EmptyState icon={BookOpen} title={source ? "Pick a title" : "Open a source to browse"} />
           ) : (
-            <MangaDetail mangaId={mangaId} cls={cls} />
+            <MangaDetail mangaId={mangaId} cls={cls} stacked={compact || detailW < STACK_BELOW} />
           )}
         </section>
       )}

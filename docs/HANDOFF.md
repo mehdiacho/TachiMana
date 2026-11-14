@@ -29,5 +29,10 @@ Read this first if you are picking up TachiMana work in a fresh session.
 
 ## Planning in progress (2026-11-14)
 
-Before more sync work, read `docs/plan/system-plan.md` (draft, waiting on Mehdi's answers) and
+Decided: D1 two-way by default, D2 a follower works normally but its changes are not sent, D3 the
+existing remote storage (WebDAV) holds the shared state and direct talk stays on the same network,
+D4 reading beside the library is a toggle, off by default (built in step B). Step B is the
+library/manga-page work in STATUS.md; steps C to H wait on the phone side (mihon#13, #14).
+
+Before more sync work, read `docs/plan/system-plan.md` (draft) and
 `docs/protocol/README.md` (the TachiMana Link Protocol and the form for phone-app work orders).

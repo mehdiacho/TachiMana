@@ -9,11 +9,12 @@ import { RecentsScreen } from "./screens/Recents/RecentsScreen";
 import { SettingsScreen } from "./screens/Settings/SettingsScreen";
 import { SyncScreen } from "./screens/Sync/SyncScreen";
 import { useDownloads } from "./store/downloads";
-import { useUi } from "./store/ui";
+import { readsInPane, useUi } from "./store/ui";
 
 export function App() {
   const screen = useUi((u) => u.screen);
   const reader = useUi((u) => u.reader);
+  const beside = useUi((u) => u.besideLibrary);
   const settings = useSettings();
   const theme = settings.data?.theme;
 
@@ -34,7 +35,7 @@ export function App() {
           {screen === "downloads" && <DownloadsScreen />}
           {screen === "sync" && <SyncScreen />}
           {screen === "settings" && <SettingsScreen />}
-          {reader && <ReaderScreen mangaId={reader.mangaId} chapterId={reader.chapterId} />}
+          {reader && !readsInPane({ besideLibrary: beside, screen }, cls === "COMPACT") && <ReaderScreen mangaId={reader.mangaId} chapterId={reader.chapterId} />}
         </>
       )}
     </Shell>

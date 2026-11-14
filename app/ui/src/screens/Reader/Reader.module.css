@@ -233,6 +233,11 @@
 /* Full screen: the pages get the whole window. The bars wait just past the top and bottom
    edges and come back when the mouse reaches an edge, a control has the keyboard, or one of
    their menus is open. */
+/* Read beside the library, full screen still takes the whole window. */
+.reader[data-immersive="true"] {
+  position: fixed;
+  z-index: 50;
+}
 .reader[data-immersive="true"] .top,
 .reader[data-immersive="true"] .bottom {
   position: absolute;

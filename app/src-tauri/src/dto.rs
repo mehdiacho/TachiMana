@@ -80,6 +80,12 @@ pub struct LibraryEntryDto {
     pub downloaded: bool,
     /// Name of the most recently uploaded chapter, for the row subtitle.
     pub latest_chapter: Option<String>,
+    /// Upload time of the newest chapter, epoch ms (0 when unknown).
+    #[ts(type = "number")]
+    pub latest_upload: i64,
+    /// When any chapter was last read, epoch ms (0 when never).
+    #[ts(type = "number")]
+    pub last_read: i64,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

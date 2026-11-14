@@ -87,6 +87,9 @@ impl Sync {
     }
 
     fn add_peer(&self, peer: PeerDevice) {
+        // A linked device announcing itself counts as seen, at the address it announced.
+        self.links
+            .seen_at(&peer.id, &crate::links::address_of(&peer.host, peer.port));
         let mut peers = lock(&self.peers);
         peers.retain(|p| p.id != peer.id);
         peers.push(peer);
