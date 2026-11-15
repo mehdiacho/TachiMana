@@ -418,3 +418,14 @@ button.item:hover,
 .globalMore:hover {
   background: var(--tm-color-outline-faint);
 }
+
+/* The row of chips under a search box. Its own rule: the library's chips sit inside a bar and
+   stretch to fill it, which in a column would take half the pane's height. */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-sm);
+  flex: none;
+  min-width: 0;
+  padding: 0 var(--tm-space-md) var(--tm-space-sm);
+}

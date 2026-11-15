@@ -127,7 +127,7 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
         <Search size={20} />
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Search ${view.name}`} aria-label={`Search ${view.name}`} maxLength={500} />
       </form>
-      <div className={l.chips} role="toolbar" aria-label="Listing">
+      <div className={s.chipRow} role="toolbar" aria-label="Listing">
         {modes.map((m) => (
           <Chip key={m.id} active={view.mode === m.id} onClick={() => setMode(m.id, "")}>
             {m.label}

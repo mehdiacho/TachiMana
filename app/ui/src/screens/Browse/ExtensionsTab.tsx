@@ -165,7 +165,7 @@ export function ExtensionsTab() {
         <Search size={20} />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search extensions" aria-label="Search extensions" />
       </label>
-      <div className={l.chips} role="toolbar" aria-label="Filters">
+      <div className={s.chipRow} role="toolbar" aria-label="Filters">
         <Chip onClick={() => setReposOpen(true)}>
           <Library size={15} /> Repositories{hasRepos ? ` · ${(repos.data ?? []).length}` : ""}
         </Chip>
