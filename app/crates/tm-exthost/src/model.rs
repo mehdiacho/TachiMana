@@ -175,6 +175,26 @@ pub struct Preference {
     pub accepted: Option<bool>,
 }
 
+/// One of a source's search filters (api.md "Filters"). Groups hold filters.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Filter {
+    /// `header`, `separator`, `select`, `text`, `checkbox`, `tristate`, `sort` or `group`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(default)]
+    pub name: String,
+    /// The choices of a select or a sort.
+    #[serde(default)]
+    pub values: Option<Vec<String>>,
+    /// The state the source starts it in; its shape depends on `kind`.
+    #[serde(default)]
+    pub state: Option<Value>,
+    /// The filters inside a group.
+    #[serde(default)]
+    pub filters: Option<Vec<Filter>>,
+}
+
 /// Image bytes and the content type the host reported.
 #[derive(Debug, Clone)]
 pub struct Image {

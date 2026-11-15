@@ -42,7 +42,10 @@ Then settings as pages with search and the NSFW source switch and mark (0.1.17, 
 "SETTINGS PAGES AND NSFW").
 
 **What to build next on the computer** is ranked in `docs/plan/improvement-review.md` (a review of
-every screen against Mihon, 2026-11-14). It waits on Mehdi's ranking. `hello/1` and the stand-in peer
+every screen against Mihon, 2026-11-14). Mehdi said go on the first batch 2026-11-15: items 1 and
+2 (a source's filters, search across all sources) are 0.1.19, STATUS.md "SOURCE FILTERS AND SEARCH
+ACROSS SOURCES"; neither has been seen against a real source yet. Next in that batch: items 3 and
+4 (chapter list, reader). `hello/1` and the stand-in peer
 are built on the computer (branch `feat/hello`, STATUS.md "HELLO AND THE STAND-IN PEER"); the
 phone already serves `/hello`. `docs/catalog/computer.md` lists every screen of the computer app
 (first pass, no screenshots yet); change it in the same change as a screen.

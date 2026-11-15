@@ -13,6 +13,7 @@ import l from "../Library/Library.module.css";
 import { MangaDetail } from "../Library/MangaDetail";
 import s from "./Browse.module.css";
 import { ExtensionsTab } from "./ExtensionsTab";
+import { GlobalSearch } from "./GlobalSearch";
 import { SourcesTab } from "./SourcesTab";
 import { SourceView } from "./SourceView";
 
@@ -21,6 +22,7 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
   const tab = useBrowse((b) => b.tab);
   const setTab = useBrowse((b) => b.setTab);
   const source = useBrowse((b) => b.source);
+  const global = useBrowse((b) => b.global);
   const mangaId = useBrowse((b) => b.mangaId);
   const openManga = useBrowse((b) => b.openManga);
   const [toast, setToast] = useState<string | null>(null);
@@ -56,6 +58,8 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
         <section className={l.master} data-cls={cls} style={compact ? undefined : { width: clamp(masterW, 260, maxMasterW()) }}>
           {source ? (
             <SourceView view={source} cls={cls} onToast={setToast} />
+          ) : global !== null ? (
+            <GlobalSearch query={global} onToast={setToast} />
           ) : (
             <>
               <div className={s.tabs} role="tablist" aria-label="Browse">
@@ -89,7 +93,7 @@ export function BrowseScreen({ cls }: { cls: WidthClass }) {
             </div>
           )}
           {mangaId === null ? (
-            <EmptyState icon={BookOpen} title={source ? "Pick a title" : "Open a source to browse"} />
+            <EmptyState icon={BookOpen} title={source || global !== null ? "Pick a title" : "Open a source to browse"} />
           ) : (
             <MangaDetail mangaId={mangaId} cls={cls} stacked={compact || detailW < STACK_BELOW} />
           )}

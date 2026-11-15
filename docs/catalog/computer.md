@@ -183,7 +183,8 @@ with this build." While it starts: "Starting the extension host…".
 ### Sources
 | Control (label as written) | Kind | What it does |
 | --- | --- | --- |
-| Search sources | text field | Filters the list by name. |
+| Find a source, or search them all | text field | Typing narrows the list by name or language. **Enter** searches every listed source for what was typed as a title. |
+| Search all N sources for “…” | row under the field | Shown while something is typed. The same as Enter: opens **All sources** (below). |
 | A source row | click | Opens the source. Rows are grouped by language. An NSFW source carries an "18+" badge. |
 | Right-click a source | menu | **Open**, **Source settings**, **Mark as NSFW** or **Mark as not NSFW**, and a line saying where the mark comes from ("As its extension says." or your own). |
 | "N NSFW sources hidden" · Show | line under the list | Shown when Settings › Browse › "Show NSFW sources" is off. **Show** turns the setting on. |
@@ -197,6 +198,8 @@ extension to start browsing." with **Get extensions**.
 | Back to sources | button | |
 | Search <source> | text field | Searches that source. |
 | Popular, Latest | chips | The source's two listings. |
+| “<words>” | chip | Shown while a search is listed. |
+| Filters · N | chip | Only when the source has filters. Opens the Filters dialog; N counts the ones changed from what the source sets. |
 | A result | click | Opens the manga page beside the results. "In library" marks ones already added. |
 
 By itself: more results load at the end of the list ("Loading more…"; "Couldn't load more.
@@ -205,8 +208,41 @@ Retry").
 When it fails: "Nothing here" with "The source found nothing for that search." or "The source
 returned no titles."
 
-Not there: **the source's filters** (genre, status, content rating, sort), search across all
-sources, pinning a source, choosing languages, open in browser.
+Not there: pinning a source, choosing languages, open in browser, saved searches.
+
+### <Source> filters (dialog)
+Reached from: **Filters** in a source. Lists what the source offers, in its order: notes, drop-down
+lists, text fields, tick boxes, three-way boxes (off, include with a tick, exclude with a bar and
+the name struck through; a click steps through them), sort buttons (a second click turns the
+direction) and groups that fold.
+
+| Control (label as written) | Kind | What it does |
+| --- | --- | --- |
+| "As the source sets them." / "N changed" | line | How far the choices are from the source's own. |
+| Reset | button | Back to the source's own. |
+| Cancel | button | Closes without searching. |
+| Search with these | button | Searches the source with the words in its search box and these filters. An empty box is allowed: the filters alone narrow the list. |
+
+Popular and Latest drop the choices. Closing the source's settings drops them too, since settings
+can change which filters there are. Needs the extension helper of 0.1.19 or later; with an older
+one the chip is not shown.
+
+### All sources (search)
+Reached from: Enter in the Sources tab's field. One section per listed source (NSFW sources are
+left out when they are hidden), in the list's order, four sources asked at a time.
+
+| Control (label as written) | Kind | What it does |
+| --- | --- | --- |
+| Back to sources | button | |
+| Search all sources | text field | Enter searches again with new words. |
+| "Searched N of M sources…" then "Found in N of M sources, N found nothing, N could not be searched." | line | |
+| A source's heading | click | Opens that source with the same search, where its filters and further pages are. Back returns here. |
+| A cover | click | Opens the manga page beside the results. "In library" marks ones already added. |
+| More in <source> | tile at the end of a row | Shown when the source has more than the row holds. The same as the heading. |
+| "Couldn't search: <reason>" · Retry | line | Under a source that failed. |
+
+A source that found nothing takes no room. When none found anything: "Nothing found" / "None of
+the N sources has a title for “…”."
 
 ### Source settings (dialog)
 Whatever the source offers (switches, lists, text). "This source has no settings." when none. A

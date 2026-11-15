@@ -143,6 +143,7 @@ fn main() {
             online::browse_sources,
             online::source_set_nsfw,
             online::browse_list,
+            online::browse_filters,
             online::online_open,
             online::manga_refresh,
             online::library_update,

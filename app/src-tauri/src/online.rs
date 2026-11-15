@@ -346,7 +346,17 @@ pub fn source_set_nsfw(state: State<'_, AppState>, source_id: String, nsfw: Opti
     Ok(())
 }
 
-/// One page of a source's popular, latest or search list.
+/// A source's search filters as it sets them to start with; empty when it has none.
+#[tauri::command]
+pub async fn browse_filters(state: State<'_, AppState>, source_id: String) -> R<Vec<FilterDto>> {
+    let source = parse_source(&source_id)?;
+    let filters = client(&state)?.filters(source).await?;
+    Ok(FilterDto::list(filters, 0))
+}
+
+/// One page of a source's popular, latest or search list. `filters` are the person's filter
+/// choices for a search, in the order `browse_filters` listed them.
+
 #[tauri::command]
 pub async fn browse_list(
     state: State<'_, AppState>,
@@ -354,6 +364,7 @@ pub async fn browse_list(
     mode: String,
     query: Option<String>,
     page: u32,
+    filters: Option<serde_json::Value>,
 ) -> R<BrowsePageDto> {
     let source = parse_source(&source_id)?;
     let c = client(&state)?;
@@ -362,8 +373,12 @@ pub async fn browse_list(
         "popular" => c.popular(source, page).await?,
         "latest" => c.latest(source, page).await?,
         "search" => {
-            c.search(source, query.as_deref().unwrap_or("").trim(), page)
-                .await?
+            let q = query.as_deref().unwrap_or("").trim();
+            // Without choices the source's own defaults apply, which every helper can do.
+            match filters.filter(|f| f.as_array().is_some_and(|a| !a.is_empty())) {
+                Some(states) => c.search_filtered(source, q, page, &states).await?,
+                None => c.search(source, q, page).await?,
+            }
         }
         _ => return Err(CmdError::new("invalid", "Unknown list.")),
     };

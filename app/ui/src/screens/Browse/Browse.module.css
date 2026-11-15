@@ -220,3 +220,212 @@ button.item:hover,
 .linkBtn:hover {
   text-decoration: underline;
 }
+
+/* ---- a source's search filters ---- */
+.filterList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-md);
+}
+.filterRule {
+  width: 100%;
+  border: 0;
+  border-top: var(--tm-hairline) solid var(--tm-color-divider);
+  margin: 0;
+}
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-base);
+}
+.filterRow > .filterName {
+  flex: 1;
+  min-width: 0;
+}
+.filterRow > input {
+  flex: 1.4;
+  min-width: 0;
+}
+.filterName {
+  font: var(--tm-type-body-row);
+}
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-sm);
+}
+.filterGroup > summary {
+  cursor: pointer;
+}
+.filterWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-xs) var(--tm-space-base);
+  padding-top: var(--tm-space-sm);
+}
+.filterWrap > .filterRow,
+.filterWrap > .filterGroup,
+.filterWrap > .hint,
+.filterWrap > .filterRule {
+  flex-basis: 100%;
+}
+.filterCheck,
+.filterTri {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-xs);
+  font: var(--tm-type-body-small);
+  color: var(--tm-color-on-background);
+  background: none;
+  border: 0;
+  padding: var(--tm-space-xxs) 0;
+  cursor: pointer;
+}
+.triBox {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--tm-radius-sm);
+  border: var(--tm-hairline) solid var(--tm-color-outline-faint);
+}
+.filterTri[data-state="1"] .triBox {
+  background: var(--tm-color-accent);
+  border-color: var(--tm-color-accent);
+  color: var(--tm-color-on-accent);
+}
+.filterTri[data-state="2"] .triBox {
+  background: var(--tm-color-close-hover);
+  border-color: var(--tm-color-close-hover);
+  color: #fff;
+}
+.filterTri[data-state="2"] {
+  text-decoration: line-through;
+}
+.filterSort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-xxs);
+  height: 30px;
+  padding: 0 var(--tm-space-sm);
+  border-radius: var(--tm-radius-md);
+  border: var(--tm-hairline) solid var(--tm-color-outline-faint);
+  background: none;
+  color: var(--tm-color-on-background);
+  font: var(--tm-type-body-small);
+  cursor: pointer;
+}
+.filterSort[data-active="true"] {
+  border-color: var(--tm-color-accent);
+  color: var(--tm-color-accent);
+}
+.filterFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-sm);
+  padding-top: var(--tm-space-md);
+}
+
+/* ---- search across all sources ---- */
+.searchAll {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-base);
+  margin: 0 var(--tm-space-md);
+  padding: var(--tm-space-sm) var(--tm-space-md);
+  border-radius: var(--tm-radius-lg);
+  color: var(--tm-color-accent);
+  text-align: left;
+  flex: none;
+}
+.searchAll:hover {
+  background: var(--tm-color-outline-faint);
+}
+.searchAllText {
+  flex: 1;
+  min-width: 0;
+  font: var(--tm-type-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.searchAllKey {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+  border: 1px solid var(--tm-color-divider);
+  border-radius: var(--tm-radius-sm);
+  padding: 1px 6px;
+}
+.globalSummary {
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+  padding: var(--tm-space-sm) var(--tm-space-lg);
+  flex: none;
+}
+.globalSource {
+  padding-bottom: var(--tm-space-md);
+}
+.globalHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-base);
+  width: 100%;
+  padding: var(--tm-space-sm);
+  border-radius: var(--tm-radius-lg);
+  text-align: left;
+  color: var(--tm-color-on-background);
+}
+.globalHead:hover {
+  background: var(--tm-color-outline-faint);
+}
+.globalNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-md);
+  font: var(--tm-type-caption);
+  color: var(--tm-color-on-background-dim);
+  padding: var(--tm-space-xs) var(--tm-space-sm);
+  min-height: 32px;
+}
+.globalRow {
+  display: flex;
+  gap: var(--tm-space-sm);
+  overflow-x: auto;
+  padding: 2px var(--tm-space-sm) var(--tm-space-sm);
+  scrollbar-width: thin;
+}
+.globalCell {
+  flex: none;
+  width: 104px;
+}
+.globalMore {
+  flex: none;
+  width: 104px;
+  aspect-ratio: 2 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tm-space-sm);
+  padding: var(--tm-space-sm);
+  border: 1px dashed var(--tm-color-divider);
+  border-radius: var(--tm-radius-sm);
+  font: var(--tm-type-caption);
+  color: var(--tm-color-accent);
+  text-align: center;
+}
+.globalMore:hover {
+  background: var(--tm-color-outline-faint);
+}
+
+/* The row of chips under a search box. Its own rule: the library's chips sit inside a bar and
+   stretch to fill it, which in a column would take half the pane's height. */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-sm);
+  flex: none;
+  min-width: 0;
+  padding: 0 var(--tm-space-md) var(--tm-space-sm);
+}
