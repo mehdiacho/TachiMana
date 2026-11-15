@@ -393,7 +393,7 @@ SOURCE FILTERS AND SEARCH ACROSS SOURCES (branch `feat/source-filters`, 0.1.19, 
   the app's commands (no real source can be reached from the container). The states the dialog
   sent were the ones chosen. NOT seen: either one against a real source in the built app.
 - Found on the way and fixed: the chips under a source's search box took half the pane's height
-  since 0.1.14 (the library bar they borrowed their rule from began to stretch), pushing results down.
+  since 0.1.10 (the library bar they borrowed their rule from began to stretch), pushing results down.
 - Not done: pinning sources (so the search is of every listed source), saved searches, "search
   this title elsewhere" from a result.
 
