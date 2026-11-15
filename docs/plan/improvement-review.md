@@ -17,8 +17,8 @@ Ranked by how much each one currently holds a person back, then by size.
 
 | # | What | Why it is first | Size |
 | --- | --- | --- | --- |
-| 1 | **Source filters in Browse** | A source can only be browsed by Popular, Latest and a text search. MangaDex's content rating, genres, status and sort are all filters, so today they cannot be changed at all. | M |
-| 2 | **Global search across sources** | Finding a manga means opening each source in turn. Mihon searches every pinned source at once. | M |
+| 1 | **Source filters in Browse** (built, 0.1.19) | A source can only be browsed by Popular, Latest and a text search. MangaDex's content rating, genres, status and sort are all filters, so today they cannot be changed at all. | M |
+| 2 | **Global search across sources** (built, 0.1.19: every listed source, not pinned ones, as there is no pinning yet) | Finding a manga means opening each source in turn. Mihon searches every pinned source at once. | M |
 | 3 | **Chapter list sort, filter and "download next N"** | The chapter list has one order and no filter. Long series are hard to work with. | S |
 | 4 | **Reader settings page, and per-manga reading mode** | Mode, fit and zoom are one global choice. A webtoon and a right-to-left manga need different modes, so the person changes it every time they switch. | M |
 | 5 | **Updates screen ("new chapters")** | The library can be updated, but there is no list of what the update found. | M |
@@ -125,8 +125,9 @@ There now: sources grouped by language, the NSFW switch and per-source mark, 18+
 settings, a source view with Popular, Latest and search, "in library" marks on results.
 
 Holds you back
-- **No source filters** (item 1). This is the largest gap in the app.
-- No global search (item 2), and no "search this title on other sources" from a result.
+- ~~No source filters~~ (item 1): built in 0.1.19, a Filters chip and dialog in a source.
+- ~~No global search~~ (item 2): built in 0.1.19, Enter in the Sources tab's field. Still not
+  there: "search this title on other sources" from a result, and saved searches.
 - No pinning of sources and no "last used" at the top; no choice of which languages to show
   (S). The NSFW mark showed the pattern: a right-click menu on a source can hold pin and hide.
 - Results have no list view, no cover size, and a long press equivalent (right-click: add to
@@ -269,3 +270,4 @@ Each batch is one release or two. Every item that adds a preference also adds an
   export a backup by hand, has "mark this and earlier chapters read", Recents resumes a
   chapter, Back exists for the reader and the open manga, and reading beside the library is
   built. The screens as they are: [`../catalog/computer.md`](../catalog/computer.md).
+- 2026-11-15: items 1 and 2 built (0.1.19).

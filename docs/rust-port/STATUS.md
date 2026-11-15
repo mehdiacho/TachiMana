@@ -380,6 +380,23 @@ accept shown on C, "Don't ask again" letting the next merge run without a card, 
 reaching D by itself, and "Both ways" on C showing the notice on D. Not done: the questions after
 scanning (roles/1), restores writing journal entries.
 
+SOURCE FILTERS AND SEARCH ACROSS SOURCES (branch `feat/source-filters`, 0.1.19, review items 1-2):
+- Helper: `GET /v1/sources/{id}/filters` and `POST /v1/sources/{id}/search` (`ext-host`
+  `Filters.kt`, `docs/rust-port/api.md` "Filters"). States mirror the filter tree by position; a
+  missing or wrong one leaves that filter as the source made it. The helper's self-test asks
+  MangaDex for its filters and searches with empty and damaged states (CI, green).
+- App: `browse_filters` and `browse_list(..., filters)`; `FiltersDialog.tsx`, `lib/filters.ts`.
+  A helper older than 0.1.19 answers 404, which reads as "no filters", so the chip is not shown.
+- Search across sources: `GlobalSearch.tsx`, `searchAll` in `store/browse.ts`, `limiter`,
+  `searchOrder` and `searchSummary` in `lib/browse.ts`. Four sources at a time, first page each.
+- Seen: both, in a browser against the dev UI with made-up sources and answers standing in for
+  the app's commands (no real source can be reached from the container). The states the dialog
+  sent were the ones chosen. NOT seen: either one against a real source in the built app.
+- Found on the way and fixed: the chips under a source's search box took half the pane's height
+  since 0.1.14 (the library bar they borrowed their rule from began to stretch), pushing results down.
+- Not done: pinning sources (so the search is of every listed source), saved searches, "search
+  this title elsewhere" from a result.
+
 HELLO AND THE STAND-IN PEER (branch `feat/hello`, 0.1.18):
 - `GET /hello` (`hello/1`, `docs/protocol/capabilities/hello-1.md`): the server lists what it
   implements; `SyncClient::hello` asks and falls back to `/ping` for older apps
