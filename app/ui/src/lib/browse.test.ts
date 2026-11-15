@@ -105,3 +105,85 @@ describe("labels", () => {
     expect(langName("xx")).toBe("XX");
   });
 });
+
+describe("search across all sources", () => {
+  it("searches in the order the Sources tab lists", async () => {
+    const { searchOrder } = await import("./browse");
+    expect(searchOrder([src("Zeta", "fr"), src("Beta", "en"), src("Multi", "all"), src("Alpha", "en")]).map((x) => x.name)).toEqual([
+      "Alpha",
+      "Beta",
+      "Multi",
+      "Zeta",
+    ]);
+  });
+
+  it("runs no more jobs at once than allowed, in order, and frees a place when one fails", async () => {
+    const { limiter } = await import("./browse");
+    const run = limiter(2);
+    let active = 0;
+    let peak = 0;
+    const started: number[] = [];
+    const job = (i: number) => async () => {
+      started.push(i);
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      active -= 1;
+      if (i === 1) throw new Error("boom");
+      return i;
+    };
+    const all = await Promise.allSettled([0, 1, 2, 3, 4].map((i) => run(job(i))));
+    expect(peak).toBe(2);
+    expect(started).toEqual([0, 1, 2, 3, 4]);
+    expect(all.map((r) => r.status)).toEqual(["fulfilled", "rejected", "fulfilled", "fulfilled", "fulfilled"]);
+  });
+
+  it("keeps to the limit when a job arrives just as another ends", async () => {
+    const { limiter } = await import("./browse");
+    const run = limiter(1);
+    let active = 0;
+    let peak = 0;
+    const job = async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await Promise.resolve();
+      active -= 1;
+    };
+    const first = run(job);
+    const second = run(job);
+    // Arrives in the same tick the first one ends, before the waiting one has woken.
+    const late = first.then(() => run(job));
+    await Promise.all([first, second, late]);
+    expect(peak).toBe(1);
+  });
+
+  it("does not start a job that was cancelled while it waited", async () => {
+    const { limiter } = await import("./browse");
+    const run = limiter(1);
+    const gone = new AbortController();
+    let ran = false;
+    const first = run(() => new Promise((r) => setTimeout(r, 5)));
+    const second = run(async () => {
+      ran = true;
+    }, gone.signal);
+    gone.abort();
+    await first;
+    await expect(second).rejects.toThrow();
+    expect(ran).toBe(false);
+    // The place it held is free again.
+    await expect(run(async () => 7)).resolves.toBe(7);
+  });
+
+  it("treats a nonsense limit as one at a time", async () => {
+    const { limiter } = await import("./browse");
+    for (const bad of [0, -3, Number.NaN]) await expect(limiter(bad)(async () => 1)).resolves.toBe(1);
+  });
+
+  it("says how far the search is, then what it found", async () => {
+    const { searchSummary } = await import("./browse");
+    expect(searchSummary([])).toBe("No sources to search.");
+    expect(searchSummary(["results", "loading", "empty"])).toBe("Searched 2 of 3 sources…");
+    expect(searchSummary(["results"])).toBe("Found in 1 of 1 source.");
+    expect(searchSummary(["results", "empty", "empty", "failed"])).toBe("Found in 1 of 4 sources, 2 found nothing, 1 could not be searched.");
+  });
+});

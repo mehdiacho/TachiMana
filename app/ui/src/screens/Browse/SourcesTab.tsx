@@ -1,6 +1,6 @@
 // Installed sources grouped by language (spec §2.17; behaviour from ui/browse/SourcesTab.kt).
 import * as Ctx from "@radix-ui/react-context-menu";
-import { Compass, EyeOff, PackagePlus, Search, Settings2 } from "lucide-react";
+import { Compass, EyeOff, Globe, PackagePlus, Search, Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "../../api/commands";
 import { keys, queryClient, useSetSettings, useSettings, useSources } from "../../api/queries";
@@ -31,6 +31,7 @@ export function SourcesTab() {
   const sources = useSources();
   const openSource = useBrowse((b) => b.openSource);
   const setTab = useBrowse((b) => b.setTab);
+  const searchAll = useBrowse((b) => b.searchAll);
   const [query, setQuery] = useState("");
   const [settingsFor, setSettingsFor] = useState<SourceDto | null>(null);
   const settings = useSettings();
@@ -58,6 +59,8 @@ export function SourcesTab() {
       .finally(() => void queryClient.invalidateQueries({ queryKey: keys.sources }));
   };
 
+  // Typing narrows the list of sources; Enter looks the words up as a title in every listed source.
+  const canSearchAll = query.trim() !== "" && shown.length > 0;
   const open = (src: SourceDto) => openSource({ sourceId: src.id, name: src.name, supportsLatest: src.supportsLatest, mode: "popular", query: "", filters: null });
 
   let body;
@@ -147,10 +150,31 @@ export function SourcesTab() {
 
   return (
     <>
-      <label className={l.search}>
+      <form
+        className={l.search}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canSearchAll) searchAll(query.trim());
+        }}
+      >
         <Search size={20} />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search sources" aria-label="Search sources" />
-      </label>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={shown.length > 0 ? "Find a source, or search them all" : "Search sources"}
+          aria-label="Find a source, or search every source for a title"
+          maxLength={500}
+        />
+      </form>
+      {canSearchAll && (
+        <button type="button" className={s.searchAll} onClick={() => searchAll(query.trim())}>
+          <Globe size={18} />
+          <span className={s.searchAllText}>
+            Search {shown.length === 1 ? "the source" : `all ${shown.length} sources`} for “{query.trim()}”
+          </span>
+          <kbd className={s.searchAllKey}>Enter</kbd>
+        </button>
+      )}
       {body}
       <SourceSettingsDialog source={settingsFor} onClose={() => setSettingsFor(null)} />
     </>

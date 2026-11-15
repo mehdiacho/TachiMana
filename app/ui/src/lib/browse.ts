@@ -142,3 +142,49 @@ export function initials(name: string): string {
   const two = second ? `${first.charAt(0)}${second.charAt(0)}` : first.slice(0, 2);
   return two.toUpperCase() || "?";
 }
+
+/** Sources in the order the Sources tab lists them: English, Multi, then the rest by language. */
+export function searchOrder(sources: SourceDto[]): SourceDto[] {
+  return groupSources(sources, "").flatMap((g) => g.items);
+}
+
+/**
+ * Runs at most `max` jobs at once; the rest wait their turn in the order they came. A job whose
+ * `signal` was aborted while it waited is not started, and rejects.
+ */
+export function limiter(max: number): <T>(job: () => Promise<T>, signal?: AbortSignal) => Promise<T> {
+  const room = Math.max(1, Math.floor(max) || 1);
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async (job, signal) => {
+    // A finished job hands its place straight to the first one waiting, so a newcomer cannot
+    // slip in between and put one more than `room` to work.
+    if (running >= room) await new Promise<void>((go) => waiting.push(go));
+    else running += 1;
+    try {
+      if (signal?.aborted) throw new Error("cancelled");
+      return await job();
+    } finally {
+      const heir = waiting.shift();
+      if (heir) heir();
+      else running -= 1;
+    }
+  };
+}
+
+/** How one source's search stands. */
+export type SearchOutcome = "loading" | "results" | "empty" | "failed";
+
+/** The line under a search of every source: how far it is, then what it found. */
+export function searchSummary(outcomes: SearchOutcome[]): string {
+  const n = (o: SearchOutcome) => outcomes.filter((x) => x === o).length;
+  const total = outcomes.length;
+  const loading = n("loading");
+  const sources = (k: number) => `${k} ${k === 1 ? "source" : "sources"}`;
+  if (total === 0) return "No sources to search.";
+  if (loading > 0) return `Searched ${total - loading} of ${sources(total)}…`;
+  const parts = [`Found in ${n("results")} of ${sources(total)}`];
+  if (n("empty") > 0) parts.push(`${n("empty")} found nothing`);
+  if (n("failed") > 0) parts.push(`${n("failed")} could not be searched`);
+  return `${parts.join(", ")}.`;
+}
