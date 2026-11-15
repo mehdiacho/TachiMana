@@ -1,8 +1,8 @@
 // One source's popular, latest and search results (behaviour from ui/browse/SourceBrowseScreen.kt),
 // as a cover grid that loads the next page near the bottom.
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { BookMarked, ChevronLeft, Search, SearchX, Settings2 } from "lucide-react";
+import { BookMarked, ChevronLeft, Search, SearchX, Settings2, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type BrowseMode } from "../../api/commands";
 import { keys, useSources } from "../../api/queries";
@@ -11,11 +11,13 @@ import { Chip, Cover, EmptyState, ErrorState, IconButton, Loading, SkeletonGrid,
 import type { CmdError } from "../../gen/CmdError";
 import type { OnlineMangaDto } from "../../gen/OnlineMangaDto";
 import { appendPage } from "../../lib/browse";
+import { changedCount, type FilterState, hasChoices } from "../../lib/filters";
 import { onlineCoverUrl } from "../../lib/tmUrl";
 import { useBrowse, type SourceView as View } from "../../store/browse";
 import { gridColumns } from "../Library/LibraryRows";
 import l from "../Library/Library.module.css";
 import s from "./Browse.module.css";
+import { FiltersDialog } from "./FiltersDialog";
 import { SourceSettingsDialog } from "./SourceSettingsDialog";
 
 /** Hard stop so a source that always claims another page cannot grow the list forever. */
@@ -31,13 +33,24 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
   const [draft, setDraft] = useState(view.query);
   const [opening, setOpening] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   useEffect(() => setDraft(view.query), [view.sourceId, view.query]);
 
   const configurable = sources.data?.find((x) => x.id === view.sourceId)?.isConfigurable ?? false;
   const query = view.mode === "search" ? view.query : null;
+  const states = view.mode === "search" ? view.filters : null;
+  // What the source lets a search be narrowed by. Asked once per source; none is common.
+  const filters = useQuery({
+    queryKey: ["browse", "filters", view.sourceId],
+    queryFn: () => api.browseFilters(view.sourceId),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const canFilter = hasChoices(filters.data ?? []);
+  const changed = changedCount(filters.data ?? [], states);
   const list = useInfiniteQuery({
-    queryKey: ["browse", "list", view.sourceId, view.mode, query ?? ""],
-    queryFn: ({ pageParam }) => api.browseList(view.sourceId, view.mode, query, pageParam),
+    queryKey: ["browse", "list", view.sourceId, view.mode, query ?? "", states],
+    queryFn: ({ pageParam }) => api.browseList(view.sourceId, view.mode, query, pageParam, states),
     initialPageParam: 1,
     getNextPageParam: (last, all) => (last.hasNextPage && all.length < MAX_PAGES ? all.length + 1 : undefined),
     retry: false,
@@ -62,7 +75,8 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
 
   const search = (q: string) => {
     const t = q.trim();
-    if (t) setMode("search", t);
+    // An empty box with filters chosen is still a search: the filters alone narrow it.
+    if (t || view.filters) setMode("search", t);
     else setMode("popular", "");
   };
 
@@ -119,15 +133,36 @@ export function SourceView({ view, cls, onToast }: { view: View; cls: WidthClass
             {m.label}
           </Chip>
         ))}
-        {view.mode === "search" && <Chip active>“{view.query}”</Chip>}
+        {view.mode === "search" && view.query && <Chip active>“{view.query}”</Chip>}
+        {canFilter && (
+          <Chip active={changed > 0} onClick={() => setFiltering(true)} aria-label={changed > 0 ? `Filters, ${changed} changed` : "Filters"}>
+            <SlidersHorizontal size={14} /> Filters{changed > 0 ? ` · ${changed}` : ""}
+          </Chip>
+        )}
       </div>
       {body}
+      <FiltersDialog
+        open={filtering}
+        sourceName={view.name}
+        filters={filters.data ?? []}
+        applied={states}
+        onApply={(next: FilterState[] | null) => {
+          const q = draft.trim();
+          // Back to the source's own filters with nothing typed is the plain popular list.
+          if (next === null && !q) setMode("popular", "");
+          else setMode("search", q, next);
+        }}
+        onClose={() => setFiltering(false)}
+      />
       <SourceSettingsDialog
         source={settings ? { id: view.sourceId, name: view.name } : null}
         onClose={() => {
           setSettings(false);
           // Settings such as language or quality change what the source lists.
           void qc.invalidateQueries({ queryKey: ["browse", "list", view.sourceId] });
+          // And which filters it offers, so choices made for the old ones are dropped.
+          void qc.invalidateQueries({ queryKey: ["browse", "filters", view.sourceId] });
+          if (view.filters) setMode(view.query ? "search" : "popular", view.query, null);
         }}
       />
     </>

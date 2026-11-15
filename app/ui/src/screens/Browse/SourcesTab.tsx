@@ -58,7 +58,7 @@ export function SourcesTab() {
       .finally(() => void queryClient.invalidateQueries({ queryKey: keys.sources }));
   };
 
-  const open = (src: SourceDto) => openSource({ sourceId: src.id, name: src.name, supportsLatest: src.supportsLatest, mode: "popular", query: "" });
+  const open = (src: SourceDto) => openSource({ sourceId: src.id, name: src.name, supportsLatest: src.supportsLatest, mode: "popular", query: "", filters: null });
 
   let body;
   if (sources.isLoading) body = <SkeletonRows count={10} />;

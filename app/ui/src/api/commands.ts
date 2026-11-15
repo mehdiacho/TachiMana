@@ -38,7 +38,9 @@ import type { CatalogDto } from "../gen/CatalogDto";
 import type { InstalledExtensionDto } from "../gen/InstalledExtensionDto";
 import type { LibraryUpdateDto } from "../gen/LibraryUpdateDto";
 import type { MangaDto } from "../gen/MangaDto";
+import type { FilterDto } from "../gen/FilterDto";
 import type { PreferenceDto } from "../gen/PreferenceDto";
+import type { FilterState } from "../lib/filters";
 import type { RefreshDto } from "../gen/RefreshDto";
 import type { RepoDto } from "../gen/RepoDto";
 import type { SourceDto } from "../gen/SourceDto";
@@ -134,8 +136,10 @@ export const api = {
   browseSources: () => call<SourceDto[]>("browse_sources"),
   /** The person's own NSFW mark for a source; null goes back to what its extension says. */
   sourceSetNsfw: (sourceId: string, nsfw: boolean | null) => call<void>("source_set_nsfw", { sourceId, nsfw }),
-  browseList: (sourceId: string, mode: BrowseMode, query: string | null, page: number) =>
-    call<BrowsePageDto>("browse_list", { sourceId, mode, query, page }),
+  browseList: (sourceId: string, mode: BrowseMode, query: string | null, page: number, filters: FilterState[] | null = null) =>
+    call<BrowsePageDto>("browse_list", { sourceId, mode, query, page, filters }),
+  /** A source's search filters as it sets them; empty when it has none. */
+  browseFilters: (sourceId: string) => call<FilterDto[]>("browse_filters", { sourceId }),
   onlineOpen: (sourceId: string, url: string, title: string) => call<RefreshDto>("online_open", { sourceId, url, title }),
   mangaRefresh: (id: number) => call<RefreshDto>("manga_refresh", { id }),
   /** Starts refreshing every online library title; progress arrives as `library-update` events. */

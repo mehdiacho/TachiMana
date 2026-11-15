@@ -182,8 +182,32 @@ Deletes the artifact and unloads the sources. `{ "ok": true }`, or 404.
 { "mangas": [ MangaDto, … ], "hasNextPage": true }
 ```
 
-`latest` answers 400 when the source has no latest list. `search` uses the source's default
-filters (as the desktop app does today).
+`latest` answers 400 when the source has no latest list. `GET …/search` uses the source's own
+filters.
+
+### Filters: `GET /v1/sources/{id}/filters`, `POST /v1/sources/{id}/search`
+
+`GET …/filters` answers the source's search filters as a tree, each with the state the source
+starts it in:
+
+```json
+[{"type": "header", "name": "…"},
+ {"type": "select", "name": "Status", "values": ["Any", "Ongoing"], "state": 0},
+ {"type": "group", "name": "Content rating", "filters": [
+   {"type": "checkbox", "name": "Safe", "state": true}]},
+ {"type": "sort", "name": "Sort", "values": ["Latest"], "state": {"index": 0, "ascending": false}}]
+```
+
+`type` is `header`, `separator`, `select` (state: index), `text` (string), `checkbox` (boolean),
+`tristate` (0 ignore, 1 include, 2 exclude), `sort` (`{index, ascending}` or null) or `group`
+(its filters are in `filters`).
+
+`POST …/search` with `{"q": "…", "page": 1, "filters": [ … ]}` searches with the caller's
+choices. `filters` holds **only the states**, in the same order as the tree; a group's state is
+the array of its children's states. A state that is missing, `null` or of the wrong shape leaves
+that filter as the source made it. The states are put onto a fresh filter list each time.
+
+A helper from before filters answers 404 to both; the app then shows no Filters button.
 
 ### `POST /v1/sources/{id}/manga`
 

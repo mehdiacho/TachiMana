@@ -147,6 +147,23 @@ private class SelfTest {
             val search = call("GET", "/v1/sources/${source.id}/search?q=${"one piece".q()}&page=1").parse<MangasPageDto>()
             check("search 'one piece' (${search?.mangas?.size})", !search?.mangas.isNullOrEmpty())
 
+            // --- Filters ---
+            val filters = call("GET", "/v1/sources/${source.id}/filters").parse<List<FilterDto>>().orEmpty()
+            check(
+                "filters (${filters.size}, groups=${filters.count { it.type == "group" }})",
+                filters.isNotEmpty() && filters.any { it.type == "group" && !it.filters.isNullOrEmpty() },
+            )
+            val unset = call("POST", "/v1/sources/${source.id}/search", """{"q":"one piece","page":1,"filters":[]}""").parse<MangasPageDto>()
+            check("filtered search with nothing set (${unset?.mangas?.size})", !unset?.mangas.isNullOrEmpty())
+            // States of the wrong shape leave each filter as the source made it.
+            val damaged = call(
+                "POST",
+                "/v1/sources/${source.id}/search",
+                """{"q":"one piece","page":1,"filters":["x",{"a":1},[[[]]],99999,null,true]}""",
+            ).parse<MangasPageDto>()
+            check("filtered search with damaged states (${damaged?.mangas?.size})", !damaged?.mangas.isNullOrEmpty())
+            check("filtered search page=0 → 400", call("POST", "/v1/sources/${source.id}/search", """{"q":"x","page":0}""").status == 400)
+
             val first = popular?.mangas?.firstOrNull()
             val cover = first?.thumbnail_url?.let {
                 call("POST", "/v1/sources/${source.id}/image", json.encodeToString(ImageRequest(url = it)))

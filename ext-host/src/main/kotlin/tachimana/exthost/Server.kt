@@ -144,6 +144,26 @@ private fun Application.hostModule(service: HostService, token: String, onShutdo
                 }
             }
 
+            get("/sources/{id}/filters") {
+                call.handle(SOURCE_TIMEOUT_MS) {
+                    val source = service.catalogueSource(call.sourceId())
+                    call.respondJson(source.getFilterList().map { it.toDto() })
+                }
+            }
+
+            // A search with the person's filter choices. The states go onto a fresh filter list
+            // from the source, so nothing is carried over from an earlier search.
+            post("/sources/{id}/search") {
+                call.handle(SOURCE_TIMEOUT_MS) {
+                    val source = service.catalogueSource(call.sourceId())
+                    val req = call.body<SearchRequest>()
+                    if (req.page < 1) throw badRequest("page must be 1 or more")
+                    val filters = source.getFilterList()
+                    req.filters?.let { applyFilterStates(filters, it) }
+                    call.respondJson(source.getSearchManga(req.page, req.q, filters).toDto())
+                }
+            }
+
             post("/sources/{id}/manga") {
                 call.handle(SOURCE_TIMEOUT_MS) {
                     val source = service.source(call.sourceId())

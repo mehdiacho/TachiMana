@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::model::{
-    AvailableExtension, Chapter, ErrorBody, Extension, Health, Image, Manga, MangaUpdate,
+    AvailableExtension, Chapter, ErrorBody, Extension, Filter, Health, Image, Manga, MangaUpdate,
     MangasPage, Page, Preference, Repo, Source,
 };
 use crate::Error;
@@ -108,6 +108,31 @@ impl Client {
             encode(query),
             page.max(1)
         ))
+        .await
+    }
+
+    /// The source's search filters, as it sets them to start with. Empty when the source has
+    /// none, and when the installed helper is from before filters (it answers 404).
+    pub async fn filters(&self, source: i64) -> Result<Vec<Filter>, Error> {
+        match self.get(&format!("/v1/sources/{source}/filters")).await {
+            Err(Error::Host { status: 404, .. }) => Ok(Vec::new()),
+            other => other,
+        }
+    }
+
+    /// A search with the person's filter choices: `states` is the array of filter states in the
+    /// order [`filters`](Self::filters) listed them (a group's state is its children's array).
+    pub async fn search_filtered(
+        &self,
+        source: i64,
+        query: &str,
+        page: u32,
+        states: &Value,
+    ) -> Result<MangasPage, Error> {
+        self.post(
+            &format!("/v1/sources/{source}/search"),
+            &json!({"q": query, "page": page.max(1), "filters": states}),
+        )
         .await
     }
 

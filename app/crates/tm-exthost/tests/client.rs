@@ -126,3 +126,53 @@ async fn unreachable_host_is_a_transport_error() {
     let client = Client::new(format!("http://127.0.0.1:{port}"), "t").unwrap();
     assert_eq!(client.health().await.unwrap_err().kind(), "transport");
 }
+
+#[tokio::test]
+async fn filters_come_as_a_tree_and_an_older_helper_has_none() {
+    let body = r#"[{"type":"header","name":"Note"},
+        {"type":"select","name":"Status","values":["Any","Ongoing"],"state":0},
+        {"type":"group","name":"Rating","filters":[{"type":"checkbox","name":"Safe","state":true}]},
+        {"type":"sort","name":"Sort","values":["Latest"],"state":{"index":0,"ascending":false}},
+        {"type":"future","name":"?","extra":1}]"#;
+    let (base, seen) = serve(vec![
+        http("200 OK", "application/json", body),
+        http("404 Not Found", "text/plain", ""),
+        http("500 Internal Server Error", "text/plain", "boom"),
+    ])
+    .await;
+    let client = Client::new(base, "t").unwrap();
+    let filters = client.filters(7).await.unwrap();
+    assert_eq!(filters.len(), 5);
+    assert_eq!(filters[1].kind, "select");
+    assert_eq!(filters[1].values.as_deref().unwrap(), ["Any", "Ongoing"]);
+    assert_eq!(filters[2].filters.as_ref().unwrap()[0].name, "Safe");
+    assert_eq!(filters[4].kind, "future", "an unknown kind keeps its place");
+    assert!(seen.lock().unwrap()[0].starts_with("GET /v1/sources/7/filters "));
+    assert!(
+        client.filters(7).await.unwrap().is_empty(),
+        "a helper without the route means no filters"
+    );
+    assert!(client.filters(7).await.is_err(), "other failures are shown");
+}
+
+#[tokio::test]
+async fn a_filtered_search_posts_the_states_in_order() {
+    let (base, seen) = serve(vec![http(
+        "200 OK",
+        "application/json",
+        r#"{"mangas":[],"hasNextPage":false}"#,
+    )])
+    .await;
+    let client = Client::new(base, "t").unwrap();
+    let states = serde_json::json!([null, 1, [true, false]]);
+    let page = client.search_filtered(7, "", 0, &states).await.unwrap();
+    assert!(page.mangas.is_empty());
+    let req = seen.lock().unwrap()[0].clone();
+    assert!(req.starts_with("POST /v1/sources/7/search "), "{req}");
+    let body: serde_json::Value =
+        serde_json::from_str(req.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+    assert_eq!(
+        body,
+        serde_json::json!({"q": "", "page": 1, "filters": [null, 1, [true, false]]})
+    );
+}

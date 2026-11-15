@@ -548,6 +548,50 @@ impl From<tm_exthost::model::Preference> for PreferenceDto {
     }
 }
 
+/// One of a source's search filters (api.md "Filters"). `kind` is header, separator, select,
+/// text, checkbox, tristate, sort or group.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FilterDto {
+    pub kind: String,
+    pub name: String,
+    /// The choices of a select or a sort.
+    pub values: Vec<String>,
+    /// select: index. text: string. checkbox: boolean. tristate: 0 ignore, 1 include, 2 exclude.
+    /// sort: `{index, ascending}` or null.
+    #[ts(type = "number | string | boolean | { index: number; ascending: boolean } | null")]
+    pub state: serde_json::Value,
+    /// The filters inside a group.
+    pub filters: Vec<FilterDto>,
+}
+
+/// Most filters kept in one list, and how deep groups may nest. Sources stay far below both.
+const MAX_FILTERS: usize = 2000;
+const MAX_FILTER_DEPTH: usize = 8;
+
+impl FilterDto {
+    /// The host's filter tree for the UI, with what cannot be shown left out: positions must
+    /// stay the same as the host's, so nothing is dropped from the middle of a list.
+    pub fn list(filters: Vec<tm_exthost::model::Filter>, depth: usize) -> Vec<Self> {
+        filters
+            .into_iter()
+            .take(MAX_FILTERS)
+            .map(|f| Self {
+                kind: f.kind,
+                name: f.name,
+                values: f.values.unwrap_or_default(),
+                state: f.state.unwrap_or(serde_json::Value::Null),
+                filters: if depth < MAX_FILTER_DEPTH {
+                    Self::list(f.filters.unwrap_or_default(), depth.saturating_add(1))
+                } else {
+                    Vec::new()
+                },
+            })
+            .collect()
+    }
+}
+
 /// Progress of the library update, sent as the `library-update` event.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
