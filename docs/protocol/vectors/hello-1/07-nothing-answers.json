@@ -1,0 +1,8 @@
+{
+  "note": "Neither route answers: the device is not reachable. This is not an error to show as a failure of a feature.",
+  "hello": null,
+  "ping": null,
+  "expect": {
+    "reachable": false
+  }
+}

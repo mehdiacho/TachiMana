@@ -1,0 +1,41 @@
+{
+  "note": "Keys this app does not know are ignored; a capability it does not know is kept in the list and simply never asked for.",
+  "hello": {
+    "protocol": "1",
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "platform": "android",
+    "profileId": "prof-1",
+    "profileName": "Main",
+    "app": {
+      "name": "mihon-custom",
+      "version": "0.0.0-test"
+    },
+    "capabilities": [
+      "hello/1",
+      "link/2",
+      "teleport/7"
+    ],
+    "futureKey": {
+      "a": 1
+    }
+  },
+  "ping": {
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "profileId": "prof-1",
+    "profileName": "Main"
+  },
+  "expect": {
+    "reachable": true,
+    "capabilities": [
+      "hello/1",
+      "link/2",
+      "teleport/7"
+    ],
+    "supports": {
+      "teleport/7": true,
+      "changes/1": false
+    }
+  }
+}

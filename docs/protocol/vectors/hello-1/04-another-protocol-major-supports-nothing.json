@@ -1,0 +1,46 @@
+{
+  "note": "protocol is the major version of the ground rules. A device on another major is reachable but nothing may be used with it.",
+  "hello": {
+    "protocol": "2",
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "platform": "android",
+    "profileId": "prof-1",
+    "profileName": "Main",
+    "app": {
+      "name": "mihon-custom",
+      "version": "0.0.0-test"
+    },
+    "capabilities": [
+      "hello/1",
+      "link/2",
+      "pull/1",
+      "queue/1",
+      "done/1",
+      "file/1",
+      "changes/1"
+    ]
+  },
+  "ping": {
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "profileId": "prof-1",
+    "profileName": "Main"
+  },
+  "expect": {
+    "reachable": true,
+    "capabilities": [
+      "hello/1",
+      "link/2",
+      "pull/1",
+      "queue/1",
+      "done/1",
+      "file/1",
+      "changes/1"
+    ],
+    "supports": {
+      "link/2": false,
+      "changes/1": false
+    }
+  }
+}

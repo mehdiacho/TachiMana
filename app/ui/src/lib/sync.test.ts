@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanCode, duration, extensionsLine, fileName, progressLine, restoreSummary, isCode, parsePort, redownloadLine, reportLine, spacedCode, splitAddress } from "./sync";
+import { cleanCode, duration, extensionsLine, fileName, helloLine, progressLine, restoreSummary, isCode, parsePort, redownloadLine, reportLine, spacedCode, splitAddress } from "./sync";
 
 describe("sync helpers", () => {
   it("spaces and cleans pairing codes", () => {
@@ -51,5 +51,15 @@ describe("sync helpers", () => {
     expect(restoreSummary({ file: "b.tachibk", summary, elapsedMs: 6600, errors: [], tracking: "Signed in to AniList as mehdi from the backup." })).toMatch(
       /0 errors\. Signed in to AniList as mehdi from the backup\.$/,
     );
+  });
+
+  it("says what a linked device's app can't do yet, and nothing when it can or is away", () => {
+    const h = (changes: boolean, roles: boolean, reachable = true) => ({ reachable, changes, roles });
+    expect(helloLine(undefined, "Pixel")).toBeNull();
+    expect(helloLine(h(false, false, false), "Pixel")).toBeNull();
+    expect(helloLine(h(true, true), "Pixel")).toBeNull();
+    expect(helloLine(h(false, false), "Pixel")).toContain("Pulling its library still works");
+    expect(helloLine(h(false, true), "Pixel")).toContain("Copy once still works");
+    expect(helloLine(h(true, false), "Pixel")).toContain("who leads");
   });
 });

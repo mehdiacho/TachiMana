@@ -99,3 +99,19 @@ export function splitAddress(input: string): { host: string; port: string | null
   if (plain) return { host: plain[1] ?? t, port: plain[2] ?? null };
   return { host: t, port: null };
 }
+
+/**
+ * What to say under a linked device about what its app can't do with this one yet. Nothing when
+ * it can do everything, and nothing when it isn't reachable (that is not a missing feature).
+ */
+export function helloLine(
+  hello: { reachable: boolean; changes: boolean; roles: boolean } | undefined,
+  name: string,
+): string | null {
+  if (!hello?.reachable) return null;
+  if (!hello.changes && !hello.roles)
+    return `The app on ${name} can't sync changes yet, so nothing stays in step by itself. Pulling its library still works.`;
+  if (!hello.changes) return `The app on ${name} can't sync changes yet, so nothing stays in step by itself. Copy once still works.`;
+  if (!hello.roles) return `The app on ${name} can't choose who leads or copy a library once yet. Changes still sync both ways.`;
+  return null;
+}

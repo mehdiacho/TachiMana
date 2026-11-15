@@ -16,6 +16,7 @@ export const keys = {
   links: ["links"] as const,
   changesLast: ["changes", "last"] as const,
   takeAsks: ["takes"] as const,
+  linkHello: (peer: string) => ["links", "hello", peer] as const,
   library: ["library"] as const,
   categories: ["categories"] as const,
   detail: (id: number) => ["detail", id] as const,
@@ -46,6 +47,9 @@ export const useSyncStatus = () => useQuery({ queryKey: keys.sync, queryFn: api.
 // Polled gently: a phone can link to this PC at any time.
 export const useTakeAsks = () => useQuery({ queryKey: keys.takeAsks, queryFn: api.takeAsks });
 export const useChangesLast = () => useQuery({ queryKey: keys.changesLast, queryFn: api.changesLast });
+// Asked again each minute: the other app can be updated, or come back onto the network.
+export const useLinkHello = (peer: string) =>
+  useQuery({ queryKey: keys.linkHello(peer), queryFn: () => api.linkHello(peer), refetchInterval: 60_000 });
 export const useLinks = () => useQuery({ queryKey: keys.links, queryFn: api.linksInfo, refetchInterval: 15_000 });
 export const useProfiles = () => useQuery({ queryKey: keys.profiles, queryFn: api.profilesList, staleTime: Infinity });
 export const useAppInfo = () => useQuery({ queryKey: keys.info, queryFn: api.appInfo });

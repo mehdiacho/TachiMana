@@ -611,3 +611,71 @@ async fn changes_and_roles_travel_over_the_link() {
         .await;
     assert!(matches!(none, Err(SyncError::Unlinked)), "{none:?}");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hello_says_what_this_app_implements_and_an_older_peer_gets_the_old_set() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = instance(&tmp.path().join("A"), false);
+    let id = || DeviceIdentity {
+        id: "A-id".into(),
+        name: "Instance A".into(),
+        pairing_code: "123456".into(),
+    };
+    let client = SyncClient::new().unwrap();
+
+    // With linking but no journal: everything except changes/1.
+    let linked = SyncServer::start_with(
+        id(),
+        a.local.clone(),
+        backup_fn(&a.db),
+        Some(0),
+        Some(tm_sync::server::Linking {
+            profile_id: "prof-1".into(),
+            profile_name: "Main".into(),
+            links: Arc::new(tm_sync::LinkStore::open(&tmp.path().join("links.json"))),
+            refused: Arc::new(std::sync::Mutex::new(None)),
+            outbox: Arc::new(tm_sync::queue::Outbox::open(
+                &tmp.path().join("outbox.json"),
+            )),
+            changes: None,
+            take: None,
+            roles_changed: None,
+        }),
+    )
+    .await
+    .unwrap();
+    let h = client.hello("127.0.0.1", linked.port()).await.unwrap();
+    assert_eq!(h.device_id, "A-id");
+    assert_eq!(h.profile_id.as_deref(), Some("prof-1"));
+    assert_eq!(h.app.name, "tachimana");
+    assert!(h.supports("hello/1") && h.supports("link/2") && h.supports("roles/1"));
+    assert!(!h.supports("changes/1"), "no journal, so not listed");
+
+    // Without linking only a pull with the code is possible.
+    let bare = SyncServer::start(id(), a.local.clone(), backup_fn(&a.db), Some(0))
+        .await
+        .unwrap();
+    let h = client.hello("127.0.0.1", bare.port()).await.unwrap();
+    assert!(h.supports("pull/1") && !h.supports("link/2"));
+
+    // An app from before hello/1: /ping only.
+    let old = axum::Router::new().route(
+        "/ping",
+        axum::routing::get(|| async {
+            axum::Json(serde_json::json!({"deviceId": "old", "deviceName": "Old app"}))
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move { axum::serve(listener, old).await.unwrap() });
+    let h = client.hello("127.0.0.1", port).await.unwrap();
+    assert_eq!(h.device_id, "old");
+    assert!(h.supports("link/2") && h.supports("pull/1") && !h.supports("hello/1"));
+
+    // Nothing there.
+    drop(bare);
+    let gone = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let dead = gone.local_addr().unwrap().port();
+    drop(gone);
+    assert!(client.hello("127.0.0.1", dead).await.is_none());
+}

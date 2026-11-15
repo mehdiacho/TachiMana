@@ -57,6 +57,117 @@ pub struct PingInfo {
     pub profile_name: Option<String>,
 }
 
+/// Major version of the protocol's ground rules (`docs/protocol/README.md` §2).
+pub const PROTOCOL: &str = "1";
+
+/// What this app implements its side of, as listed by `GET /hello`.
+pub const CAPABILITIES: &[&str] = &[
+    "hello/1",
+    "link/2",
+    "pull/1",
+    "queue/1",
+    "done/1",
+    "file/1",
+    "changes/1",
+    "roles/1",
+];
+
+/// What a device with no `/hello` is taken to implement: the apps released before it existed.
+pub const LEGACY_CAPABILITIES: &[&str] = &["link/2", "pull/1"];
+
+/// Most capabilities kept from a `/hello` answer, and the longest one kept.
+const MAX_CAPABILITIES: usize = 64;
+const MAX_CAPABILITY_LEN: usize = 64;
+
+/// The app a device runs, as it names itself.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppInfo {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub version: String,
+}
+
+/// Answer of `GET /hello` (`hello/1`): who a device is and what it implements.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Hello {
+    #[serde(default)]
+    pub protocol: String,
+    pub device_id: String,
+    pub device_name: String,
+    #[serde(default)]
+    pub platform: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_name: Option<String>,
+    #[serde(default)]
+    pub app: AppInfo,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+}
+
+impl Hello {
+    /// What a device that answers `/ping` but has no `/hello` is taken to be.
+    pub fn legacy(ping: PingInfo) -> Self {
+        Self {
+            protocol: PROTOCOL.to_owned(),
+            device_id: ping.device_id,
+            device_name: ping.device_name,
+            platform: String::new(),
+            profile_id: ping.profile_id,
+            profile_name: ping.profile_name,
+            app: AppInfo::default(),
+            capabilities: LEGACY_CAPABILITIES
+                .iter()
+                .map(|c| (*c).to_owned())
+                .collect(),
+        }
+    }
+
+    /// What to take a device to be from the bodies of its `/hello` and `/ping` answers (each
+    /// `None` when that route gave no success). A `/hello` that does not parse counts as absent.
+    pub fn from_answers(hello: Option<&[u8]>, ping: Option<&[u8]>) -> Option<Self> {
+        if let Some(h) = hello.and_then(|b| serde_json::from_slice::<Self>(b).ok()) {
+            return Some(h.tidy());
+        }
+        let ping: PingInfo = serde_json::from_slice(ping?).ok()?;
+        Some(Self::legacy(ping))
+    }
+
+    /// A received answer made safe to keep: the list is capped, and entries that are not a
+    /// `name/major` are dropped.
+    pub fn tidy(mut self) -> Self {
+        self.capabilities.retain(|c| is_capability(c));
+        self.capabilities.truncate(MAX_CAPABILITIES);
+        self
+    }
+
+    /// Whether the two devices can use `capability` (`name/major`) together: the protocol major
+    /// matches and the device lists it.
+    pub fn supports(&self, capability: &str) -> bool {
+        self.protocol == PROTOCOL && self.capabilities.iter().any(|c| c == capability)
+    }
+}
+
+/// `name/major`: a lower-case name (letters, digits, `-`), a slash, and a number.
+fn is_capability(c: &str) -> bool {
+    if c.len() > MAX_CAPABILITY_LEN {
+        return false;
+    }
+    let Some((name, major)) = c.split_once('/') else {
+        return false;
+    };
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && !major.is_empty()
+        && major.bytes().all(|b| b.is_ascii_digit())
+}
+
 /// Body of `POST /link`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -347,5 +458,57 @@ mod tests {
             j,
             r#"{"deviceId":"A","deviceName":"PC","backupSize":3,"files":[{"path":"a/b","size":1,"lastModified":2}]}"#
         );
+    }
+
+    /// Runs every file in docs/protocol/vectors/hello-1.
+    #[test]
+    fn hello_vectors() {
+        let dir =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/protocol/vectors/hello-1");
+        let mut ran = 0;
+        for f in std::fs::read_dir(&dir).unwrap() {
+            let path = f.unwrap().path();
+            let v: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            let body = |k: &str| {
+                v.get(k).filter(|b| !b.is_null()).map(|b| match b.as_str() {
+                    Some(raw) => raw.as_bytes().to_vec(),
+                    None => serde_json::to_vec(b).unwrap(),
+                })
+            };
+            let got = Hello::from_answers(body("hello").as_deref(), body("ping").as_deref());
+            let expect = &v["expect"];
+            assert_eq!(
+                got.is_some(),
+                expect["reachable"].as_bool().unwrap(),
+                "{path:?}"
+            );
+            if let Some(h) = got {
+                let caps: Vec<String> =
+                    serde_json::from_value(expect["capabilities"].clone()).unwrap();
+                assert_eq!(h.capabilities, caps, "{path:?}");
+                for (cap, want) in expect["supports"].as_object().unwrap() {
+                    assert_eq!(h.supports(cap), want.as_bool().unwrap(), "{path:?} {cap}");
+                }
+            }
+            ran += 1;
+        }
+        assert!(ran >= 5, "only {ran} hello vectors ran");
+    }
+
+    #[test]
+    fn our_own_list_is_well_formed_and_capped() {
+        assert!(CAPABILITIES.iter().all(|c| is_capability(c)));
+        assert!(LEGACY_CAPABILITIES.iter().all(|c| is_capability(c)));
+        let many = Hello {
+            capabilities: (0..500).map(|i| format!("x{i}/1")).collect(),
+            ..Hello::legacy(PingInfo {
+                device_id: "d".into(),
+                device_name: "n".into(),
+                profile_id: None,
+                profile_name: None,
+            })
+        };
+        assert_eq!(many.tidy().capabilities.len(), MAX_CAPABILITIES);
     }
 }

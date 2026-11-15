@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub use client::SyncClient;
 pub use identity::DeviceIdentity;
 pub use links::{Link, LinkStore};
-pub use protocol::{ManifestFile, PeerDevice, SyncManifest};
+pub use protocol::{Hello, ManifestFile, PeerDevice, SyncManifest};
 use tm_backup::ImportSummary;
 use tm_db::Db;
 

@@ -92,6 +92,7 @@ fn main() {
             sync::restore_nas_password,
             changes::changes_last,
             changes::link_set_mode,
+            changes::link_hello,
             take::take_asks,
             take::take_answer,
             take::take_from,

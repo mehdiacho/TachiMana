@@ -1,0 +1,20 @@
+{
+  "note": "A /hello body that is not the expected JSON counts as no /hello.",
+  "hello": "<html>not json</html>",
+  "ping": {
+    "deviceId": "phone-1",
+    "deviceName": "Test phone",
+    "profileId": "prof-1",
+    "profileName": "Main"
+  },
+  "expect": {
+    "reachable": true,
+    "capabilities": [
+      "link/2",
+      "pull/1"
+    ],
+    "supports": {
+      "changes/1": false
+    }
+  }
+}
