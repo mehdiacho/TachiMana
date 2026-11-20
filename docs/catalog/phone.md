@@ -393,6 +393,8 @@ on (Settings › Library), each category keeps its own sort.
 | Local source | checkbox |
 | Language | checkbox |
 | Continue reading button | checkbox |
+| **Privacy** | heading; fork |
+| Blur 18+ covers | checkbox; fork; on by default. Blurs the library cover of a series from an extension rated NSFW, or whose genres include Adult, Hentai, Smut, Mature, 18+, R-18, Explicit, Pornographic, Erotica or NSFW (not Ecchi), with a crossed-out eye on top. Off: no cover is blurred. |
 | **Tabs** | heading |
 | Show category tabs | checkbox |
 | Show number of items | checkbox |
@@ -403,6 +405,15 @@ Badges on a cover, left to right:
 - linked-computer count, with a laptop icon (fork)
 - unread count
 - language or local
+
+While "Blur 18+ covers" is on (all fork):
+
+- a series' own ⋮ menu has **Blur cover in library** or **Unblur cover in library**
+- the library's selection ⋮ menu has **Blur covers** and **Unblur covers** for every selected series
+- long-pressing a source in Browse › Sources adds **Blur covers from this source** or
+  **Unblur covers from this source**
+
+A series set by hand beats its source, and a source set by hand beats the automatic rule.
 
 ## Categories
 
